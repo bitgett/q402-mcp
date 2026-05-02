@@ -41,11 +41,12 @@ You'll get a ranked breakdown immediately — no API key, no signup, no funds at
 | Tool | Auth | Purpose |
 |---|---|---|
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
-| `q402_balance` | API key | Show gas tank balance + remaining daily quota. Read-only. |
-| `q402_history` | API key | List recent relayed transactions for the configured key. Read-only. |
-| `q402_pay` | API key + private key + flag | Send a gasless payment. **Sandbox by default** — see [Live mode](#live-mode). |
+| `q402_balance` | API key | Verify the API key, show tier (live vs sandbox), and remaining quota. |
+| `q402_pay` | API key + private key + flag | Send a gasless payment. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
 
 `q402_pay` follows a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address, amount, chain, and token.
+
+> Per-chain gas tank balances and full transaction history live in the [dashboard](https://q402.quackai.ai/dashboard) — those endpoints require a wallet signature, not a bare API key, so the MCP server points the agent there instead of exposing them.
 
 ---
 

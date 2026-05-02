@@ -1,9 +1,12 @@
 /**
  * q402_balance — read-only, requires an API key.
  *
- * Returns gas tank balances and remaining daily quota for the configured key.
- * Calls the public q402-landing endpoints `/api/wallet-balance` and
- * `/api/keys/verify` (both already exposed in production).
+ * Returns the API key's validity, tier (live vs sandbox), and remaining
+ * subscription quota. Calls the public `/api/keys/verify` endpoint (POST).
+ *
+ * Per-chain gas tank balances are deliberately *not* surfaced here — that
+ * endpoint requires a wallet signature, not a bare API key. Gas tank state
+ * lives in the dashboard at https://q402.quackai.ai/dashboard.
  */
 
 import { z } from "zod";
@@ -16,8 +19,10 @@ export interface BalanceSummary {
   apiKeyKind: "live" | "test" | "missing";
   /** Pre-redacted form of the API key for display. Never returns the full key. */
   apiKeyMasked: string | null;
-  walletBalances?: unknown;
-  quotaRemaining?: unknown;
+  /** Raw response from /api/keys/verify (valid flag, address, plan, quota …). */
+  verify?: unknown;
+  /** Pointer for the agent when richer data is needed. */
+  dashboardUrl: string;
   setupHint?: string;
 }
 
@@ -31,41 +36,34 @@ export async function runBalance(): Promise<BalanceSummary> {
     return {
       apiKeyKind: "missing",
       apiKeyMasked: null,
+      dashboardUrl: "https://q402.quackai.ai/dashboard",
       setupHint:
         "Set Q402_API_KEY to a key issued at https://q402.quackai.ai/dashboard. " +
-        "Test-tier keys (q402_test_*) work too — they show sandbox quota and balances.",
+        "Test-tier keys (q402_test_*) work too — they show sandbox quota.",
     };
   }
 
-  const headers = { "Content-Type": "application/json" };
-  const base = CONFIG.relayBaseUrl;
-
-  const [walletResp, verifyResp] = await Promise.all([
-    fetch(`${base}/wallet-balance?apiKey=${encodeURIComponent(CONFIG.apiKey!)}`, { headers }),
-    fetch(`${base}/keys/verify`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ apiKey: CONFIG.apiKey }),
-    }),
-  ]);
-
-  const walletJson = walletResp.ok ? await walletResp.json() : { error: `HTTP ${walletResp.status}` };
-  const verifyJson = verifyResp.ok ? await verifyResp.json() : { error: `HTTP ${verifyResp.status}` };
+  const resp = await fetch(`${CONFIG.relayBaseUrl}/keys/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey: CONFIG.apiKey }),
+  });
+  const verifyJson = resp.ok ? await resp.json() : { error: `HTTP ${resp.status}` };
 
   return {
     apiKeyKind: CONFIG.apiKeyKind,
     apiKeyMasked: mask(CONFIG.apiKey),
-    walletBalances: walletJson,
-    quotaRemaining: verifyJson,
+    verify: verifyJson,
+    dashboardUrl: "https://q402.quackai.ai/dashboard",
   };
 }
 
 export const BALANCE_TOOL = {
   name: "q402_balance",
   description:
-    "Show the configured API key's gas tank balances per chain and remaining daily quota. " +
-    "Read-only — no transactions are sent. Useful before q402_pay when the user wants to " +
-    "confirm they have gas credit on the target chain.",
+    "Verify the configured API key and show its tier (live vs sandbox) and remaining " +
+    "subscription quota. Read-only. For per-chain gas tank balances, point the user at " +
+    "https://q402.quackai.ai/dashboard — that data needs a wallet signature, not a bare key.",
   inputSchema: {
     type: "object" as const,
     properties: {},

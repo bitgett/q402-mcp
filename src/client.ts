@@ -47,14 +47,16 @@ export interface ClientOptions {
   rpcUrl?: string;
 }
 
+// Mirrors CHAIN_RPC_FALLBACKS[*][0] in q402-landing/app/lib/relayer.ts so the
+// MCP client and the production relayer agree on RPC defaults.
 const DEFAULT_RPC: Record<number, string> = {
-  1: "https://eth.llamarpc.com",
-  56: "https://bsc-dataseed.bnbchain.org",
+  1: "https://ethereum.publicnode.com",
+  56: "https://bsc-dataseed1.binance.org/",
   43114: "https://api.avax.network/ext/bc/C/rpc",
   196: "https://rpc.xlayer.tech",
-  988: "https://rpc.stable.tech",
+  988: "https://rpc.stable.xyz",
   5000: "https://rpc.mantle.xyz",
-  1776: "https://k8s.mainnet.json-rpc.injective.network",
+  1776: "https://sentry.evm-rpc.injective.network/",
 };
 
 const TRANSFER_AUTH_TYPES = {
@@ -202,7 +204,12 @@ export class Q402NodeClient {
       nonce: authNonce,
     });
 
-    const body = {
+    // The /api/relay route accepts three nonce field names depending on chain
+    // (avax/bnb/eth/mantle/injective → `nonce`, xlayer → `xlayerNonce`,
+    // stable → `stableNonce`). The on-wire shape mirrors the browser SDK's
+    // _payEIP7702 / _payXLayerEIP7702 / _payStableEIP7702 paths so the same
+    // server route handles either client identically.
+    const baseBody = {
       apiKey,
       chain: chain.key,
       token: input.token,
@@ -210,11 +217,16 @@ export class Q402NodeClient {
       to: input.to,
       amount: amountRaw,
       deadline,
-      nonce: paymentNonce.toString(),
       witnessSig,
       authorization,
       facilitator,
     };
+    const body =
+      chain.key === "xlayer"
+        ? { ...baseBody, xlayerNonce: paymentNonce.toString() }
+        : chain.key === "stable"
+          ? { ...baseBody, stableNonce: paymentNonce.toString() }
+          : { ...baseBody, nonce: paymentNonce.toString() };
 
     const resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay`, {
       method: "POST",

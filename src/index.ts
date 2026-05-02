@@ -1,12 +1,11 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes four tools to any MCP-compatible AI client (Claude Desktop, Claude
+ * Exposes three tools to any MCP-compatible AI client (Claude Desktop, Claude
  * Code, Cline, …):
  *
  *   q402_quote    read-only, no key, no funds — gas comparison across 7 chains
- *   q402_balance  read-only, requires key — gas tank + daily quota
- *   q402_history  read-only, requires key — recent relays
+ *   q402_balance  read-only, requires key — verify + remaining quota
  *   q402_pay      sandbox-default — real TX only when API key (live tier),
  *                 private key, and Q402_ENABLE_REAL_PAYMENTS=1 all set
  *
@@ -25,7 +24,6 @@ import { CONFIG } from "./config.js";
 import { QUOTE_TOOL, QuoteInputSchema, runQuote } from "./tools/quote.js";
 import { PAY_TOOL, PayInputSchema, runPay } from "./tools/pay.js";
 import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js";
-import { HISTORY_TOOL, HistoryInputSchema, runHistory } from "./tools/history.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
 const PACKAGE_VERSION = "0.1.0";
@@ -41,7 +39,7 @@ async function main(): Promise<void> {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [QUOTE_TOOL, BALANCE_TOOL, HISTORY_TOOL, PAY_TOOL],
+    tools: [QUOTE_TOOL, BALANCE_TOOL, PAY_TOOL],
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async req => {
@@ -55,10 +53,6 @@ async function main(): Promise<void> {
         case "q402_balance": {
           BalanceInputSchema.parse(args ?? {});
           return { content: [jsonText(await runBalance())] };
-        }
-        case "q402_history": {
-          const parsed = HistoryInputSchema.parse(args ?? {});
-          return { content: [jsonText(await runHistory(parsed))] };
         }
         case "q402_pay": {
           const parsed = PayInputSchema.parse(args ?? {});
