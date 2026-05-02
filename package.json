@@ -1,0 +1,61 @@
+{
+  "name": "@quackai/q402-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Q402 — gasless stablecoin payments across 7 EVM chains, callable directly from Claude Desktop and any MCP-compatible AI agent.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "q402",
+    "x402",
+    "stablecoin",
+    "usdc",
+    "usdt",
+    "gasless",
+    "eip-7702",
+    "payments",
+    "ai-agents"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "q402-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "ethers": "^6.16.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.5.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitgett/q402-mcp.git"
+  },
+  "homepage": "https://q402.quackai.ai/claude",
+  "bugs": {
+    "url": "https://github.com/bitgett/q402-mcp/issues"
+  },
+  "license": "Apache-2.0",
+  "author": "Quack AI Labs <hello@quackai.ai>",
+  "publishConfig": {
+    "access": "public"
+  }
+}

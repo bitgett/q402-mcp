@@ -1,0 +1,123 @@
+# @quackai/q402-mcp
+
+> MCP server for Q402 — gasless USDC and USDT payments across 7 EVM chains, callable directly from Claude Desktop and any other Model Context Protocol client.
+
+[![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
+[![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
+
+Claude can now reason about stablecoin payments end to end — quote a transfer across 7 chains, pick the cheapest route, and (optionally) settle the transaction over [Q402](https://q402.quackai.ai)'s EIP-7702 relayer infrastructure. The recipient receives the full amount; the sender pays $0 in gas.
+
+---
+
+## Quick start (Claude Desktop)
+
+```bash
+claude mcp add q402 -- npx @quackai/q402-mcp
+```
+
+Or, if you prefer editing the config file directly, add this entry to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "q402": {
+      "command": "npx",
+      "args": ["-y", "@quackai/q402-mcp"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop and ask:
+
+> *"Compare gas costs to send 50 USDC to vitalik.eth across all 7 Q402 chains."*
+
+You'll get a ranked breakdown immediately — no API key, no signup, no funds at risk.
+
+---
+
+## Tools exposed
+
+| Tool | Auth | Purpose |
+|---|---|---|
+| `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
+| `q402_balance` | API key | Show gas tank balance + remaining daily quota. Read-only. |
+| `q402_history` | API key | List recent relayed transactions for the configured key. Read-only. |
+| `q402_pay` | API key + private key + flag | Send a gasless payment. **Sandbox by default** — see [Live mode](#live-mode). |
+
+`q402_pay` follows a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address, amount, chain, and token.
+
+---
+
+## Sandbox vs live mode
+
+By default the MCP server operates in **sandbox mode**: `q402_pay` returns a deterministic-looking fake transaction hash, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any Claude Desktop install without worrying about an LLM hallucinating a payment.
+
+To enable real on-chain transactions, **all three** environment variables must be set:
+
+```bash
+Q402_API_KEY=q402_live_...           # live-tier key from /dashboard
+Q402_PRIVATE_KEY=0xabc...            # signer for the payer EOA
+Q402_ENABLE_REAL_PAYMENTS=1          # explicit opt-in
+```
+
+Anything missing → automatic sandbox fallback with a hint pointing at what to set.
+
+### Hard caps
+
+Two additional guards run before every payment regardless of mode:
+
+| Env var | Default | Effect |
+|---|---|---|
+| `Q402_MAX_AMOUNT_PER_CALL` | `5` | Reject any single call where `amount > N` USD-equivalent. |
+| `Q402_ALLOWED_RECIPIENTS` | (empty = off) | Comma-separated address allowlist. When set, all other recipients are rejected. |
+
+Combined with the `confirm: true` argument the tool requires, this means the model needs (a) explicit user OK in chat, (b) amount ≤ cap, (c) recipient on allowlist if one exists, (d) all three live-mode env vars set, before a single wei moves.
+
+---
+
+## Configuration reference
+
+| Env var | Required for | Notes |
+|---|---|---|
+| `Q402_API_KEY` | balance/history/live-pay | Issue at https://q402.quackai.ai/dashboard. `q402_test_*` keys keep sandbox on. |
+| `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
+| `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
+| `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `5`. |
+| `Q402_ALLOWED_RECIPIENTS` | optional | Comma-separated lowercase addresses. Defaults to no allowlist. |
+| `Q402_RELAY_BASE_URL` | optional | Defaults to `https://q402.quackai.ai/api`. Override for self-hosted Q402. |
+
+---
+
+## Supported chains
+
+| Chain | Chain ID | Token(s) | Notes |
+|---|---|---|---|
+| BNB Chain | 56 | USDC, USDT | |
+| Ethereum | 1 | USDC, USDT | L1 — gas is volatile, quote is a snapshot. |
+| Avalanche C-Chain | 43114 | USDC, USDT | |
+| X Layer | 196 | USDC, USDT | |
+| Stable | 988 | USDT0 (USDC and USDT both alias) | Gas paid in USDT0. |
+| Mantle | 5000 | USDC, USDT0 | LayerZero OFT USDT0 since 2025-11-27. |
+| Injective EVM | 1776 | USDT only | Native USDC via Circle CCTP announced for Q2 2026. |
+
+---
+
+## Why this exists
+
+x402 standardised "402 Payment Required" semantics for AI agents but the official Coinbase facilitator only covers a few chains and assumes ERC-3009 token support — which excludes BNB USDT, Mantle USDT0, Injective USDT, and the chains where most stablecoin volume actually lives.
+
+Q402 implements the same payer experience (single signature, $0 gas, instant settlement) on all 7 of those chains using EIP-7702 delegated execution, which works with any ERC-20. This MCP server makes that infrastructure addressable from Claude itself.
+
+If you want to dig into how the wire protocol differs from x402, see [Q402 docs](https://q402.quackai.ai/docs).
+
+---
+
+## Repository
+
+Source code: https://github.com/bitgett/q402-mcp
+Issues / requests: https://github.com/bitgett/q402-mcp/issues
+
+## License
+
+Apache-2.0 — see [LICENSE](./LICENSE).
