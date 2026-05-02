@@ -1,6 +1,6 @@
 {
   "name": "@quackai/q402-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Q402 — gasless stablecoin payments across 7 EVM chains, callable directly from Claude Desktop and any MCP-compatible AI agent.",
   "keywords": [
     "mcp",
@@ -17,9 +17,9 @@
     "ai-agents"
   ],
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "dist/index.js",
   "bin": {
-    "q402-mcp": "./dist/index.js"
+    "q402-mcp": "dist/index.js"
   },
   "files": [
     "dist",

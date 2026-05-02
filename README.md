@@ -81,7 +81,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 
 | Env var | Required for | Notes |
 |---|---|---|
-| `Q402_API_KEY` | balance/history/live-pay | Issue at https://q402.quackai.ai/dashboard. `q402_test_*` keys keep sandbox on. |
+| `Q402_API_KEY` | balance, live-pay | Issue at https://q402.quackai.ai/dashboard. `q402_test_*` keys keep sandbox on. |
 | `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
 | `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `5`. |

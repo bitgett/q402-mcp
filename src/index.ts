@@ -26,7 +26,7 @@ import { PAY_TOOL, PayInputSchema, runPay } from "./tools/pay.js";
 import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_VERSION = "0.1.1";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
