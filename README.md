@@ -12,7 +12,7 @@ Claude can now reason about stablecoin payments end to end — quote a transfer 
 ## Quick start (Claude Desktop)
 
 ```bash
-claude mcp add q402 -- npx @quackai/q402-mcp
+claude mcp add q402 -- npx -y @quackai/q402-mcp
 ```
 
 Or, if you prefer editing the config file directly, add this entry to your `claude_desktop_config.json`:
