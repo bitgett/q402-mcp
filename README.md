@@ -41,7 +41,7 @@ You'll get a ranked breakdown immediately — no API key, no signup, no funds at
 | Tool | Auth | Purpose |
 |---|---|---|
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
-| `q402_balance` | API key | Verify the API key, show tier (live vs sandbox), and remaining quota. |
+| `q402_balance` | API key | Verify the API key and report its plan tier (live vs sandbox). |
 | `q402_pay` | API key + private key + flag | Send a gasless payment. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
 
 `q402_pay` follows a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address, amount, chain, and token.

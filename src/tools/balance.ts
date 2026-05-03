@@ -1,12 +1,14 @@
 /**
  * q402_balance — read-only, requires an API key.
  *
- * Returns the API key's validity, tier (live vs sandbox), and remaining
- * subscription quota. Calls the public `/api/keys/verify` endpoint (POST).
+ * Returns the API key's validity and plan tier from `/api/keys/verify` (POST).
+ * The endpoint currently exposes `valid / address / plan / createdAt`; it does
+ * NOT include remaining daily quota or per-chain gas-tank balances. Those need
+ * a wallet signature and live in the dashboard at https://q402.quackai.ai/dashboard.
  *
- * Per-chain gas tank balances are deliberately *not* surfaced here — that
- * endpoint requires a wallet signature, not a bare API key. Gas tank state
- * lives in the dashboard at https://q402.quackai.ai/dashboard.
+ * If the verify endpoint is ever extended to include `remainingCredits` /
+ * `quotaBonus`, this tool's response shape passes them through automatically
+ * (we forward the whole `verify` blob), so no MCP-side change is required.
  */
 
 import { z } from "zod";
@@ -61,9 +63,9 @@ export async function runBalance(): Promise<BalanceSummary> {
 export const BALANCE_TOOL = {
   name: "q402_balance",
   description:
-    "Verify the configured API key and show its tier (live vs sandbox) and remaining " +
-    "subscription quota. Read-only. For per-chain gas tank balances, point the user at " +
-    "https://q402.quackai.ai/dashboard — that data needs a wallet signature, not a bare key.",
+    "Verify the configured API key and report its plan tier (live vs sandbox). Read-only. " +
+    "For remaining daily quota and per-chain gas tank balances, point the user at " +
+    "https://q402.quackai.ai/dashboard — those need a wallet signature, not a bare key.",
   inputSchema: {
     type: "object" as const,
     properties: {},
