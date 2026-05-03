@@ -1,7 +1,8 @@
 {
   "name": "@quackai/q402-mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "MCP server for Q402 — gasless stablecoin payments across 7 EVM chains, callable directly from Claude Desktop and any MCP-compatible AI agent.",
+  "mcpName": "io.github.bitgett/q402-mcp",
   "keywords": [
     "mcp",
     "model-context-protocol",
