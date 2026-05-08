@@ -1,13 +1,14 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes three tools to any MCP-compatible AI client (Claude Desktop, Claude
+ * Exposes four tools to any MCP-compatible AI client (Claude Desktop, Claude
  * Code, Cline, …):
  *
  *   q402_quote    read-only, no key, no funds — gas comparison across 7 chains
  *   q402_balance  read-only, requires key — verify + remaining quota
  *   q402_pay      sandbox-default — real TX only when API key (live tier),
  *                 private key, and Q402_ENABLE_REAL_PAYMENTS=1 all set
+ *   q402_receipt  read-only, no key — fetch + locally verify a Trust Receipt
  *
  * Configuration is environment-only (no on-disk state); see README for the
  * full env reference.
@@ -24,9 +25,10 @@ import { CONFIG } from "./config.js";
 import { QUOTE_TOOL, QuoteInputSchema, runQuote } from "./tools/quote.js";
 import { PAY_TOOL, PayInputSchema, runPay } from "./tools/pay.js";
 import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js";
+import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.1.3";
+const PACKAGE_VERSION = "0.2.0";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -39,7 +41,7 @@ async function main(): Promise<void> {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [QUOTE_TOOL, BALANCE_TOOL, PAY_TOOL],
+    tools: [QUOTE_TOOL, BALANCE_TOOL, PAY_TOOL, RECEIPT_TOOL],
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async req => {
@@ -57,6 +59,10 @@ async function main(): Promise<void> {
         case "q402_pay": {
           const parsed = PayInputSchema.parse(args ?? {});
           return { content: [jsonText(await runPay(parsed))] };
+        }
+        case "q402_receipt": {
+          const parsed = ReceiptInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runReceipt(parsed))] };
         }
         default:
           return {
