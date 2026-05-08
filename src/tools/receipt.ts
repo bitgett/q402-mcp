@@ -1,9 +1,12 @@
 /**
  * q402_receipt — read-only, no API key required.
  *
- * Looks up a Q402 Trust Receipt by id (preferred) or by on-chain txHash and
- * returns the public-shaped record, plus a derived `verified` boolean from a
- * client-side ECDSA recovery against the relayer EOA.
+ * Looks up a Q402 Trust Receipt **by receiptId** and returns the public-shaped
+ * record plus a `verified` boolean from a client-side ECDSA recovery against
+ * the relayer EOA. txHash-only lookup is **not** supported in v0.2.x — the
+ * public JSON endpoint doesn't expose the tx → receiptId index yet, so the
+ * tool returns notFound when given txHash alone. Pass `receiptId` (rct_…)
+ * for everything that exists today.
  *
  * The receipt itself is the canonical settlement attestation produced by the
  * relay route — every successful POST /api/relay creates one (with a backfill
@@ -160,7 +163,7 @@ export async function runReceipt(input: ReceiptInput): Promise<ReceiptSummary> {
   // Resolve receiptId — directly given, or looked up via the relay's
   // /api/receipt index. We use the public JSON endpoint, which already
   // strips server-only fields (apiKeyId, optional apiKeyTier).
-  let receiptId = input.receiptId ?? null;
+  const receiptId = input.receiptId ?? null;
 
   if (!receiptId && input.txHash) {
     // No public tx-lookup endpoint exists today; the relay route owns the
@@ -217,22 +220,23 @@ export async function runReceipt(input: ReceiptInput): Promise<ReceiptSummary> {
 export const RECEIPT_TOOL = {
   name: "q402_receipt",
   description:
-    "Look up a Q402 Trust Receipt by its rct_… id and return the settlement record + a locally-verified " +
-    "ECDSA boolean (the tool re-runs the same hash recovery the receipt page does in the browser). " +
-    "Read-only; no API key required. Use after q402_pay to give the user a shareable verified-by-Q402 URL, " +
-    "or to independently verify a receipt id someone shared with you.",
+    "Look up a Q402 Trust Receipt by its rct_… receiptId and return the settlement record + a locally-verified " +
+    "ECDSA boolean (the tool re-runs the same canonical-JSON + EIP-191 recovery the receipt page does in the " +
+    "browser). Read-only; no API key required. Use after q402_pay to give the user a shareable verified-by-Q402 URL, " +
+    "or to independently verify a receipt id someone shared with you. " +
+    "**receiptId is required**; passing only txHash returns notFound (tx → receiptId lookup is reserved for a future release).",
   inputSchema: {
     type: "object" as const,
     properties: {
       receiptId: {
         type:        "string",
         pattern:     "^rct_[0-9a-f]{24}$",
-        description: "Receipt id (rct_ + 24 hex chars). Returned by q402_pay; also visible at the end of any /receipt/ URL.",
+        description: "Receipt id (rct_ + 24 hex chars). Returned by q402_pay; also visible at the end of any /receipt/ URL. This is the only path that resolves today.",
       },
       txHash: {
         type:        "string",
         pattern:     "^0x[0-9a-fA-F]{64}$",
-        description: "Optional on-chain tx hash. Reserved for a future tx → receipt index; today the tool returns notFound when only txHash is given.",
+        description: "Reserved for a future tx → receipt index. Today this is unimplemented and the tool returns notFound when only txHash is provided. Pass receiptId instead.",
       },
     },
     additionalProperties: false,

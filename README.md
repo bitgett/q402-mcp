@@ -41,10 +41,16 @@ You'll get a ranked breakdown immediately — no API key, no signup, no funds at
 | Tool | Auth | Purpose |
 |---|---|---|
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
-| `q402_balance` | API key | Verify the API key and report its plan tier (live vs sandbox). |
+| `q402_balance` | API key | Verify the API key and report its plan tier + remaining quota credits (live vs sandbox). |
 | `q402_pay` | API key + private key + flag | Send a gasless payment. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
+| `q402_receipt` | none | Look up a Trust Receipt by `rct_…` id and locally verify its ECDSA signature against the relayer EOA. Returns the public settlement record + a `verified` boolean. *receiptId-only today; tx-hash lookup reserved for a future release.* |
 
 `q402_pay` follows a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address, amount, chain, and token.
+
+`q402_receipt` is the natural follow-up: after `q402_pay` returns a `receiptUrl`, hand the agent the `rct_…` id and ask *"verify this receipt"* — the tool re-runs the same canonical-JSON + EIP-191 recovery the receipt page does in the browser, so the verification doesn't depend on trusting any UI. Example prompts that work today:
+
+> *"Pay 0.10 USDT on BNB to vitalik.eth, then verify the receipt."*  
+> *"Is `rct_afa5f50bc49a65ebba3b28ab` a real Q402 receipt? Verify the signature."*
 
 > Per-chain gas tank balances and full transaction history live in the [dashboard](https://q402.quackai.ai/dashboard) — those endpoints require a wallet signature, not a bare API key, so the MCP server points the agent there instead of exposing them.
 
