@@ -158,8 +158,10 @@ export const PAY_TOOL = {
       },
       token: {
         type: "string",
-        enum: ["USDC", "USDT"],
-        description: "Stablecoin to send. On Injective only USDT is currently supported.",
+        enum: ["USDC", "USDT", "RLUSD"],
+        description:
+          "Stablecoin to send. USDC / USDT supported on most chains; Injective is USDT-only. " +
+          "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.",
       },
       confirm: {
         type: "boolean",

@@ -28,7 +28,7 @@ import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js
 import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.3.1";
+const PACKAGE_VERSION = "0.3.2";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };

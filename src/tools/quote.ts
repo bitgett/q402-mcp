@@ -109,8 +109,9 @@ export const QUOTE_TOOL = {
       },
       token: {
         type: "string",
-        enum: ["USDC", "USDT"],
-        description: "Optional token filter.",
+        enum: ["USDC", "USDT", "RLUSD"],
+        description:
+          "Optional token filter. RLUSD (Ripple USD) is Ethereum-only — passing it narrows the quote to chain=\"eth\".",
       },
       chain: {
         type: "string",
