@@ -1,6 +1,6 @@
 {
   "name": "@quackai/q402-mcp",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains, callable directly from Claude Desktop and any other Model Context Protocol client.",
   "mcpName": "io.github.bitgett/q402-mcp",
   "keywords": [
@@ -39,7 +39,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "ethers": "^6.16.0",
     "zod": "^3.23.8"
   },
