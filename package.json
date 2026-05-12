@@ -1,6 +1,6 @@
 {
   "name": "@quackai/q402-mcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains, callable directly from Claude Desktop and any other Model Context Protocol client.",
   "mcpName": "io.github.bitgett/q402-mcp",
   "keywords": [
@@ -57,7 +57,7 @@
     "url": "https://github.com/bitgett/q402-mcp/issues"
   },
   "license": "Apache-2.0",
-  "author": "Quack AI Labs <hello@quackai.ai>",
+  "author": "David Lee <davidlee@quackai.ai>",
   "publishConfig": {
     "access": "public"
   }
