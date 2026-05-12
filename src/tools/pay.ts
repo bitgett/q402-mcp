@@ -25,7 +25,10 @@ export const PayInputSchema = z.object({
     .string()
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string")
     .describe('Human-readable decimal amount, e.g. "5.00".'),
-  token: z.enum(["USDC", "USDT"]),
+  token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
+    'Stablecoin symbol. USDC / USDT supported on most chains (Injective is USDT-only). ' +
+      'RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.',
+  ),
   confirm: z
     .literal(true)
     .describe(

@@ -24,7 +24,7 @@ export interface PayResult {
   txHash: string;
   blockNumber?: string;
   tokenAmount: string;
-  token: "USDC" | "USDT";
+  token: "USDC" | "USDT" | "RLUSD";
   chain: string;
   method: string;
   /** Set on sandbox / simulated responses so the agent can disclose mode. */
@@ -35,7 +35,7 @@ export interface PayResult {
 export interface PayInput {
   to: string;
   amount: string;
-  token: "USDC" | "USDT";
+  token: "USDC" | "USDT" | "RLUSD";
 }
 
 export interface ClientOptions {

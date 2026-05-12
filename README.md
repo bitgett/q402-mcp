@@ -1,6 +1,6 @@
 # @quackai/q402-mcp
 
-> MCP server for Q402 — gasless USDC and USDT payments across 7 EVM chains, callable directly from Claude Desktop and any other Model Context Protocol client.
+> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains, callable directly from Claude Desktop and any other Model Context Protocol client.
 
 [![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
 [![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
@@ -101,7 +101,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 | Chain | Chain ID | Token(s) | Notes |
 |---|---|---|---|
 | BNB Chain | 56 | USDC, USDT | |
-| Ethereum | 1 | USDC, USDT | L1 — gas is volatile, quote is a snapshot. |
+| Ethereum | 1 | USDC, USDT, **RLUSD** | L1 — gas is volatile, quote is a snapshot. RLUSD (Ripple USD, NY DFS regulated, decimals 18) Ethereum-only. |
 | Avalanche C-Chain | 43114 | USDC, USDT | |
 | X Layer | 196 | USDC, USDT | |
 | Stable | 988 | USDT0 (USDC and USDT both alias) | Gas paid in USDT0. |

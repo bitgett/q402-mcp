@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 — gasless USDC/USDT payments across 7 EVM chains, callable from any MCP client.",
+  "description": "Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains, callable from any MCP client.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.2.1",
+  "version": "0.3.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "transport": {
         "type": "stdio"
       },

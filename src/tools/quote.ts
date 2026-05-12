@@ -15,9 +15,13 @@ export const QuoteInputSchema = z.object({
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string like \"5.00\"")
     .describe("Human-readable decimal amount the user intends to send (e.g. \"5\", \"50.00\")."),
   token: z
-    .enum(["USDC", "USDT"])
+    .enum(["USDC", "USDT", "RLUSD"])
     .optional()
-    .describe("Optional token filter. When omitted, both stablecoin options are reported."),
+    .describe(
+      "Optional token filter. USDC / USDT are supported on most chains; RLUSD " +
+        "(Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only — passing " +
+        "RLUSD here narrows the quote to chain=\"eth\".",
+    ),
   chain: z
     .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective"])
     .optional()
@@ -34,13 +38,13 @@ interface ChainQuote {
   chainId: number;
   gasToken: string;
   approxGasCostUsd: number;
-  supportedTokens: ReadonlyArray<"USDC" | "USDT">;
+  supportedTokens: ReadonlyArray<"USDC" | "USDT" | "RLUSD">;
   gasTokenForReceiver: "0 (gasless)";
   note?: string;
 }
 
 function quoteForChain(cfg: ChainConfig): ChainQuote {
-  const supported: ReadonlyArray<"USDC" | "USDT"> = cfg.supportedTokens ?? ["USDC", "USDT"];
+  const supported: ReadonlyArray<"USDC" | "USDT" | "RLUSD"> = cfg.supportedTokens ?? ["USDC", "USDT"];
   return {
     chain: cfg.key,
     name: cfg.name,
