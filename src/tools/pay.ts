@@ -135,7 +135,9 @@ function describeSandboxReason(): string {
 export const PAY_TOOL = {
   name: "q402_pay",
   description:
-    "Send a gasless USDC or USDT payment via Q402. SANDBOX BY DEFAULT — no funds move " +
+    "Send a gasless USDC, USDT, or RLUSD payment via Q402. RLUSD (Ripple USD, NY DFS " +
+    "regulated, decimals 18) is supported on Ethereum mainnet only; USDC/USDT span all " +
+    "seven Q402 chains (Injective is USDT-only). SANDBOX BY DEFAULT — no funds move " +
     "unless Q402_API_KEY (live tier), Q402_PRIVATE_KEY, and Q402_ENABLE_REAL_PAYMENTS=1 " +
     "are all set. The recipient receives the full amount; the sender pays $0 in gas. " +
     "ALWAYS get explicit user confirmation of the exact recipient address, amount, " +
