@@ -26,6 +26,18 @@ export interface BalanceSummary {
   /** Pointer for the agent when richer data is needed. */
   dashboardUrl: string;
   setupHint?: string;
+  /**
+   * Trial-only summary lifted out of `verify` for convenient display. Present
+   * when /api/keys/verify returns `isTrial: true` (subscription.plan ===
+   * "trial"). Non-trial keys leave this undefined. The shape matches what the
+   * landing site's dashboard banner reads — days left + raw expiry timestamp.
+   */
+  trial?: {
+    daysLeft: number;
+    expiresAt: string;
+    creditsRemaining: number;
+    signupUrl: string;
+  };
 }
 
 function mask(key: string | null): string | null {
@@ -52,20 +64,42 @@ export async function runBalance(): Promise<BalanceSummary> {
   });
   const verifyJson = resp.ok ? await resp.json() : { error: `HTTP ${resp.status}` };
 
+  // Hoist trial fields out of the verify blob so the model sees them at the
+  // top of the response. The /api/keys/verify route writes these only when
+  // the subscription is on the trial plan; paid keys leave `trial` undefined.
+  const v = verifyJson as {
+    isTrial?: boolean;
+    trialExpiresAt?: string;
+    trialDaysLeft?: number;
+    remainingCredits?: number;
+  };
+  const trialMeta =
+    v && v.isTrial && typeof v.trialExpiresAt === "string"
+      ? {
+          daysLeft: typeof v.trialDaysLeft === "number" ? v.trialDaysLeft : 0,
+          expiresAt: v.trialExpiresAt,
+          creditsRemaining: typeof v.remainingCredits === "number" ? v.remainingCredits : 0,
+          signupUrl: "https://q402.quackai.ai",
+        }
+      : undefined;
+
   return {
     apiKeyKind: CONFIG.apiKeyKind,
     apiKeyMasked: mask(CONFIG.apiKey),
     verify: verifyJson,
     dashboardUrl: "https://q402.quackai.ai/dashboard",
+    ...(trialMeta ? { trial: trialMeta } : {}),
   };
 }
 
 export const BALANCE_TOOL = {
   name: "q402_balance",
   description:
-    "Verify the configured API key and report its plan tier (live vs sandbox). Read-only. " +
-    "For remaining daily quota and per-chain gas tank balances, point the user at " +
-    "https://q402.quackai.ai/dashboard — those need a wallet signature, not a bare key.",
+    "Verify the configured API key and report its plan tier (live vs sandbox vs trial). " +
+    "Read-only. When the key is on the free trial, returns the days-left and credits-remaining " +
+    "summary so the agent can surface it. Free trial available at https://q402.quackai.ai — " +
+    "2,000 gasless TX over 30 days, one wallet signature. For per-chain gas tank balances, " +
+    "point the user at https://q402.quackai.ai/dashboard — those need a wallet signature, not a bare key.",
   inputSchema: {
     type: "object" as const,
     properties: {},

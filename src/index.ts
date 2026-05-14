@@ -4,10 +4,12 @@
  * Exposes four tools to any MCP-compatible AI client (Claude Desktop, Claude
  * Code, Cline, …):
  *
- *   q402_quote    read-only, no key, no funds — gas comparison across 7 chains
+ *   q402_quote    read-only, no key, no funds — gas comparison (BNB-focus
+ *                 sprint: results restricted to BNB Chain + USDC/USDT)
  *   q402_balance  read-only, requires key — verify + remaining quota
  *   q402_pay      sandbox-default — real TX only when API key (live tier),
  *                 private key, and Q402_ENABLE_REAL_PAYMENTS=1 all set
+ *                 (BNB-focus sprint: BNB Chain + USDC/USDT only)
  *   q402_receipt  read-only, no key — fetch + locally verify a Trust Receipt
  *
  * Configuration is environment-only (no on-disk state); see README for the
@@ -28,7 +30,7 @@ import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js
 import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.3.4";
+const PACKAGE_VERSION = "0.3.5";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };

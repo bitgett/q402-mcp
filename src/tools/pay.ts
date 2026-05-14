@@ -135,12 +135,14 @@ function describeSandboxReason(): string {
 export const PAY_TOOL = {
   name: "q402_pay",
   description:
-    "Send a gasless USDC, USDT, or RLUSD payment via Q402. RLUSD (Ripple USD, NY DFS " +
-    "regulated, decimals 18) is supported on Ethereum mainnet only; USDC/USDT span all " +
-    "seven Q402 chains (Injective is USDT-only). SANDBOX BY DEFAULT — no funds move " +
-    "unless Q402_API_KEY (live tier), Q402_PRIVATE_KEY, and Q402_ENABLE_REAL_PAYMENTS=1 " +
-    "are all set. The recipient receives the full amount; the sender pays $0 in gas. " +
-    "ALWAYS get explicit user confirmation of the exact recipient address, amount, " +
+    "Send a gasless USDC or USDT payment via Q402. BNB-FOCUS SPRINT IS ACTIVE: " +
+    'only chain: "bnb" with token "USDC" or "USDT" is accepted; every other ' +
+    "chain and RLUSD return an error directing the caller back to BNB. " +
+    "(The other 6 chains and RLUSD return after the sprint window.) " +
+    "SANDBOX BY DEFAULT — no funds move unless Q402_API_KEY (live tier), " +
+    "Q402_PRIVATE_KEY, and Q402_ENABLE_REAL_PAYMENTS=1 are all set. The " +
+    "recipient receives the full amount; the sender pays $0 in gas. ALWAYS " +
+    "get explicit user confirmation of the exact recipient address, amount, " +
     "chain, and token in conversation immediately before calling this tool.",
   inputSchema: {
     type: "object" as const,

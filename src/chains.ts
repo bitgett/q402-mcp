@@ -1,5 +1,5 @@
 /**
- * Static chain registry — mirrors q402-landing/public/q402-sdk.js v1.6.0.
+ * Static chain registry — mirrors q402-landing/public/q402-sdk.js v1.7.x.
  *
  * The authoritative source for these values is contracts.manifest.json on the
  * q402-landing repo; this MCP package keeps a frozen copy so it can be used
@@ -7,6 +7,13 @@
  *
  * If any address, chainId, decimals, or domain name changes upstream, bump
  * this file *and* the @quackai/q402-mcp version in lock-step.
+ *
+ * ── BNB-focus sprint (2026-05-13 → 2026-05-20) ───────────────────────────────
+ * While BNB_FOCUS_MODE is true (see below), `supportedTokens` for every chain
+ * other than BNB is rewritten to [] at module load. The chain entries are
+ * intentionally retained verbatim so quote and pay calls produce a single
+ * sprint-aware rejection message, and the original 7-chain matrix is one
+ * boolean flip away.
  */
 
 export type ChainKey =
@@ -159,6 +166,25 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
   },
 };
 
+// ─── BNB-focus sprint flag (mirrors q402-landing app/lib/feature-flags.ts) ────
+// These two flags MUST track each other or server and SDK will disagree on
+// which calls to accept. The post-config narrowing loop below is what
+// actually enforces the gate; flip BNB_FOCUS_MODE to false to restore the
+// original 7-chain `supportedTokens` lists verbatim.
+export const BNB_FOCUS_MODE = true;
+export const BNB_FOCUS_REJECTION_MESSAGE =
+  "BNB-focus sprint: this chain/token is temporarily hidden. " +
+  "Full multi-chain support returns after the sprint window. " +
+  'Pass chain: "bnb" with token "USDC" or "USDT".';
+
+if (BNB_FOCUS_MODE) {
+  for (const key of CHAIN_KEYS) {
+    if (key !== "bnb") {
+      (CHAIN_CONFIG[key] as { supportedTokens: ReadonlyArray<"USDC" | "USDT" | "RLUSD"> }).supportedTokens = [];
+    }
+  }
+}
+
 export function getChain(key: ChainKey): ChainConfig {
   const cfg = CHAIN_CONFIG[key];
   if (!cfg) throw new Error(`Unsupported chain: ${key}. Supported: ${CHAIN_KEYS.join(", ")}`);
@@ -166,6 +192,9 @@ export function getChain(key: ChainKey): ChainConfig {
 }
 
 export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD"): TokenInfo {
+  if (BNB_FOCUS_MODE && !(cfg.supportedTokens?.includes(token) ?? false)) {
+    throw new Error(BNB_FOCUS_REJECTION_MESSAGE);
+  }
   if (token === "RLUSD") {
     if (!cfg.rlusd) {
       throw new Error(

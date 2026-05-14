@@ -5,6 +5,10 @@
 [![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
 [![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
 
+> **🎟️ Free trial available (2026-05-13 → 2026-05-20)** — 2,000 gasless transactions on BNB Chain (USDC + USDT), 30-day window, no card. One wallet signature: <https://q402.quackai.ai>.
+>
+> **BNB-focus sprint window:** while the sprint is on, `q402_pay` accepts `chain: "bnb"` with `token: "USDC"` or `"USDT"` only; the other 6 chains and RLUSD return after the sprint. `q402_quote` is narrowed to BNB Chain accordingly. Source-of-truth flag: [`feature-flags.ts`](https://github.com/bitgett/Q402-Institutional/blob/feat/bnb-focus-sprint/app/lib/feature-flags.ts).
+
 Claude can now reason about stablecoin payments end to end — quote a transfer across 7 chains, pick the cheapest route, and (optionally) settle the transaction over [Q402](https://q402.quackai.ai)'s EIP-7702 relayer infrastructure. The recipient receives the full amount; the sender pays $0 in gas.
 
 ---
