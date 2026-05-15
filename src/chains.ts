@@ -8,7 +8,7 @@
  * If any address, chainId, decimals, or domain name changes upstream, bump
  * this file *and* the @quackai/q402-mcp version in lock-step.
  *
- * ── BNB-focus sprint (2026-05-13 → 2026-05-20) ───────────────────────────────
+ * ── BNB-focus sprint (2026-05-19 → 2026-06-30) ───────────────────────────────
  * While BNB_FOCUS_MODE is true (see below), `supportedTokens` for every chain
  * other than BNB is rewritten to [] at module load. The chain entries are
  * intentionally retained verbatim so quote and pay calls produce a single
