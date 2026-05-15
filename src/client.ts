@@ -71,13 +71,6 @@ const TRANSFER_AUTH_TYPES = {
   ],
 };
 
-const AUTHORIZATION_TYPES = {
-  Authorization: [
-    { name: "address", type: "address" },
-    { name: "nonce", type: "uint256" },
-  ],
-};
-
 /**
  * Convert a human-readable decimal amount to a raw uint256 string, rejecting
  * any input that would lose precision through Number/parseFloat. Mirrors
@@ -108,16 +101,36 @@ async function signAuthorization(
   wallet: Wallet,
   args: { chainId: number; address: string; nonce: number },
 ): Promise<{ chainId: number; address: string; nonce: number; yParity: number; r: string; s: string }> {
-  const domain = { name: "EIP7702Authorization", version: "1", chainId: args.chainId };
-  const sig = await wallet.signTypedData(domain, AUTHORIZATION_TYPES, {
+  // EIP-7702 protocol-level authorization signature.
+  //
+  //   message  = keccak256(0x05 || rlp([chainId, address, nonce]))
+  //   r, s, yParity = secp256k1.sign(privateKey, message)
+  //
+  // ethers v6.16+ exposes `Wallet.authorize()` which produces exactly this
+  // signature. An earlier revision of this file signed an EIP-712 typed
+  // digest over a custom domain instead — wrong message, the EVM
+  // ecrecovered a different address and the authorizationList silently
+  // failed to delegate. Tx still succeeded as a no-op call into the
+  // un-delegated EOA, so settlement appeared to commit while no tokens
+  // moved.
+  //
+  // Wallets that had a delegation persisted from a prior (correctly-
+  // signed) authorization happened to work because the EOA already had
+  // the impl code installed; fresh EOAs broke. Hence this is the root
+  // fix for any first-time-binding wallet on the trial flow.
+  const auth = await wallet.authorize({
+    chainId: args.chainId,
     address: args.address,
     nonce: args.nonce,
   });
-  const r = sig.slice(0, 66);
-  const s = "0x" + sig.slice(66, 130);
-  const v = parseInt(sig.slice(130, 132), 16);
-  const yParity = v === 27 ? 0 : 1;
-  return { chainId: args.chainId, address: args.address, nonce: args.nonce, yParity, r, s };
+  return {
+    chainId: Number(auth.chainId),
+    address: auth.address,
+    nonce: Number(auth.nonce),
+    yParity: auth.signature.yParity,
+    r: auth.signature.r,
+    s: auth.signature.s,
+  };
 }
 
 export class Q402NodeClient {
