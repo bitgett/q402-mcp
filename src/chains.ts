@@ -171,7 +171,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
 // which calls to accept. The post-config narrowing loop below is what
 // actually enforces the gate; flip BNB_FOCUS_MODE to false to restore the
 // original 7-chain `supportedTokens` lists verbatim.
-export const BNB_FOCUS_MODE = true;
+export const BNB_FOCUS_MODE = false;
 export const BNB_FOCUS_REJECTION_MESSAGE =
   "BNB-focus sprint: this chain/token is temporarily hidden. " +
   "Full multi-chain support returns after the sprint window. " +
