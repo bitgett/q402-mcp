@@ -102,10 +102,12 @@ export function runQuote(input: QuoteInput): {
 export const QUOTE_TOOL = {
   name: "q402_quote",
   description:
-    "Compare gas costs and supported tokens for the chains Q402 relays for. " +
-    "BNB-focus sprint: results are currently restricted to BNB Chain + USDC/USDT " +
-    "(other chains and RLUSD return after the sprint window). Read-only — no API " +
-    "key needed, no funds move. Use this before q402_pay so the user sees what's currently routable.",
+    "Compare gas costs and supported tokens across the 7 chains Q402 relays " +
+    "for (avax, bnb, eth, xlayer, stable, mantle, injective). Trial-tier API " +
+    "keys see BNB-only quotes (q402_pay enforces the same scope server-side); " +
+    "paid-tier keys see the full matrix including RLUSD on Ethereum and " +
+    "Injective USDT-only. Read-only — no API key needed, no funds move. Use " +
+    "this before q402_pay so the user sees what's currently routable on their tier.",
   // Plain JSON schema mirroring the Zod schema above; MCP servers receive parameters as JSON.
   inputSchema: {
     type: "object" as const,
