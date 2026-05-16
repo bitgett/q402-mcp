@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.3.12",
+  "version": "0.3.13",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.3.12",
+      "version": "0.3.13",
       "transport": {
         "type": "stdio"
       },
@@ -55,11 +55,11 @@
         },
         {
           "name": "Q402_RELAY_BASE_URL",
-          "description": "Override for the Q402 relay endpoint. Defaults to https://q402.quackai.ai/api when unset; useful for self-hosted Q402 deployments.",
+          "description": "Override for the Q402 relay endpoint. During the BNB-focus sprint (0.3.13) the default points at the sprint preview deploy so trial users hit the same KV as the dashboard issuing their keys; this flips back to https://q402.quackai.ai/api in 0.4.0 post-merge. Set explicitly if running against a self-hosted Q402 deployment.",
           "isRequired": false,
           "isSecret": false,
           "format": "string",
-          "default": "https://q402.quackai.ai/api"
+          "default": "https://q402-institutional-git-feat-bnb-f-e317ee-bitgett-7677s-projects.vercel.app/api"
         }
       ]
     }
