@@ -254,6 +254,165 @@ export class Q402NodeClient {
     data.explorerUrl = Q402NodeClient.explorerUrl(chain, data.txHash);
     return data;
   }
+
+  /**
+   * Multi-recipient settlement on a single chain + token. Trial keys can
+   * fan out to at most 5 recipients per call; paid keys up to 20. The
+   * server enforces the cap and rejects oversized batches with
+   * `BATCH_TOO_LARGE`.
+   *
+   * Each recipient is independently authorised: one EIP-712
+   * TransferAuthorization witness + one EIP-7702 authorization tuple
+   * per row. The authorization nonces are issued sequentially starting
+   * from the EOA's current on-chain nonce, so the EVM applies them
+   * cleanly in batch order. Execution is sequential server-side; the
+   * first transfer must succeed (it installs / re-confirms the
+   * delegation), after which the remaining transfers are surfaced in
+   * the result array even if individual ones fail.
+   */
+  async batchPay(inputs: PayInput[]): Promise<BatchPayResult> {
+    if (!Array.isArray(inputs) || inputs.length === 0) {
+      throw new Error("batchPay requires at least one recipient");
+    }
+
+    const { chain, relayBaseUrl, apiKey, privateKey } = this.opts;
+
+    // Pre-validate every recipient's token before any signing — we don't
+    // want to sign 4 of 5 transfers and only then discover the 5th was
+    // a chain/token mismatch.
+    for (let i = 0; i < inputs.length; i++) {
+      const inp = inputs[i];
+      const tokenCfg = tokenFor(chain, inp.token);
+      if (chain.supportedTokens && !chain.supportedTokens.includes(inp.token)) {
+        throw new Error(
+          `recipient[${i}]: token ${inp.token} is not supported on chain ${chain.key}. ` +
+            `Supported: ${chain.supportedTokens.join(", ")}.`,
+        );
+      }
+      // toRawAmount throws on invalid decimal — surface it tagged with the index.
+      try {
+        toRawAmount(inp.amount, tokenCfg.decimals);
+      } catch (e) {
+        throw new Error(
+          `recipient[${i}]: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
+    const rpcUrl = this.opts.rpcUrl ?? DEFAULT_RPC[chain.chainId];
+    if (!rpcUrl) {
+      throw new Error(
+        `no RPC URL configured for chain ${chain.key} (chainId ${chain.chainId})`,
+      );
+    }
+    const provider = new JsonRpcProvider(rpcUrl);
+    const wallet = new Wallet(privateKey, provider);
+    const owner = await wallet.getAddress();
+    const facilitator = await this.fetchFacilitator();
+
+    // Sequential EIP-7702 authorization nonces. The EVM expects each
+    // authorization's nonce to equal the EOA's on-chain nonce at the
+    // moment that tx lands. After the first batch tx lands, the EOA
+    // nonce advances by 1; the second authorization (nonce = base + 1)
+    // is valid for the second tx; and so on.
+    const baseAuthNonce = await provider.getTransactionCount(owner);
+    const deadline = Math.floor(Date.now() / 1000) + 600;
+
+    const recipients = [];
+    for (let i = 0; i < inputs.length; i++) {
+      const inp = inputs[i];
+      const tokenCfg = tokenFor(chain, inp.token);
+      const amountRaw = toRawAmount(inp.amount, tokenCfg.decimals);
+      const paymentNonce = toBigInt(randomBytes(32));
+
+      const witnessSig = await wallet.signTypedData(
+        {
+          name: chain.domainName,
+          version: "1",
+          chainId: chain.chainId,
+          verifyingContract: owner,
+        },
+        TRANSFER_AUTH_TYPES,
+        {
+          owner,
+          facilitator,
+          token: tokenCfg.address,
+          recipient: inp.to,
+          amount: BigInt(amountRaw),
+          nonce: paymentNonce,
+          deadline: BigInt(deadline),
+        },
+      );
+
+      const authorization = await signAuthorization(wallet, {
+        chainId: chain.chainId,
+        address: chain.implContract,
+        nonce: baseAuthNonce + i,
+      });
+
+      const baseRow = {
+        from: owner,
+        to: inp.to,
+        amount: amountRaw,
+        deadline,
+        witnessSig,
+        authorization,
+      };
+      const row =
+        chain.key === "xlayer"
+          ? { ...baseRow, xlayerNonce: paymentNonce.toString() }
+          : chain.key === "stable"
+            ? { ...baseRow, stableNonce: paymentNonce.toString() }
+            : { ...baseRow, nonce: paymentNonce.toString() };
+      recipients.push(row);
+    }
+
+    // Send the batch.
+    const resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        chain: chain.key,
+        token: inputs[0].token, // all recipients must share token; pre-validated above
+        facilitator,
+        recipients,
+      }),
+    });
+    const data = (await resp.json()) as BatchPayResult & { error?: string };
+    if (!resp.ok) {
+      throw new Error(data.error ?? `relay/batch failed (HTTP ${resp.status})`);
+    }
+
+    // Decorate each successful row with the explorer URL — same shape
+    // single-recipient pay() returns, so agents can render uniformly.
+    data.results = data.results.map((r) => ({
+      ...r,
+      ...(r.success && r.txHash
+        ? { explorerUrl: Q402NodeClient.explorerUrl(chain, r.txHash) }
+        : {}),
+    }));
+    return data;
+  }
+}
+
+export interface BatchPayResult {
+  ok: boolean;
+  scope: "trial" | "paid";
+  limit: number;
+  totalSuccess: number;
+  totalFailed: number;
+  aborted: boolean;
+  results: Array<{
+    success: boolean;
+    txHash?: string;
+    blockNumber?: number;
+    receiptId?: string;
+    method?: string;
+    explorerUrl?: string | null;
+    error?: string;
+    code?: string;
+  }>;
 }
 
 /**

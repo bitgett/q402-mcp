@@ -46,10 +46,11 @@ You'll get a ranked breakdown immediately — no API key, no signup, no funds at
 |---|---|---|
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
 | `q402_balance` | API key | Verify the API key and report its plan tier + remaining quota credits (live vs sandbox). |
-| `q402_pay` | API key + private key + flag | Send a gasless payment. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
+| `q402_pay` | API key + private key + flag | Send a gasless payment to a single recipient. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
+| `q402_batch_pay` | API key + private key + flag | Send a gasless payment to **multiple** recipients in one call on a single chain × token. Trial keys: 5 rows max. Paid keys: 20 rows max. Same sandbox gating as `q402_pay`. |
 | `q402_receipt` | none | Look up a Trust Receipt by `rct_…` id and locally verify its ECDSA signature against the relayer EOA. Returns the public settlement record + a `verified` boolean. *receiptId-only today; tx-hash lookup reserved for a future release.* |
 
-`q402_pay` follows a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address, amount, chain, and token.
+`q402_pay` and `q402_batch_pay` follow a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address(es), amount(s), chain, and token. For batch calls the user must approve the **full batch**, not the individual rows.
 
 `q402_receipt` is the natural follow-up: after `q402_pay` returns a `receiptUrl`, hand the agent the `rct_…` id and ask *"verify this receipt"* — the tool re-runs the same canonical-JSON + EIP-191 recovery the receipt page does in the browser, so the verification doesn't depend on trusting any UI. Example prompts that work today:
 

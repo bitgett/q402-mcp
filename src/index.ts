@@ -1,16 +1,22 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes four tools to any MCP-compatible AI client (Claude Desktop, Claude
+ * Exposes five tools to any MCP-compatible AI client (Claude Desktop, Claude
  * Code, Cline, …):
  *
- *   q402_quote    read-only, no key, no funds — gas comparison (BNB-focus
- *                 sprint: results restricted to BNB Chain + USDC/USDT)
- *   q402_balance  read-only, requires key — verify + remaining quota
- *   q402_pay      sandbox-default — real TX only when API key (live tier),
- *                 private key, and Q402_ENABLE_REAL_PAYMENTS=1 all set
- *                 (BNB-focus sprint: BNB Chain + USDC/USDT only)
- *   q402_receipt  read-only, no key — fetch + locally verify a Trust Receipt
+ *   q402_quote      read-only, no key, no funds — gas comparison
+ *   q402_balance    read-only, requires key — verify + remaining quota
+ *   q402_pay        single-recipient settlement. Sandbox-default — real TX
+ *                   only when API key (live tier), private key, and
+ *                   Q402_ENABLE_REAL_PAYMENTS=1 all set
+ *   q402_batch_pay  multi-recipient settlement (trial: 5 / paid: 20 per call).
+ *                   Same chain + token across all recipients. Same sandbox
+ *                   gating as q402_pay
+ *   q402_receipt    read-only, no key — fetch + locally verify a Trust Receipt
+ *
+ * Trial-scope policy (server-enforced via API key plan): trial keys are
+ * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
+ * batch. Paid keys get the full 7-chain surface and 20-recipient batches.
  *
  * Configuration is environment-only (no on-disk state); see README for the
  * full env reference.
@@ -26,11 +32,12 @@ import {
 import { CONFIG } from "./config.js";
 import { QUOTE_TOOL, QuoteInputSchema, runQuote } from "./tools/quote.js";
 import { PAY_TOOL, PayInputSchema, runPay } from "./tools/pay.js";
+import { BATCH_PAY_TOOL, BatchPayInputSchema, runBatchPay } from "./tools/batch-pay.js";
 import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js";
 import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.3.8";
+const PACKAGE_VERSION = "0.3.9";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -43,7 +50,7 @@ async function main(): Promise<void> {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [QUOTE_TOOL, BALANCE_TOOL, PAY_TOOL, RECEIPT_TOOL],
+    tools: [QUOTE_TOOL, BALANCE_TOOL, PAY_TOOL, BATCH_PAY_TOOL, RECEIPT_TOOL],
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async req => {
@@ -61,6 +68,10 @@ async function main(): Promise<void> {
         case "q402_pay": {
           const parsed = PayInputSchema.parse(args ?? {});
           return { content: [jsonText(await runPay(parsed))] };
+        }
+        case "q402_batch_pay": {
+          const parsed = BatchPayInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runBatchPay(parsed))] };
         }
         case "q402_receipt": {
           const parsed = ReceiptInputSchema.parse(args ?? {});
