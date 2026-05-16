@@ -269,34 +269,62 @@ export class Q402NodeClient {
    * first transfer must succeed (it installs / re-confirms the
    * delegation), after which the remaining transfers are surfaced in
    * the result array even if individual ones fail.
+   *
+   * Signature shape: `{ token, recipients }`. The previous revision took
+   * `PayInput[]` (with token on each row), which read as if rows could
+   * carry different tokens — but the request body only ships one token
+   * field, so the per-row token on rows 1..N was silently ignored.
+   * Codex audit P2: surface the constraint in the type so consumers
+   * can't accidentally build a "mixed-token batch" that quietly drops
+   * the second token. Same chain + same token across one batch, full
+   * stop.
    */
-  async batchPay(inputs: PayInput[]): Promise<BatchPayResult> {
-    if (!Array.isArray(inputs) || inputs.length === 0) {
+  async batchPay(input: { token: PayInput["token"]; recipients: Array<{ to: string; amount: string }> }): Promise<BatchPayResult> {
+    const { token, recipients: rows } = input;
+    if (!Array.isArray(rows) || rows.length === 0) {
       throw new Error("batchPay requires at least one recipient");
+    }
+    if (typeof token !== "string") {
+      throw new Error("batchPay({ token, recipients }): token must be a string");
     }
 
     const { chain, relayBaseUrl, apiKey, privateKey } = this.opts;
 
-    // Pre-validate every recipient's token before any signing — we don't
-    // want to sign 4 of 5 transfers and only then discover the 5th was
-    // a chain/token mismatch.
-    for (let i = 0; i < inputs.length; i++) {
-      const inp = inputs[i];
-      const tokenCfg = tokenFor(chain, inp.token);
-      if (chain.supportedTokens && !chain.supportedTokens.includes(inp.token)) {
-        throw new Error(
-          `recipient[${i}]: token ${inp.token} is not supported on chain ${chain.key}. ` +
-            `Supported: ${chain.supportedTokens.join(", ")}.`,
-        );
-      }
-      // toRawAmount throws on invalid decimal — surface it tagged with the index.
+    // Token / chain compatibility, once for the whole batch.
+    const tokenCfg = tokenFor(chain, token);
+    if (chain.supportedTokens && !chain.supportedTokens.includes(token)) {
+      throw new Error(
+        `token ${token} is not supported on chain ${chain.key}. ` +
+          `Supported: ${chain.supportedTokens.join(", ")}.`,
+      );
+    }
+
+    // Pre-validate every recipient's amount before any signing — we don't
+    // want to sign 4 of 5 transfers and only then discover the 5th had
+    // a malformed amount.
+    for (let i = 0; i < rows.length; i++) {
       try {
-        toRawAmount(inp.amount, tokenCfg.decimals);
+        toRawAmount(rows[i].amount, tokenCfg.decimals);
       } catch (e) {
         throw new Error(
           `recipient[${i}]: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
+    }
+
+    // Chain scope for batchPay — default EIP-7702 mode only (avax / bnb /
+    // eth / mantle / injective). X Layer and Stable use chain-specific
+    // nonce field shapes (xlayerNonce / stableNonce) and the X Layer USDC
+    // path has an EIP-3009 fallback that doesn't install a delegation at
+    // all — none of those compose cleanly with sequential first-failure-
+    // abort batching today. Codex audit P2-A: keep the supported-chain
+    // claim consistent across browser SDK / Node client / docs.
+    if (chain.key === "xlayer" || chain.key === "stable") {
+      throw new Error(
+        `batchPay does not yet support chain "${chain.key}". Supported batch chains: ` +
+          `avax, bnb, eth, mantle, injective (default EIP-7702 mode). ` +
+          `For "${chain.key}" use pay() in a client-side loop.`,
+      );
     }
 
     const rpcUrl = this.opts.rpcUrl ?? DEFAULT_RPC[chain.chainId];
@@ -318,11 +346,10 @@ export class Q402NodeClient {
     const baseAuthNonce = await provider.getTransactionCount(owner);
     const deadline = Math.floor(Date.now() / 1000) + 600;
 
-    const recipients = [];
-    for (let i = 0; i < inputs.length; i++) {
-      const inp = inputs[i];
-      const tokenCfg = tokenFor(chain, inp.token);
-      const amountRaw = toRawAmount(inp.amount, tokenCfg.decimals);
+    const signedRows = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const amountRaw = toRawAmount(row.amount, tokenCfg.decimals);
       const paymentNonce = toBigInt(randomBytes(32));
 
       const witnessSig = await wallet.signTypedData(
@@ -337,7 +364,7 @@ export class Q402NodeClient {
           owner,
           facilitator,
           token: tokenCfg.address,
-          recipient: inp.to,
+          recipient: row.to,
           amount: BigInt(amountRaw),
           nonce: paymentNonce,
           deadline: BigInt(deadline),
@@ -350,21 +377,15 @@ export class Q402NodeClient {
         nonce: baseAuthNonce + i,
       });
 
-      const baseRow = {
+      signedRows.push({
         from: owner,
-        to: inp.to,
+        to: row.to,
         amount: amountRaw,
+        nonce: paymentNonce.toString(),
         deadline,
         witnessSig,
         authorization,
-      };
-      const row =
-        chain.key === "xlayer"
-          ? { ...baseRow, xlayerNonce: paymentNonce.toString() }
-          : chain.key === "stable"
-            ? { ...baseRow, stableNonce: paymentNonce.toString() }
-            : { ...baseRow, nonce: paymentNonce.toString() };
-      recipients.push(row);
+      });
     }
 
     // Send the batch.
@@ -374,14 +395,35 @@ export class Q402NodeClient {
       body: JSON.stringify({
         apiKey,
         chain: chain.key,
-        token: inputs[0].token, // all recipients must share token; pre-validated above
+        token,
         facilitator,
-        recipients,
+        recipients: signedRows,
       }),
     });
     const data = (await resp.json()) as BatchPayResult & { error?: string };
-    if (!resp.ok) {
-      throw new Error(data.error ?? `relay/batch failed (HTTP ${resp.status})`);
+
+    // Aborted batches (server returns 424) and partial failures (207) must
+    // throw, not return — earlier revision only threw on !resp.ok but the
+    // server then returned 200/ok:true even when recipient[0] failed and
+    // the batch was abandoned. Agents calling q402_batch_pay would have
+    // reported "batch sent" to the user even though zero transfers landed.
+    // Codex audit P1: throw a BatchPayError carrying the per-row results
+    // so callers can still surface what landed and what didn't.
+    if (!resp.ok || data.ok === false) {
+      const err = new BatchPayError(
+        data.aborted
+          ? `Batch aborted: recipient[0] failed (${data.results?.[0]?.error ?? "unknown"}). No transfers landed.`
+          : data.totalFailed > 0
+            ? `Batch completed with ${data.totalFailed}/${data.results?.length ?? "?"} failed rows.`
+            : (data.error ?? `relay/batch failed (HTTP ${resp.status})`),
+        {
+          aborted:      !!data.aborted,
+          totalSuccess: data.totalSuccess ?? 0,
+          totalFailed:  data.totalFailed  ?? signedRows.length,
+          results:      data.results ?? [],
+        },
+      );
+      throw err;
     }
 
     // Decorate each successful row with the explorer URL — same shape
@@ -393,6 +435,33 @@ export class Q402NodeClient {
         : {}),
     }));
     return data;
+  }
+}
+
+/**
+ * Thrown by Q402NodeClient.batchPay() when the server rejected the batch
+ * (aborted on first failure) or completed with at least one failed row.
+ * Carries the same shape the success path returns so callers don't lose
+ * the per-recipient results.
+ */
+export class BatchPayError extends Error {
+  readonly aborted: boolean;
+  readonly totalSuccess: number;
+  readonly totalFailed: number;
+  readonly results: BatchPayResult["results"];
+
+  constructor(message: string, details: {
+    aborted: boolean;
+    totalSuccess: number;
+    totalFailed: number;
+    results: BatchPayResult["results"];
+  }) {
+    super(message);
+    this.name         = "BatchPayError";
+    this.aborted      = details.aborted;
+    this.totalSuccess = details.totalSuccess;
+    this.totalFailed  = details.totalFailed;
+    this.results      = details.results;
   }
 }
 

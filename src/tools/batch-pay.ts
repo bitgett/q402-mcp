@@ -23,9 +23,10 @@
 
 import { isAddress } from "ethers";
 import { z } from "zod";
-import { CHAIN_KEYS, getChain, tokenFor } from "../chains.js";
+import { getChain, tokenFor } from "../chains.js";
 import { CONFIG } from "../config.js";
 import {
+  BatchPayError,
   Q402NodeClient,
   sandboxPay,
   type BatchPayResult,
@@ -40,8 +41,13 @@ const RECIPIENT_LIMIT_PAID  = 20;
 // reject them.
 const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 
+// Batch-supported chains: 5 of 7. xlayer + stable use chain-specific nonce
+// field shapes (xlayerNonce / stableNonce / eip3009Nonce) that don't compose
+// cleanly with sequential first-fail-abort batching. The server's
+// /api/relay/batch rejects those chains regardless, but failing here gets
+// the error in front of the agent instead of after a round-trip.
 export const BatchPayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective"]),
+  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective"]),
   token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
     "Stablecoin symbol. USDC / USDT supported on most chains (Injective is " +
       "USDT-only). RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
@@ -80,9 +86,11 @@ export type BatchPayInput = z.infer<typeof BatchPayInputSchema>;
 
 export interface BatchPaySummary {
   mode: "sandbox" | "live";
+  status: "success" | "partial_failure" | "aborted" | "sandbox";
   result?: BatchPayResult | { sandbox: PayResult[]; reason: string };
   guardsApplied: string[];
   setupHint?: string;
+  error?: string;
 }
 
 function maxAmountGuardBatch(recipients: BatchPayInput["recipients"], cap: number): void {
@@ -151,6 +159,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push("mode=sandbox");
     return {
       mode: "sandbox",
+      status: "sandbox",
       result: { sandbox: sandboxResults, reason: describeSandboxReason() },
       guardsApplied,
       setupHint: describeSandboxReason(),
@@ -163,13 +172,44 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     chain,
     relayBaseUrl: CONFIG.relayBaseUrl,
   });
-  const result = await client.batchPay(
-    input.recipients.map((r) => ({ to: r.to, amount: r.amount, token: input.token })),
-  );
-  guardsApplied.push("mode=live");
-  guardsApplied.push(`scope=${result.scope} (server enforced)`);
-  guardsApplied.push(`batch_size=${input.recipients.length}/${result.limit}`);
-  return { mode: "live", result, guardsApplied };
+  // We intentionally catch BatchPayError here instead of letting it bubble
+  // up. Letting it throw would lose the per-row results array — the MCP
+  // index.ts handler converts thrown errors into `{ error: message }` only,
+  // so the agent would know "batch failed" but not "rows 0,2 landed, row 1
+  // failed with insufficient gas-tank". Surfacing the structured result on
+  // the BatchPaySummary lets the model report each row's fate to the user.
+  try {
+    const result = await client.batchPay({
+      token: input.token,
+      recipients: input.recipients.map((r) => ({ to: r.to, amount: r.amount })),
+    });
+    guardsApplied.push("mode=live");
+    guardsApplied.push(`scope=${result.scope} (server enforced)`);
+    guardsApplied.push(`batch_size=${input.recipients.length}/${result.limit}`);
+    return { mode: "live", status: "success", result, guardsApplied };
+  } catch (err) {
+    if (err instanceof BatchPayError) {
+      guardsApplied.push("mode=live");
+      guardsApplied.push(`batch_${err.aborted ? "aborted" : "partial_failure"}`);
+      const status: BatchPaySummary["status"] = err.aborted ? "aborted" : "partial_failure";
+      return {
+        mode: "live",
+        status,
+        result: {
+          ok: false,
+          scope: "paid",
+          limit: input.recipients.length,
+          totalSuccess: err.totalSuccess,
+          totalFailed: err.totalFailed,
+          aborted: err.aborted,
+          results: err.results,
+        },
+        guardsApplied,
+        error: err.message,
+      };
+    }
+    throw err;
+  }
 }
 
 function describeSandboxReason(): string {
@@ -190,7 +230,8 @@ export const BATCH_PAY_TOOL = {
   description:
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
     `Trial keys (q402_live_* with plan='trial'): max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + ` +
-    `USDC/USDT only. Paid keys: max ${RECIPIENT_LIMIT_PAID} recipients per call, full 7-chain support. ` +
+    `USDC/USDT only. Paid keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 5 EIP-7702 default ` +
+    "chains (avax, bnb, eth, mantle, injective). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
     "SANDBOX BY DEFAULT — real on-chain TX only when Q402_API_KEY (live), Q402_PRIVATE_KEY, " +
     "and Q402_ENABLE_REAL_PAYMENTS=1 are all set. Every recipient receives the full amount; " +
     "the sender pays $0 in gas for the entire batch. ALWAYS get explicit user confirmation " +
@@ -201,8 +242,11 @@ export const BATCH_PAY_TOOL = {
     properties: {
       chain: {
         type: "string",
-        enum: CHAIN_KEYS as readonly string[],
-        description: "Target chain. Applies to every recipient in the batch.",
+        // Narrower than the full chain set — xlayer and stable are NOT batchable
+        // (chain-specific nonce field shapes). Use q402_pay in a loop for
+        // those chains.
+        enum: ["avax", "bnb", "eth", "mantle", "injective"],
+        description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here — use q402_pay in a loop.",
       },
       token: {
         type: "string",
