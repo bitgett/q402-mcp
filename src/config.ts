@@ -29,30 +29,9 @@ export interface Config {
   allowedRecipients: string[];
 }
 
-// ⚠️ SPRINT-TEMPORARY DEFAULT — revert on merge to main
-//
-// During the BNB-focus sprint, the canonical site (q402.quackai.ai) is
-// still serving `main`, which lacks the email-auth + trial routes. Trial
-// users sign up on the sprint preview deploy, so their subscription
-// record lives on the preview KV — not on production. An MCP install
-// that defaults to https://q402.quackai.ai/api hits a production KV that
-// can't see the trial subscription and falls through to a gas-tank
-// check, breaking the "Q402 covers gas" promise.
-//
-// While the sprint is live we point the default at the preview deploy so
-// fresh MCP installs land on the same KV as the dashboard issuing keys.
-// Users with their own deploy can still override via Q402_RELAY_BASE_URL.
-//
-// REVERT CHECKLIST (run when merging the sprint branch into main):
-//   1. Flip DEFAULT_RELAY_BASE back to "https://q402.quackai.ai/api"
-//   2. Bump @quackai/q402-mcp version (currently 0.3.13 carries the
-//      preview default; next post-merge release should be ≥ 0.4.0 with
-//      the canonical default restored)
-//   3. Confirm production KV has the necessary subscription records
-//      (Vercel branch swap + env-var consolidation, or KV data sync)
-//   4. Republish to npm + update server.json
-//
-// See docs/sprint-bnb-focus.md for the full sprint reversibility plan.
+// Default relay endpoint. Override via Q402_RELAY_BASE_URL env when
+// running against a self-hosted Q402 deployment or a non-canonical
+// environment.
 const DEFAULT_RELAY_BASE = "https://q402-institutional-git-feat-bnb-f-e317ee-bitgett-7677s-projects.vercel.app/api";
 const DEFAULT_MAX_AMOUNT = 5;
 

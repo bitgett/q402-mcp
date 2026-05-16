@@ -93,7 +93,7 @@ The server has no client-specific code. If your client speaks stdio MCP, point i
 
 ---
 
-> **🚧 Sprint window (BNB-focus, 2026-05-19 → 2026-06-30)** — `0.3.13` ships with the default `Q402_RELAY_BASE_URL` pointing at the sprint preview deploy. That's the deploy currently issuing trial keys and where the matching subscription records live. Once the sprint branch is merged into `main` and `q402.quackai.ai` serves the sprint code, the default will flip back to the canonical site in `0.4.0`. Set `Q402_RELAY_BASE_URL` explicitly in env if you want to override.
+> `Q402_RELAY_BASE_URL` overrides the relay endpoint. Set it explicitly when running against a self-hosted Q402 deployment or a non-canonical environment.
 
 ---
 
