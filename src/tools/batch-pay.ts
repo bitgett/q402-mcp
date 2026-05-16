@@ -190,6 +190,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   } catch (err) {
     if (err instanceof BatchPayError) {
       guardsApplied.push("mode=live");
+      guardsApplied.push(`scope=${err.scope} (server enforced)`);
       guardsApplied.push(`batch_${err.aborted ? "aborted" : "partial_failure"}`);
       const status: BatchPaySummary["status"] = err.aborted ? "aborted" : "partial_failure";
       return {
@@ -197,8 +198,8 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
         status,
         result: {
           ok: false,
-          scope: "paid",
-          limit: input.recipients.length,
+          scope: err.scope,
+          limit: err.limit,
           totalSuccess: err.totalSuccess,
           totalFailed: err.totalFailed,
           aborted: err.aborted,

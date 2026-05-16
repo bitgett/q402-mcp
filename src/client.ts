@@ -418,6 +418,12 @@ export class Q402NodeClient {
             : (data.error ?? `relay/batch failed (HTTP ${resp.status})`),
         {
           aborted:      !!data.aborted,
+          // Preserve the server's scope/limit so the MCP tool surface can
+          // report the actual tier (trial vs paid) rather than guessing.
+          // Falls back to "paid" / row count only when the failure didn't
+          // come from the relay route (e.g. network-level error).
+          scope:        data.scope ?? "paid",
+          limit:        data.limit ?? signedRows.length,
           totalSuccess: data.totalSuccess ?? 0,
           totalFailed:  data.totalFailed  ?? signedRows.length,
           results:      data.results ?? [],
@@ -445,20 +451,26 @@ export class Q402NodeClient {
  * the per-recipient results.
  */
 export class BatchPayError extends Error {
-  readonly aborted: boolean;
+  readonly aborted:      boolean;
+  readonly scope:        "trial" | "paid";
+  readonly limit:        number;
   readonly totalSuccess: number;
-  readonly totalFailed: number;
-  readonly results: BatchPayResult["results"];
+  readonly totalFailed:  number;
+  readonly results:      BatchPayResult["results"];
 
   constructor(message: string, details: {
-    aborted: boolean;
+    aborted:      boolean;
+    scope:        "trial" | "paid";
+    limit:        number;
     totalSuccess: number;
-    totalFailed: number;
-    results: BatchPayResult["results"];
+    totalFailed:  number;
+    results:      BatchPayResult["results"];
   }) {
     super(message);
     this.name         = "BatchPayError";
     this.aborted      = details.aborted;
+    this.scope        = details.scope;
+    this.limit        = details.limit;
     this.totalSuccess = details.totalSuccess;
     this.totalFailed  = details.totalFailed;
     this.results      = details.results;
