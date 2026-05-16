@@ -32,7 +32,7 @@ export interface Config {
 // Default relay endpoint. Override via Q402_RELAY_BASE_URL env when
 // running against a self-hosted Q402 deployment or a non-canonical
 // environment.
-const DEFAULT_RELAY_BASE = "https://q402-institutional-git-feat-bnb-f-e317ee-bitgett-7677s-projects.vercel.app/api";
+const DEFAULT_RELAY_BASE = "https://q402.quackai.ai/api";
 const DEFAULT_MAX_AMOUNT = 5;
 
 function classifyApiKey(k: string | null): Config["apiKeyKind"] {
