@@ -4,3 +4,9 @@ dist
 *.log
 .env
 .env.*
+
+# MCP registry publisher binary — extracted locally from
+# github.com/modelcontextprotocol/registry releases for `mcp-publisher publish`.
+# Kept out of git; download fresh per release.
+mcp-publisher
+mcp-publisher.exe

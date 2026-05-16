@@ -42,13 +42,24 @@ Restart Claude Desktop and ask:
 
 ### OpenAI Codex CLI
 
-One-liner using Codex's built-in registration command:
+Three install paths — pick the one that matches your workflow.
+
+**(a) Codex plugin marketplace** (recommended — bundles the MCP config so users don't write TOML):
+
+```bash
+codex plugin marketplace add bitgett/q402-mcp
+codex /plugins        # browse and install "q402"
+```
+
+This repo carries a Codex plugin manifest at [`.codex-plugin/plugin.json`](./.codex-plugin/plugin.json) and a marketplace catalog at [`.agents/plugins/marketplace.json`](./.agents/plugins/marketplace.json), so any signed-in Codex user can register it as a marketplace source and install with one click.
+
+**(b) Single MCP server via `codex mcp add`** (no plugin wrapper — just register the stdio server):
 
 ```bash
 codex mcp add q402 -- npx -y @quackai/q402-mcp
 ```
 
-Or edit `~/.codex/config.toml` directly (`.codex/config.toml` for per-project scope):
+**(c) Direct `~/.codex/config.toml` edit** (`.codex/config.toml` for per-project scope):
 
 ```toml
 [mcp_servers.q402]

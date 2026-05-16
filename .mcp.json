@@ -1,0 +1,9 @@
+{
+  "mcp_servers": {
+    "q402": {
+      "command": "npx",
+      "args": ["-y", "@quackai/q402-mcp"],
+      "startup_timeout_sec": 20.0
+    }
+  }
+}

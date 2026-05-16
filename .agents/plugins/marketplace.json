@@ -1,0 +1,20 @@
+{
+  "name": "q402",
+  "interface": {
+    "displayName": "Q402 — Gasless Stablecoin Payments"
+  },
+  "plugins": [
+    {
+      "name": "q402",
+      "source": {
+        "source": "local",
+        "path": "../.."
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Payments"
+    }
+  ]
+}
