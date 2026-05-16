@@ -1,8 +1,8 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes five tools to any MCP-compatible AI client (Claude Desktop, Claude
- * Code, Cline, …):
+ * Exposes five tools to any MCP-compatible AI client (Claude Desktop,
+ * Claude Code, OpenAI Codex CLI, Cline, …):
  *
  *   q402_quote      read-only, no key, no funds — gas comparison
  *   q402_balance    read-only, requires key — verify + remaining quota
@@ -37,7 +37,7 @@ import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js
 import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.3.9";
+const PACKAGE_VERSION = "0.3.10";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -96,7 +96,8 @@ async function main(): Promise<void> {
   await server.connect(transport);
 
   // Stdio MCP servers stay attached to the parent process; the transport keeps
-  // the event loop alive until Claude Desktop closes the pipe.
+  // the event loop alive until the host (Claude Desktop, Codex CLI, …) closes
+  // the pipe.
   process.stderr.write(
     `${PACKAGE_NAME} v${PACKAGE_VERSION} ready (mode=${CONFIG.mode}, ` +
       `cap=$${CONFIG.maxAmountPerCallUsd}, allowlist=${CONFIG.allowedRecipients.length})\n`,

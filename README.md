@@ -1,6 +1,6 @@
 # @quackai/q402-mcp
 
-> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains, callable directly from Claude Desktop and any other Model Context Protocol client.
+> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
 
 [![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
 [![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
@@ -13,13 +13,17 @@ Claude can now reason about stablecoin payments end to end — quote a transfer 
 
 ---
 
-## Quick start (Claude Desktop)
+## Quick start
+
+The server speaks stdio MCP, so any MCP-compatible client can use it. The two paths verified end-to-end today are **Claude (Desktop / Code)** and **OpenAI Codex CLI**.
+
+### Claude Desktop / Claude Code
 
 ```bash
 claude mcp add q402 -- npx -y @quackai/q402-mcp
 ```
 
-Or, if you prefer editing the config file directly, add this entry to your `claude_desktop_config.json`:
+Or edit `claude_desktop_config.json` directly:
 
 ```json
 {
@@ -36,7 +40,45 @@ Restart Claude Desktop and ask:
 
 > *"Compare gas costs to send 50 USDC to vitalik.eth across all 7 Q402 chains."*
 
-You'll get a ranked breakdown immediately — no API key, no signup, no funds at risk.
+### OpenAI Codex CLI
+
+One-liner using Codex's built-in registration command:
+
+```bash
+codex mcp add q402 -- npx -y @quackai/q402-mcp
+```
+
+Or edit `~/.codex/config.toml` directly (`.codex/config.toml` for per-project scope):
+
+```toml
+[mcp_servers.q402]
+command = "npx"
+args = ["-y", "@quackai/q402-mcp"]
+startup_timeout_sec = 20.0
+```
+
+To enable real on-chain payments, pass the three live-mode env vars **explicitly** under `env` — Codex does **not** forward host env vars by default:
+
+```toml
+[mcp_servers.q402]
+command = "npx"
+args = ["-y", "@quackai/q402-mcp"]
+startup_timeout_sec = 20.0
+env = {
+  Q402_API_KEY              = "q402_live_...",
+  Q402_PRIVATE_KEY          = "0xabc...",
+  Q402_ENABLE_REAL_PAYMENTS = "1",
+  Q402_MAX_AMOUNT_PER_CALL  = "5",
+}
+```
+
+> If you'd rather not inline secrets in `config.toml`, use the `env_vars` allow-list form to forward specific names from your shell environment instead — see the [Codex config reference](https://developers.openai.com/codex/config-reference) for the full schema.
+
+Then run `codex` and ask the same kind of question. The first call may take a few seconds while `npx` warms its cache; subsequent calls are instant.
+
+### Any other MCP client
+
+The server has no client-specific code. If your client speaks stdio MCP, point it at `npx -y @quackai/q402-mcp` and the four tools listed below will appear.
 
 ---
 
@@ -63,7 +105,7 @@ You'll get a ranked breakdown immediately — no API key, no signup, no funds at
 
 ## Sandbox vs live mode
 
-By default the MCP server operates in **sandbox mode**: `q402_pay` returns a deterministic-looking fake transaction hash, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any Claude Desktop install without worrying about an LLM hallucinating a payment.
+By default the MCP server operates in **sandbox mode**: `q402_pay` returns a deterministic-looking fake transaction hash, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an LLM hallucinating a payment.
 
 To enable real on-chain transactions, **all three** environment variables must be set:
 
