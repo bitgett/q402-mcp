@@ -41,7 +41,7 @@ const RECIPIENT_LIMIT_PAID  = 20;
 // reject them.
 const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 
-// Batch-supported chains: 5 of 7. xlayer + stable use chain-specific nonce
+// Batch-supported chains: 6 of 8. xlayer + stable use chain-specific nonce
 // field shapes (xlayerNonce / stableNonce / eip3009Nonce) that don't compose
 // cleanly with sequential first-fail-abort batching. The server's
 // /api/relay/batch rejects those chains regardless, but failing here gets
