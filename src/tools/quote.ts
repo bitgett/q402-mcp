@@ -1,7 +1,7 @@
 /**
  * q402_quote — read-only, no API key required.
  *
- * Compares gas costs across the seven chains Q402 relays for, given a payment
+ * Compares gas costs across the eight chains Q402 relays for, given a payment
  * amount and (optional) target chain/token. Lets a Claude agent reason about
  * "where should I send this?" before any signing happens.
  */
@@ -23,10 +23,10 @@ export const QuoteInputSchema = z.object({
         "RLUSD here narrows the quote to chain=\"eth\".",
     ),
   chain: z
-    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective"])
+    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad"])
     .optional()
     .describe(
-      "Optional chain filter. When omitted, all 7 chains are compared and ranked by gas cost.",
+      "Optional chain filter. When omitted, all 8 chains are compared and ranked by gas cost.",
     ),
 });
 
@@ -102,8 +102,8 @@ export function runQuote(input: QuoteInput): {
 export const QUOTE_TOOL = {
   name: "q402_quote",
   description:
-    "Compare gas costs and supported tokens across the 7 chains Q402 relays " +
-    "for (avax, bnb, eth, xlayer, stable, mantle, injective). Trial-tier API " +
+    "Compare gas costs and supported tokens across the 8 chains Q402 relays " +
+    "for (avax, bnb, eth, xlayer, stable, mantle, injective, monad). Trial-tier API " +
     "keys see BNB-only quotes (q402_pay enforces the same scope server-side); " +
     "paid-tier keys see the full matrix including RLUSD on Ethereum and " +
     "Injective USDT-only. Read-only — no API key needed, no funds move. Use " +
@@ -125,7 +125,7 @@ export const QUOTE_TOOL = {
       chain: {
         type: "string",
         enum: CHAIN_KEYS as readonly string[],
-        description: "Optional chain filter; omit to compare all 7.",
+        description: "Optional chain filter; omit to compare all 8.",
       },
     },
     required: ["amount"],

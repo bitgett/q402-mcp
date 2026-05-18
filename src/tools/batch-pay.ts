@@ -47,7 +47,7 @@ const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 // /api/relay/batch rejects those chains regardless, but failing here gets
 // the error in front of the agent instead of after a round-trip.
 export const BatchPayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective"]),
+  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad"]),
   token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
     "Stablecoin symbol. USDC / USDT supported on most chains (Injective is " +
       "USDT-only). RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
@@ -231,8 +231,8 @@ export const BATCH_PAY_TOOL = {
   description:
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
     `Trial keys (q402_live_* with plan='trial'): max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + ` +
-    `USDC/USDT only. Paid keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 5 EIP-7702 default ` +
-    "chains (avax, bnb, eth, mantle, injective). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
+    `USDC/USDT only. Paid keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 6 EIP-7702 default ` +
+    "chains (avax, bnb, eth, mantle, injective, monad). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
     "SANDBOX BY DEFAULT — real on-chain TX only when Q402_API_KEY (live), Q402_PRIVATE_KEY, " +
     "and Q402_ENABLE_REAL_PAYMENTS=1 are all set. Every recipient receives the full amount; " +
     "the sender pays $0 in gas for the entire batch. ALWAYS get explicit user confirmation " +
@@ -246,7 +246,7 @@ export const BATCH_PAY_TOOL = {
         // Narrower than the full chain set — xlayer and stable are NOT batchable
         // (chain-specific nonce field shapes). Use q402_pay in a loop for
         // those chains.
-        enum: ["avax", "bnb", "eth", "mantle", "injective"],
+        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad"],
         description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here — use q402_pay in a loop.",
       },
       token: {
