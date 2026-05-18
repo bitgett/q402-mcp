@@ -89,7 +89,7 @@ Then run `codex` and ask the same kind of question. The first call may take a fe
 
 ### Any other MCP client
 
-The server has no client-specific code. If your client speaks stdio MCP, point it at `npx -y @quackai/q402-mcp` and the four tools listed below will appear.
+The server has no client-specific code. If your client speaks stdio MCP, point it at `npx -y @quackai/q402-mcp` and the five tools listed below will appear.
 
 ---
 
