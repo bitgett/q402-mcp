@@ -1,7 +1,7 @@
 /**
  * Runtime configuration parsed from environment variables.
  *
- * Two-key model (since v0.5.0):
+ * Two-key model (since v0.4.3, refined in v0.4.4):
  *   Q402_TRIAL_API_KEY       BNB-only sponsored Trial key (free 2k TX).
  *   Q402_MULTICHAIN_API_KEY  Paid 8-chain key backed by per-chain Gas Tank.
  *   Q402_API_KEY             Legacy single-key fallback. Used for both

@@ -149,6 +149,10 @@ Q402_ENABLE_REAL_PAYMENTS=1                # explicit opt-in
 
 Anything missing for the resolved scope → automatic sandbox fallback with a hint pointing at what to set.
 
+> ⚠️ **Sandbox returns a deterministic-looking fake `txHash` and a synthetic success result.** A user who *expected* a live transfer (e.g. forgot to set `Q402_ENABLE_REAL_PAYMENTS=1`, mis-typed a scoped env var, or hit an impossible chain×scope combination like `keyScope: "trial"` + `chain: "monad"`) gets a "success" back and may believe funds actually moved.
+>
+> Two-layer mitigation: every sandbox response carries a `setupHint` field on the tool result describing **exactly why** sandbox was selected, and the `q402_balance` tool's `apiKeyKind: "missing"` makes the same diagnosis explicit. Always check `setupHint` on the first call from a new install. The deterministic `txHash` pattern (`0x` + 64 hex derived from `keccak256(chain, to, amount, token, "sandbox")`) is intentional so the agent can recognise it post-hoc, but the safer habit is to inspect `setupHint` before showing the user a success message.
+
 ### Hard caps
 
 Two additional guards run before every payment regardless of mode:
