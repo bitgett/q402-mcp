@@ -12,7 +12,7 @@
  * While BNB_FOCUS_MODE is true (see below), `supportedTokens` for every chain
  * other than BNB is rewritten to [] at module load. The chain entries are
  * intentionally retained verbatim so quote and pay calls produce a single
- * sprint-aware rejection message, and the original 7-chain matrix is one
+ * sprint-aware rejection message, and the original 8-chain matrix is one
  * boolean flip away.
  */
 
@@ -23,7 +23,8 @@ export type ChainKey =
   | "xlayer"
   | "stable"
   | "mantle"
-  | "injective";
+  | "injective"
+  | "monad";
 
 export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "avax",
@@ -33,6 +34,7 @@ export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "stable",
   "mantle",
   "injective",
+  "monad",
 ];
 
 export interface TokenInfo {
@@ -164,13 +166,27 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     approxGasCostUsd: 0.004,
     note: "USDT only until Circle CCTP native USDC ships (announced for Q2 2026).",
   },
+  monad: {
+    key: "monad",
+    name: "Monad",
+    chainId: 143,
+    domainName: "Q402 Monad",
+    implContract: "0x39Ba9520718eE069D7f72882FF4C28a5Ea8a2acC",
+    gasToken: "MON",
+    explorer: "https://monadscan.com",
+    // Native Circle USDC via CCTP V2 (not bridged) + USDT0 (LayerZero OFT).
+    usdc: { address: "0x754704Bc059F8C67012fEd69BC8A327a5aafb603", decimals: 6 },
+    usdt: { address: "0xe7cd86e13AC4309349F30B3435a9d337750fC82D", decimals: 6 },
+    supportedTokens: ["USDC", "USDT"],
+    approxGasCostUsd: 0.002,
+  },
 };
 
 // ─── BNB-focus sprint flag (mirrors q402-landing app/lib/feature-flags.ts) ────
 // These two flags MUST track each other or server and SDK will disagree on
 // which calls to accept. The post-config narrowing loop below is what
 // actually enforces the gate; flip BNB_FOCUS_MODE to false to restore the
-// original 7-chain `supportedTokens` lists verbatim.
+// original 8-chain `supportedTokens` lists verbatim.
 export const BNB_FOCUS_MODE = false;
 export const BNB_FOCUS_REJECTION_MESSAGE =
   "BNB-focus sprint: this chain/token is temporarily hidden. " +

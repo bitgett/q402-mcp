@@ -1,7 +1,7 @@
 {
   "name": "q402",
-  "version": "0.4.0",
-  "description": "Q402 — gasless USDC, USDT, and RLUSD payments across 7 EVM chains (BNB, Ethereum, Avalanche, X Layer, Stable, Mantle, Injective). Five tools: q402_quote, q402_balance, q402_pay, q402_batch_pay, q402_receipt. Sandbox-by-default; real on-chain TX requires explicit live-mode env vars.",
+  "version": "0.4.1",
+  "description": "Q402 — gasless USDC, USDT, and RLUSD payments across 8 EVM chains (BNB, Ethereum, Avalanche, X Layer, Stable, Mantle, Injective, Monad). Five tools: q402_quote, q402_balance, q402_pay, q402_batch_pay, q402_receipt. Sandbox-by-default; real on-chain TX requires explicit live-mode env vars.",
   "author": "QuackAI <hello@quackai.ai>",
   "homepage": "https://q402.quackai.ai",
   "repository": "https://github.com/bitgett/q402-mcp",

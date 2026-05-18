@@ -16,7 +16,7 @@ import { CONFIG } from "../config.js";
 import { Q402NodeClient, sandboxPay, type PayResult } from "../client.js";
 
 export const PayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective"]),
+  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad"]),
   to: z
     .string()
     .refine(isAddress, "to must be a valid 0x-prefixed EVM address")
@@ -139,7 +139,7 @@ export const PAY_TOOL = {
     "the API key tier: trial keys (q402_live_* with plan='trial') are " +
     'restricted to chain: "bnb" + token "USDC" or "USDT" (server returns ' +
     "TRIAL_BNB_ONLY for anything else). Paid keys can relay across the full " +
-    "7-chain matrix — avax, bnb, eth, xlayer, stable, mantle, injective — " +
+    "8-chain matrix — avax, bnb, eth, xlayer, stable, mantle, injective, monad — " +
     "with USDC/USDT supported on most chains, RLUSD on Ethereum only, and " +
     "Injective USDT-only. SANDBOX BY DEFAULT — no funds move unless " +
     "Q402_API_KEY (live tier), Q402_PRIVATE_KEY, and Q402_ENABLE_REAL_PAYMENTS=1 " +
