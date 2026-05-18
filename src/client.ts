@@ -304,7 +304,7 @@ export class Q402NodeClient {
     // a malformed amount.
     for (let i = 0; i < rows.length; i++) {
       try {
-        toRawAmount(rows[i].amount, tokenCfg.decimals);
+        toRawAmount(rows[i]!.amount, tokenCfg.decimals);
       } catch (e) {
         throw new Error(
           `recipient[${i}]: ${e instanceof Error ? e.message : String(e)}`,
@@ -349,7 +349,10 @@ export class Q402NodeClient {
 
     const signedRows = [];
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
+      // noUncheckedIndexedAccess: rows[i] is typed as T | undefined even
+      // though the loop bound guarantees presence. Assert here so the
+      // rest of the loop body doesn't litter `!` operators.
+      const row = rows[i]!;
       const amountRaw = toRawAmount(row.amount, tokenCfg.decimals);
       const paymentNonce = toBigInt(randomBytes(32));
 

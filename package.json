@@ -40,7 +40,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "prepublishOnly": "npm run build",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run lint && npm run build",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -65,5 +66,8 @@
   "author": "David Lee <davidlee@quackai.ai>",
   "publishConfig": {
     "access": "public"
+  },
+  "overrides": {
+    "ws": "^8.20.1"
   }
 }

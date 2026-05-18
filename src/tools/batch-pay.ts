@@ -107,7 +107,7 @@ function maxAmountGuardBatch(recipients: BatchPayInput["recipients"], cap: numbe
   // is per-call to bound blast radius of a single agent decision, and
   // the trial-key recipient count itself bounds the batch.
   for (let i = 0; i < recipients.length; i++) {
-    const r = recipients[i];
+    const r = recipients[i]!;
     const numeric = Number(r.amount);
     if (!Number.isFinite(numeric)) {
       throw new Error(`recipients[${i}]: unparseable amount "${r.amount}"`);
@@ -127,10 +127,10 @@ function recipientAllowlistGuardBatch(
 ): void {
   if (allow.length === 0) return;
   for (let i = 0; i < recipients.length; i++) {
-    const to = recipients[i].to.toLowerCase();
-    if (!allow.includes(to)) {
+    const r = recipients[i]!;
+    if (!allow.includes(r.to.toLowerCase())) {
       throw new Error(
-        `recipients[${i}]: ${recipients[i].to} is not in Q402_ALLOWED_RECIPIENTS. ` +
+        `recipients[${i}]: ${r.to} is not in Q402_ALLOWED_RECIPIENTS. ` +
           "Either add this address to the allowlist or unset the env var to disable the guard.",
       );
     }

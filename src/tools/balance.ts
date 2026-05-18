@@ -116,10 +116,12 @@ export async function runBalance(): Promise<BalanceSummary> {
 
   // Legacy alias: surface the multichain scope's data first, else trial,
   // else legacy. Keeps single-scope consumers working without changes.
+  // targets.length > 0 was guaranteed above (early return otherwise), so
+  // scopes is non-empty and the final fallback is always defined.
   const primary =
     scopes.find(s => s.scope === "multichain") ??
     scopes.find(s => s.scope === "trial") ??
-    scopes[0];
+    scopes[0]!;
 
   return {
     apiKeyKind: CONFIG.apiKeyKind,
