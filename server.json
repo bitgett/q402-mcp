@@ -6,19 +6,33 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.4.2",
+  "version": "0.4.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.4.2",
+      "version": "0.4.4",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
+          "name": "Q402_TRIAL_API_KEY",
+          "description": "Free Trial API key from https://q402.quackai.ai/event. BNB Chain only, 2,000 sponsored TXs, gas covered by Q402. Single payments on chain='bnb' auto-route to this key when set.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "Q402_MULTICHAIN_API_KEY",
+          "description": "Paid Multichain API key from https://q402.quackai.ai/payment. Full 8-chain support with per-chain Gas Tank. Non-BNB payments and 6+ row batches auto-route to this key.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
           "name": "Q402_API_KEY",
-          "description": "Q402 API key from https://q402.quackai.ai/dashboard. q402_test_* keys keep the server in sandbox mode; q402_live_* keys are required for real on-chain transactions.",
+          "description": "Legacy single-env fallback. Used for both scopes when neither Q402_TRIAL_API_KEY nor Q402_MULTICHAIN_API_KEY is set. q402_test_* keys keep sandbox mode; q402_live_* keys are required for real on-chain transactions.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"

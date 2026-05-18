@@ -160,10 +160,11 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  // Two-key resolution (see pay.ts for rationale). Throws clearly on
-  // conflicting scope (e.g. keyScope='trial' with chain='monad').
+  // Two-key resolution (see pay.ts for rationale). Sandbox-default: never
+  // throws. Batches pass intent="batch" so auto routing prefers the
+  // multichain key (cap=20) over the trial key (cap=5).
   const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
-  const resolved = resolveApiKey(input.chain, scopeRequest);
+  const resolved = resolveApiKey(input.chain, scopeRequest, "batch");
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
   const live = isLiveModeFor(resolved);
@@ -172,7 +173,8 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
     );
     guardsApplied.push("mode=sandbox");
-    const reason = describeSandboxReason(resolved.apiKey);
+    const reason =
+      resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "");
     return {
       mode: "sandbox",
       status: "sandbox",
@@ -183,7 +185,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   }
 
   const client = new Q402NodeClient({
-    apiKey: resolved.apiKey,
+    apiKey: resolved.apiKey!,
     privateKey: CONFIG.privateKey!,
     chain,
     relayBaseUrl: CONFIG.relayBaseUrl,

@@ -102,15 +102,14 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  // Two-key resolution. Throws on conflicting scope (e.g. keyScope='trial'
-  // with chain='monad') with a clear message — surfacing the failure here
-  // is far better UX than sandboxing silently or hitting the relay's 403.
+  // Two-key resolution. Sandbox-default: never throws. When a scope can't be
+  // resolved to a live key (env missing, impossible chain×scope combo, …) the
+  // resolver returns `apiKey: null` plus a `sandboxReason` hint that we
+  // surface as the agent-visible setupHint.
   const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
-  const resolved = resolveApiKey(input.chain, scopeRequest);
+  const resolved = resolveApiKey(input.chain, scopeRequest, "single");
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
-  // Live mode for THIS resolved key. A live Trial key + sandbox legacy key
-  // shouldn't accidentally sandbox a trial payment, so the gate is per-key.
   const live = isLiveModeFor(resolved);
   if (!live) {
     const result = sandboxPay(chain, {
@@ -119,12 +118,16 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       token: input.token,
     });
     guardsApplied.push("mode=sandbox");
-    const setupHint = describeSandboxReason(resolved.apiKey);
+    // Prefer the resolver's specific reason (e.g. "trial+monad impossible")
+    // over the generic missing-env message. Falls back to the generic when
+    // the resolver returned a key but live mode failed on its own gates.
+    const setupHint =
+      resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "");
     return { result, guardsApplied, setupHint };
   }
 
   const client = new Q402NodeClient({
-    apiKey: resolved.apiKey,
+    apiKey: resolved.apiKey!,
     privateKey: CONFIG.privateKey!,
     chain,
     relayBaseUrl: CONFIG.relayBaseUrl,
