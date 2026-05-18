@@ -8,12 +8,11 @@
  * If any address, chainId, decimals, or domain name changes upstream, bump
  * this file *and* the @quackai/q402-mcp version in lock-step.
  *
- * ── BNB-focus sprint (2026-05-19 → 2026-06-30) ───────────────────────────────
- * While BNB_FOCUS_MODE is true (see below), `supportedTokens` for every chain
- * other than BNB is rewritten to [] at module load. The chain entries are
- * intentionally retained verbatim so quote and pay calls produce a single
- * sprint-aware rejection message, and the original 8-chain matrix is one
- * boolean flip away.
+ * Emergency BNB-only narrowing: `BNB_FOCUS_MODE` (defined below) is currently
+ * false — the full 8-chain matrix is live. The flag stays in the module as a
+ * one-line revert path if a future incident requires temporarily collapsing
+ * the supported set to BNB. Trial-key restrictions are enforced server-side
+ * via TRIAL_BNB_ONLY (separate code path) and don't depend on this flag.
  */
 
 export type ChainKey =
@@ -182,15 +181,17 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
   },
 };
 
-// ─── BNB-focus sprint flag (mirrors q402-landing app/lib/feature-flags.ts) ────
-// These two flags MUST track each other or server and SDK will disagree on
-// which calls to accept. The post-config narrowing loop below is what
-// actually enforces the gate; flip BNB_FOCUS_MODE to false to restore the
-// original 8-chain `supportedTokens` lists verbatim.
+// ─── BNB-only emergency flag (mirrors q402-landing app/lib/feature-flags.ts) ──
+// Currently false: the full 8-chain matrix is live. The flag exists as a
+// one-line revert path — flipping to true rewrites `supportedTokens` for
+// every non-BNB chain to [] at module load, which makes every non-BNB
+// quote/pay call produce a single deterministic rejection message. The
+// landing repo's BNB_FOCUS_MODE must track this value; tests pin the
+// match.
 export const BNB_FOCUS_MODE = false;
 export const BNB_FOCUS_REJECTION_MESSAGE =
-  "BNB-focus sprint: this chain/token is temporarily hidden. " +
-  "Full multi-chain support returns after the sprint window. " +
+  "BNB-only mode active: this chain/token is temporarily hidden. " +
+  "Full multi-chain support is the normal state. " +
   'Pass chain: "bnb" with token "USDC" or "USDT".';
 
 if (BNB_FOCUS_MODE) {

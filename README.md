@@ -76,7 +76,7 @@ command = "npx"
 args = ["-y", "@quackai/q402-mcp"]
 startup_timeout_sec = 20.0
 env = {
-  # Two-key model (v0.4.4+): set whichever applies — both is best.
+  # Two-key model (v0.4.5+): set whichever applies — both is best.
   # The server auto-routes by chain: BNB → trial key, else multichain key.
   # Both keys use the same q402_live_ prefix — the env var name is what
   # carries the scope, not the key string. Get the values from the
@@ -133,14 +133,14 @@ By default the MCP server operates in **sandbox mode**: `q402_pay` returns a det
 To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set, and `Q402_ENABLE_REAL_PAYMENTS=1`:
 
 ```bash
-# Two-key model (v0.4.4+) — set whichever applies. Both is best.
+# Two-key model (v0.4.5+) — set whichever applies. Both is best.
 # Auto-routing: chain="bnb" → trial key (if set), otherwise multichain key.
 # Override per call with keyScope: "auto" | "trial" | "multichain".
 Q402_TRIAL_API_KEY=q402_live_...           # BNB-only sponsored Trial key (from /event)
 Q402_MULTICHAIN_API_KEY=q402_live_...      # paid 8-chain key (per-chain Gas Tank)
 
 # Legacy fallback. Used for both scopes when the two above are unset —
-# pre-v0.4.4 users keep working without any config change.
+# pre-v0.4.5 users keep working without any config change.
 Q402_API_KEY=q402_live_...
 
 Q402_PRIVATE_KEY=0xabc...                  # signer for the payer EOA
@@ -172,7 +172,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 |---|---|---|
 | `Q402_TRIAL_API_KEY` | live-pay (BNB) | BNB-only sponsored Trial key. Free at https://q402.quackai.ai/event. Used automatically for `chain="bnb"` when set. |
 | `Q402_MULTICHAIN_API_KEY` | live-pay (8-chain) | Paid 8-chain key. Get one at https://q402.quackai.ai/payment. Used for all non-BNB chains and for BNB when no Trial key is set. |
-| `Q402_API_KEY` | legacy fallback | Pre-v0.4.4 single-env path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
+| `Q402_API_KEY` | legacy fallback | Pre-v0.4.5 single-env path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
 | `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
 | `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `5`. |
