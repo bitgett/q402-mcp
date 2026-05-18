@@ -169,6 +169,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 | Stable | 988 | USDT0 (USDC and USDT both alias) | Gas paid in USDT0. |
 | Mantle | 5000 | USDC, USDT0 | LayerZero OFT USDT0 since 2025-11-27. |
 | Injective EVM | 1776 | USDT only | Native USDC via Circle CCTP announced for Q2 2026. |
+| Monad | 143 | USDC, USDT0 | Native Circle USDC (CCTP V2) + USDT0 (LayerZero OFT). |
 
 ---
 
@@ -176,7 +177,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 
 x402 standardised "402 Payment Required" semantics for AI agents but the official Coinbase facilitator only covers a few chains and assumes ERC-3009 token support — which excludes BNB USDT, Mantle USDT0, Injective USDT, and the chains where most stablecoin volume actually lives.
 
-Q402 implements the same payer experience (single signature, $0 gas, instant settlement) on all 7 of those chains using EIP-7702 delegated execution, which works with any ERC-20. This MCP server makes that infrastructure addressable from Claude itself.
+Q402 implements the same payer experience (single signature, $0 gas, instant settlement) on all 8 of those chains using EIP-7702 delegated execution, which works with any ERC-20. This MCP server makes that infrastructure addressable from Claude itself.
 
 If you want to dig into how the wire protocol differs from x402, see [Q402 docs](https://q402.quackai.ai/docs).
 
