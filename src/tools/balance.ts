@@ -1,37 +1,27 @@
 /**
- * q402_balance — read-only, requires an API key.
+ * q402_balance — read-only, requires at least one API key.
  *
  * Returns the API key's validity and plan tier from `/api/keys/verify` (POST).
- * The endpoint currently exposes `valid / address / plan / createdAt`; it does
- * NOT include remaining daily quota or per-chain gas-tank balances. Those need
- * a wallet signature and live in the dashboard at https://q402.quackai.ai/dashboard.
+ * The endpoint exposes `valid / address / plan / createdAt / remainingCredits`
+ * and a trial summary (`isTrial / trialDaysLeft / trialExpiresAt`) when the
+ * key is trial-scoped.
  *
- * If the verify endpoint is ever extended to include `remainingCredits` /
- * `quotaBonus`, this tool's response shape passes them through automatically
- * (we forward the whole `verify` blob), so no MCP-side change is required.
+ * Two-key model: when both Q402_TRIAL_API_KEY and Q402_MULTICHAIN_API_KEY
+ * are set, this tool verifies both and returns both summaries so the model
+ * can show the user the full picture in one read. Single-env legacy callers
+ * (only Q402_API_KEY set) get a one-scope response as before.
  */
 
 import { z } from "zod";
-import { CONFIG } from "../config.js";
+import { CONFIG, type KeyScope } from "../config.js";
 
 export const BalanceInputSchema = z.object({});
 export type BalanceInput = z.infer<typeof BalanceInputSchema>;
 
-export interface BalanceSummary {
-  apiKeyKind: "live" | "test" | "missing";
-  /** Pre-redacted form of the API key for display. Never returns the full key. */
-  apiKeyMasked: string | null;
-  /** Raw response from /api/keys/verify (valid flag, address, plan, quota …). */
-  verify?: unknown;
-  /** Pointer for the agent when richer data is needed. */
-  dashboardUrl: string;
-  setupHint?: string;
-  /**
-   * Trial-only summary lifted out of `verify` for convenient display. Present
-   * when /api/keys/verify returns `isTrial: true` (subscription.plan ===
-   * "trial"). Non-trial keys leave this undefined. The shape matches what the
-   * landing site's dashboard banner reads — days left + raw expiry timestamp.
-   */
+export interface ScopedVerifyResult {
+  scope: KeyScope | "legacy";
+  apiKeyMasked: string;
+  verify: unknown;
   trial?: {
     daysLeft: number;
     expiresAt: string;
@@ -40,66 +30,117 @@ export interface BalanceSummary {
   };
 }
 
+export interface BalanceSummary {
+  /**
+   * Legacy fields. Mirror the most relevant scope so callers that only know
+   * about the single-key shape keep working. Prefer `scopes` for new code.
+   */
+  apiKeyKind: "live" | "test" | "missing";
+  apiKeyMasked: string | null;
+  verify?: unknown;
+  trial?: ScopedVerifyResult["trial"];
+
+  /** Per-scope verification results. Empty when no key is configured. */
+  scopes: ScopedVerifyResult[];
+
+  dashboardUrl: string;
+  setupHint?: string;
+}
+
 function mask(key: string | null): string | null {
   if (!key || key.length < 12) return null;
   return `${key.slice(0, 12)}…${key.slice(-4)}`;
 }
 
-export async function runBalance(): Promise<BalanceSummary> {
-  if (CONFIG.apiKeyKind === "missing") {
-    return {
-      apiKeyKind: "missing",
-      apiKeyMasked: null,
-      dashboardUrl: "https://q402.quackai.ai/dashboard",
-      setupHint:
-        "Set Q402_API_KEY to a key issued at https://q402.quackai.ai/dashboard. " +
-        "Test-tier keys (q402_test_*) work too — they show sandbox quota.",
-    };
-  }
-
+async function verifyOne(apiKey: string): Promise<unknown> {
   const resp = await fetch(`${CONFIG.relayBaseUrl}/keys/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey: CONFIG.apiKey }),
+    body: JSON.stringify({ apiKey }),
   });
-  const verifyJson = resp.ok ? await resp.json() : { error: `HTTP ${resp.status}` };
+  return resp.ok ? await resp.json() : { error: `HTTP ${resp.status}` };
+}
 
-  // Hoist trial fields out of the verify blob so the model sees them at the
-  // top of the response. The /api/keys/verify route writes these only when
-  // the subscription is on the trial plan; paid keys leave `trial` undefined.
+function extractTrial(verifyJson: unknown): ScopedVerifyResult["trial"] | undefined {
   const v = verifyJson as {
     isTrial?: boolean;
     trialExpiresAt?: string;
     trialDaysLeft?: number;
     remainingCredits?: number;
   };
-  const trialMeta =
-    v && v.isTrial && typeof v.trialExpiresAt === "string"
-      ? {
-          daysLeft: typeof v.trialDaysLeft === "number" ? v.trialDaysLeft : 0,
-          expiresAt: v.trialExpiresAt,
-          creditsRemaining: typeof v.remainingCredits === "number" ? v.remainingCredits : 0,
-          signupUrl: "https://q402.quackai.ai",
-        }
-      : undefined;
+  if (!v || !v.isTrial || typeof v.trialExpiresAt !== "string") return undefined;
+  return {
+    daysLeft: typeof v.trialDaysLeft === "number" ? v.trialDaysLeft : 0,
+    expiresAt: v.trialExpiresAt,
+    creditsRemaining: typeof v.remainingCredits === "number" ? v.remainingCredits : 0,
+    signupUrl: "https://q402.quackai.ai",
+  };
+}
+
+export async function runBalance(): Promise<BalanceSummary> {
+  // Build the per-scope list. Each entry is verified independently so a
+  // typo'd trial key doesn't mask the multichain key's validity.
+  const targets: Array<{ scope: ScopedVerifyResult["scope"]; key: string }> = [];
+  if (CONFIG.trialApiKey)      targets.push({ scope: "trial",      key: CONFIG.trialApiKey });
+  if (CONFIG.multichainApiKey) targets.push({ scope: "multichain", key: CONFIG.multichainApiKey });
+  // Only emit the legacy entry when neither scoped key is set — otherwise
+  // it'd duplicate one of the entries above.
+  if (targets.length === 0 && CONFIG.legacyApiKey) {
+    targets.push({ scope: "legacy", key: CONFIG.legacyApiKey });
+  }
+
+  if (targets.length === 0) {
+    return {
+      apiKeyKind: "missing",
+      apiKeyMasked: null,
+      scopes: [],
+      dashboardUrl: "https://q402.quackai.ai/dashboard",
+      setupHint:
+        "Set Q402_TRIAL_API_KEY (BNB-only sponsored, free at /event) and/or " +
+        "Q402_MULTICHAIN_API_KEY (paid 8-chain from /dashboard). " +
+        "Single-env legacy: Q402_API_KEY also works.",
+    };
+  }
+
+  const scopes: ScopedVerifyResult[] = await Promise.all(
+    targets.map(async ({ scope, key }) => {
+      const verify = await verifyOne(key);
+      return {
+        scope,
+        apiKeyMasked: mask(key) ?? key,
+        verify,
+        trial: extractTrial(verify),
+      };
+    }),
+  );
+
+  // Legacy alias: surface the multichain scope's data first, else trial,
+  // else legacy. Keeps single-scope consumers working without changes.
+  const primary =
+    scopes.find(s => s.scope === "multichain") ??
+    scopes.find(s => s.scope === "trial") ??
+    scopes[0];
 
   return {
     apiKeyKind: CONFIG.apiKeyKind,
-    apiKeyMasked: mask(CONFIG.apiKey),
-    verify: verifyJson,
+    apiKeyMasked: primary.apiKeyMasked,
+    verify: primary.verify,
+    trial: primary.trial,
+    scopes,
     dashboardUrl: "https://q402.quackai.ai/dashboard",
-    ...(trialMeta ? { trial: trialMeta } : {}),
   };
 }
 
 export const BALANCE_TOOL = {
   name: "q402_balance",
   description:
-    "Verify the configured API key and report its plan tier (live vs sandbox vs trial). " +
-    "Read-only. When the key is on the free trial, returns the days-left and credits-remaining " +
-    "summary so the agent can surface it. Free trial available at https://q402.quackai.ai — " +
-    "2,000 gasless TX over 30 days, one wallet signature. For per-chain gas tank balances, " +
-    "point the user at https://q402.quackai.ai/dashboard — those need a wallet signature, not a bare key.",
+    "Verify the configured API key(s) and report each one's plan tier (live vs sandbox vs trial). " +
+    "Read-only. When both Q402_TRIAL_API_KEY and Q402_MULTICHAIN_API_KEY are set, returns " +
+    "BOTH summaries so the agent can show the user trial credits AND paid credits in one view. " +
+    "For trial-scoped keys, returns days-left + credits-remaining for the trial allotment. " +
+    "Free trial available at https://q402.quackai.ai/event — 2,000 gasless TX over 30 days. " +
+    "For per-chain gas tank balances, point the user at https://q402.quackai.ai/dashboard — " +
+    "those need a wallet signature, not a bare key.",
   inputSchema: {
     type: "object" as const,
     properties: {},

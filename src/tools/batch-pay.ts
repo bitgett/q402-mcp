@@ -24,7 +24,7 @@
 import { isAddress } from "ethers";
 import { z } from "zod";
 import { getChain, tokenFor } from "../chains.js";
-import { CONFIG } from "../config.js";
+import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest } from "../config.js";
 import {
   BatchPayError,
   Q402NodeClient,
@@ -71,6 +71,14 @@ export const BatchPayInputSchema = z.object({
     .describe(
       "Array of {to, amount} pairs. All recipients share the same chain and " +
         `token. Trial keys: max ${RECIPIENT_LIMIT_TRIAL} rows. Paid keys: max ${RECIPIENT_LIMIT_PAID} rows.`,
+    ),
+  keyScope: z
+    .enum(["auto", "trial", "multichain"])
+    .optional()
+    .describe(
+      'Which API key to use. "auto" (default) picks Trial for BNB when ' +
+        'Q402_TRIAL_API_KEY is set, Multichain otherwise. Trial forces the ' +
+        'BNB-only sponsored key; "multichain" forces the paid 8-chain key.',
     ),
   confirm: z
     .literal(true)
@@ -152,22 +160,30 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  if (CONFIG.mode === "sandbox") {
+  // Two-key resolution (see pay.ts for rationale). Throws clearly on
+  // conflicting scope (e.g. keyScope='trial' with chain='monad').
+  const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
+  const resolved = resolveApiKey(input.chain, scopeRequest);
+  guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
+
+  const live = isLiveModeFor(resolved);
+  if (!live) {
     const sandboxResults = input.recipients.map((r) =>
       sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
     );
     guardsApplied.push("mode=sandbox");
+    const reason = describeSandboxReason(resolved.apiKey);
     return {
       mode: "sandbox",
       status: "sandbox",
-      result: { sandbox: sandboxResults, reason: describeSandboxReason() },
+      result: { sandbox: sandboxResults, reason },
       guardsApplied,
-      setupHint: describeSandboxReason(),
+      setupHint: reason,
     };
   }
 
   const client = new Q402NodeClient({
-    apiKey: CONFIG.apiKey!,
+    apiKey: resolved.apiKey,
     privateKey: CONFIG.privateKey!,
     chain,
     relayBaseUrl: CONFIG.relayBaseUrl,
@@ -213,9 +229,9 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   }
 }
 
-function describeSandboxReason(): string {
+function describeSandboxReason(resolvedKey: string): string {
   const missing: string[] = [];
-  if (CONFIG.apiKeyKind !== "live") missing.push("Q402_API_KEY (must start with q402_live_)");
+  if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
   if (!CONFIG.privateKey) missing.push("Q402_PRIVATE_KEY");
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
@@ -230,11 +246,13 @@ export const BATCH_PAY_TOOL = {
   name: "q402_batch_pay",
   description:
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
-    `Trial keys (q402_live_* with plan='trial'): max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + ` +
-    `USDC/USDT only. Paid keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 6 EIP-7702 default ` +
-    "chains (avax, bnb, eth, mantle, injective, monad). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
-    "SANDBOX BY DEFAULT — real on-chain TX only when Q402_API_KEY (live), Q402_PRIVATE_KEY, " +
-    "and Q402_ENABLE_REAL_PAYMENTS=1 are all set. Every recipient receives the full amount; " +
+    "Uses Q402_TRIAL_API_KEY for chain='bnb' when the Trial env is set, " +
+    "Q402_MULTICHAIN_API_KEY otherwise. Set keyScope='trial' or 'multichain' to force one. " +
+    `Trial keys: max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + USDC/USDT only. ` +
+    `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 6 EIP-7702 default chains ` +
+    "(avax, bnb, eth, mantle, injective, monad). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
+    "SANDBOX BY DEFAULT — real on-chain TX only when the resolved key is live (q402_live_*), " +
+    "Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. Every recipient receives the full amount; " +
     "the sender pays $0 in gas for the entire batch. ALWAYS get explicit user confirmation " +
     "of the complete recipient + amount list, chain, and token in conversation immediately " +
     "before calling this tool — the user must approve the full batch, not the individual rows.",
@@ -278,6 +296,13 @@ export const BATCH_PAY_TOOL = {
           required: ["to", "amount"],
           additionalProperties: false,
         },
+      },
+      keyScope: {
+        type: "string",
+        enum: ["auto", "trial", "multichain"],
+        description:
+          'Which API key to use. "auto" (default) picks Trial for BNB when ' +
+          'Q402_TRIAL_API_KEY is set, Multichain otherwise.',
       },
       confirm: {
         type: "boolean",

@@ -12,7 +12,7 @@
 import { isAddress } from "ethers";
 import { z } from "zod";
 import { CHAIN_KEYS, getChain, tokenFor } from "../chains.js";
-import { CONFIG } from "../config.js";
+import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest } from "../config.js";
 import { Q402NodeClient, sandboxPay, type PayResult } from "../client.js";
 
 export const PayInputSchema = z.object({
@@ -29,6 +29,15 @@ export const PayInputSchema = z.object({
     'Stablecoin symbol. USDC / USDT supported on most chains (Injective is USDT-only). ' +
       'RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.',
   ),
+  keyScope: z
+    .enum(["auto", "trial", "multichain"])
+    .optional()
+    .describe(
+      'Which API key to use. "auto" (default) picks the Trial key for BNB ' +
+        'when Q402_TRIAL_API_KEY is set, and the Multichain key otherwise. ' +
+        '"trial" forces the BNB-only sponsored key. "multichain" forces the ' +
+        'paid 8-chain key.',
+    ),
   confirm: z
     .literal(true)
     .describe(
@@ -93,19 +102,29 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  if (CONFIG.mode === "sandbox") {
+  // Two-key resolution. Throws on conflicting scope (e.g. keyScope='trial'
+  // with chain='monad') with a clear message — surfacing the failure here
+  // is far better UX than sandboxing silently or hitting the relay's 403.
+  const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
+  const resolved = resolveApiKey(input.chain, scopeRequest);
+  guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
+
+  // Live mode for THIS resolved key. A live Trial key + sandbox legacy key
+  // shouldn't accidentally sandbox a trial payment, so the gate is per-key.
+  const live = isLiveModeFor(resolved);
+  if (!live) {
     const result = sandboxPay(chain, {
       to: input.to,
       amount: input.amount,
       token: input.token,
     });
     guardsApplied.push("mode=sandbox");
-    const setupHint = describeSandboxReason();
+    const setupHint = describeSandboxReason(resolved.apiKey);
     return { result, guardsApplied, setupHint };
   }
 
   const client = new Q402NodeClient({
-    apiKey: CONFIG.apiKey!,
+    apiKey: resolved.apiKey,
     privateKey: CONFIG.privateKey!,
     chain,
     relayBaseUrl: CONFIG.relayBaseUrl,
@@ -119,9 +138,9 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   return { result, guardsApplied };
 }
 
-function describeSandboxReason(): string {
+function describeSandboxReason(resolvedKey: string): string {
   const missing: string[] = [];
-  if (CONFIG.apiKeyKind !== "live") missing.push("Q402_API_KEY (must start with q402_live_)");
+  if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
   if (!CONFIG.privateKey) missing.push("Q402_PRIVATE_KEY");
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
@@ -135,18 +154,19 @@ function describeSandboxReason(): string {
 export const PAY_TOOL = {
   name: "q402_pay",
   description:
-    "Send a gasless USDC, USDT, or RLUSD payment via Q402. Scope depends on " +
-    "the API key tier: trial keys (q402_live_* with plan='trial') are " +
-    'restricted to chain: "bnb" + token "USDC" or "USDT" (server returns ' +
-    "TRIAL_BNB_ONLY for anything else). Paid keys can relay across the full " +
-    "8-chain matrix — avax, bnb, eth, xlayer, stable, mantle, injective, monad — " +
-    "with USDC/USDT supported on most chains, RLUSD on Ethereum only, and " +
-    "Injective USDT-only. SANDBOX BY DEFAULT — no funds move unless " +
-    "Q402_API_KEY (live tier), Q402_PRIVATE_KEY, and Q402_ENABLE_REAL_PAYMENTS=1 " +
-    "are all set. The recipient receives the full amount; the sender pays $0 " +
-    "in gas. ALWAYS get explicit user confirmation of the exact recipient " +
-    "address, amount, chain, and token in conversation immediately before " +
-    "calling this tool.",
+    "Send a gasless USDC, USDT, or RLUSD payment via Q402. " +
+    "Uses Q402_TRIAL_API_KEY (BNB-only sponsored Trial) when chain='bnb' and " +
+    "the Trial env is set, and Q402_MULTICHAIN_API_KEY (paid 8-chain) otherwise. " +
+    "Set keyScope='trial' or 'multichain' to force one explicitly. " +
+    "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
+    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad — " +
+    "USDC/USDT on most chains, RLUSD on Ethereum only, Injective USDT-only. " +
+    "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
+    "(q402_live_*), Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. " +
+    "The recipient receives the full amount; the sender pays $0 in gas. " +
+    "ALWAYS get explicit user confirmation of the exact recipient address, " +
+    "amount, chain, and token in conversation immediately before calling " +
+    "this tool.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -169,6 +189,14 @@ export const PAY_TOOL = {
         description:
           "Stablecoin to send. USDC / USDT supported on most chains; Injective is USDT-only. " +
           "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.",
+      },
+      keyScope: {
+        type: "string",
+        enum: ["auto", "trial", "multichain"],
+        description:
+          'Which API key to use. "auto" (default) picks Trial for BNB when ' +
+          'Q402_TRIAL_API_KEY is set, Multichain otherwise. "trial" forces the ' +
+          'BNB-only sponsored key. "multichain" forces the paid 8-chain key.',
       },
       confirm: {
         type: "boolean",
