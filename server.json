@@ -6,26 +6,26 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.4.7",
+  "version": "0.4.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.4.7",
+      "version": "0.4.8",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "Q402_TRIAL_API_KEY",
-          "description": "Free Trial API key from https://q402.quackai.ai/event. BNB Chain only, 2,000 sponsored TXs, gas covered by Q402. Single payments on chain='bnb' auto-route to this key when set.",
+          "description": "Free Trial API key from https://q402.quackai.ai/event. BNB Chain only, 2,000 sponsored TXs, gas covered by Q402. BNB payments auto-route to this key when set (same rule for q402_pay and q402_batch_pay up to 5 recipients). For 6+ recipient BNB batches, q402_batch_pay returns status='ambiguous' so the agent can ask the user how to split.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
         },
         {
           "name": "Q402_MULTICHAIN_API_KEY",
-          "description": "Paid Multichain API key from https://q402.quackai.ai/payment. Full 8-chain support with per-chain Gas Tank. Non-BNB payments and 6+ row batches auto-route to this key.",
+          "description": "Paid Multichain API key from https://q402.quackai.ai/payment. Full 8-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments AND whenever keyScope='multichain' is chosen. Use it to send all rows in a 6+ recipient BNB batch after the ambiguity prompt.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
