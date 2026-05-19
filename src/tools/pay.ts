@@ -39,10 +39,10 @@ export const PayInputSchema = z.object({
     .enum(["auto", "trial", "multichain"])
     .optional()
     .describe(
-      'Which API key to use. "auto" (default) picks the Trial key for BNB ' +
-        'when Q402_TRIAL_API_KEY is set, and the Multichain key otherwise. ' +
-        '"trial" forces the BNB-only sponsored key. "multichain" forces the ' +
-        'paid 8-chain key.',
+      'Which API key to use. "auto" (default): chain="bnb" + ' +
+        'Q402_TRIAL_API_KEY set → Trial (free sponsored); else Multichain. ' +
+        '"trial" forces the BNB-only sponsored key. "multichain" forces ' +
+        'the paid 8-chain key. Same rule applies to q402_batch_pay.',
     ),
   confirm: z
     .literal(true)
@@ -111,9 +111,10 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   // Two-key resolution. Sandbox-default: never throws. When a scope can't be
   // resolved to a live key (env missing, impossible chain×scope combo, …) the
   // resolver returns `apiKey: null` plus a `sandboxReason` hint that we
-  // surface as the agent-visible setupHint.
+  // surface as the agent-visible setupHint. Unified rule with q402_batch_pay:
+  // BNB + Trial key set ⇒ Trial; else Multichain.
   const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
-  const resolved = resolveApiKey(input.chain, scopeRequest, "single");
+  const resolved = resolveApiKey(input.chain, scopeRequest);
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
   const live = isLiveModeFor(resolved);
@@ -164,8 +165,8 @@ export const PAY_TOOL = {
   name: "q402_pay",
   description:
     "Send a gasless USDC, USDT, or RLUSD payment via Q402. " +
-    "Uses Q402_TRIAL_API_KEY (BNB-only sponsored Trial) when chain='bnb' and " +
-    "the Trial env is set, and Q402_MULTICHAIN_API_KEY (paid 8-chain) otherwise. " +
+    "Auto-routing: chain='bnb' + Q402_TRIAL_API_KEY set → Trial (free sponsored); " +
+    "anything else → Multichain (paid 8-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
     "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad — " +

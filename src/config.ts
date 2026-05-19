@@ -114,22 +114,23 @@ export function loadConfig(): Config {
 export const CONFIG = loadConfig();
 
 /**
- * Resolve the API key to use for a (chain, scope, intent) request.
+ * Resolve the API key to use for a (chain, scope) request.
  *
- * Auto routing rules (when scope === "auto"):
- *   - intent === "batch"                                   → multichain
- *                                                            (trial cap is 5;
- *                                                            multichain cap
- *                                                            is 20 — defaulting
- *                                                            batches to trial
- *                                                            silently breaks
- *                                                            any 6+ row batch.)
- *   - chain === "bnb" AND trialApiKey present              → trial
- *                                                            (single-pay: burn
- *                                                            the free sponsored
- *                                                            allotment first.)
- *   - otherwise                                            → multichain
+ * Auto routing rule (when scope === "auto"):
+ *   - chain === "bnb" AND Q402_TRIAL_API_KEY set  → trial
+ *   - otherwise                                    → multichain
  *   - if the chosen scope has no key, fall back to legacyApiKey
+ *
+ * This rule applies UNIFORMLY to `q402_pay` (single) AND `q402_batch_pay`
+ * (batch). The batch-vs-single distinction used to live in this resolver
+ * (batches always picked multichain to avoid the Trial 5-recipient cap),
+ * but that surprised users by silently charging the paid pool for what
+ * they expected to be a free Trial flow. The current design is honest:
+ * BNB always prefers Trial when a Trial key is set; if a batch would
+ * exceed the Trial cap, the batch-pay tool surfaces an `ambiguous` status
+ * BEFORE executing so the agent can ask the user how to handle it
+ * (`keyScope: "trial"` to use 5, `keyScope: "multichain"` for all, or two
+ * separate calls to split). See `batch-pay.ts` for the ambiguity gate.
  *
  * NEVER THROWS. The MCP server is sandbox-default by design: any failure to
  * resolve a live key returns a null `apiKey` and a `sandboxReason` so the
@@ -153,25 +154,18 @@ export interface ResolvedKey {
   sandboxReason?: string;
 }
 
-/** Caller intent. Auto-routing splits single vs batch — see comment above. */
-export type Intent = "single" | "batch";
-
 export function resolveApiKey(
   chain: string,
   scope: KeyScopeRequest = "auto",
-  intent: Intent = "single",
 ): ResolvedKey {
   const effectiveScope: KeyScope =
     scope === "auto"
-      ? // Smart routing: batches default to multichain (trial cap=5 would
-        // silently fail any 6+ recipient batch). Single payments default to
-        // trial on BNB when a trial key is set, so the free sponsored
-        // allotment gets used naturally.
-        intent === "batch"
-        ? "multichain"
-        : chain === "bnb" && CONFIG.trialApiKey
-          ? "trial"
-          : "multichain"
+      ? // Unified rule for single + batch: BNB prefers Trial when set,
+        // everything else uses Multichain. Batch cap ambiguity is handled
+        // in batch-pay.ts BEFORE this resolver runs.
+        chain === "bnb" && CONFIG.trialApiKey
+        ? "trial"
+        : "multichain"
       : scope;
 
   if (effectiveScope === "trial") {

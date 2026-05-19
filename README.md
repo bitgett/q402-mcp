@@ -76,11 +76,14 @@ command = "npx"
 args = ["-y", "@quackai/q402-mcp"]
 startup_timeout_sec = 20.0
 env = {
-  # Two-key model (v0.4.6+): set whichever applies — both is best.
-  # Auto-routing:
-  #   q402_pay (single)  → BNB + trial key set ⇒ trial; else multichain.
-  #   q402_batch_pay     → ALWAYS multichain (trial cap=5 silently breaks
-  #                        6+ row batches; pass keyScope="trial" to force).
+  # Two-key model (v0.4.7+): set whichever applies — both is best.
+  # Auto-routing rule (same for q402_pay AND q402_batch_pay):
+  #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
+  #   anything else                          → Multichain (paid 8-chain)
+  # Batch ambiguity: when auto would land on Trial AND recipients.length > 5,
+  # q402_batch_pay returns status="ambiguous" WITHOUT executing so the agent
+  # can ask the user — pass keyScope="trial" (first 5), "multichain" (all
+  # paid), or call twice (5 free + remainder paid).
   # Both keys use the same q402_live_ prefix — the env var name is what
   # carries the scope, not the key string. Get the values from the
   # dashboard (each key has its own copy button per view).
@@ -115,7 +118,7 @@ The server has no client-specific code. If your client speaks stdio MCP, point i
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
 | `q402_balance` | API key | Verify the API key and report its plan tier + remaining quota credits (live vs sandbox). |
 | `q402_pay` | API key + private key + flag | Send a gasless payment to a single recipient. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
-| `q402_batch_pay` | API key + private key + flag | Send a gasless payment to **multiple** recipients in one call on a single chain × token. Trial keys: 5 rows max. Paid keys: 20 rows max. **Supported chains: avax, bnb, eth, mantle, injective, monad** (default EIP-7702 mode). xlayer + stable are NOT batchable — use `q402_pay` in a loop for those. Same sandbox gating as `q402_pay`. **Rate-limit note:** the inner `/api/relay` budget (30/min per key) is consumed per row, so a paid 20-row batch leaves ~10 inner slots for the next minute. |
+| `q402_batch_pay` | API key + private key + flag | Send a gasless payment to **multiple** recipients in one call on a single chain × token. Trial keys: 5 rows max. Paid keys: 20 rows max. **Auto-routing:** same rule as `q402_pay` (BNB + Trial key set ⇒ Trial, else Multichain). **Ambiguity gate:** 6+ recipient BNB batches with Trial set return `status="ambiguous"` instead of executing — the agent asks the user to pick `keyScope="trial"` (first 5), `"multichain"` (all paid), or two calls (5 free + remainder paid). **Supported chains: avax, bnb, eth, mantle, injective, monad** (default EIP-7702 mode). xlayer + stable are NOT batchable — use `q402_pay` in a loop for those. Same sandbox gating as `q402_pay`. **Rate-limit note:** the inner `/api/relay` budget (30/min per key) is consumed per row, so a paid 20-row batch leaves ~10 inner slots for the next minute. |
 | `q402_receipt` | none | Look up a Trust Receipt by `rct_…` id and locally verify its ECDSA signature against the relayer EOA. Returns the public settlement record + a `verified` boolean. *receiptId-only today; tx-hash lookup reserved for a future release.* |
 
 `q402_pay` and `q402_batch_pay` follow a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address(es), amount(s), chain, and token. For batch calls the user must approve the **full batch**, not the individual rows.
@@ -136,16 +139,18 @@ By default the MCP server operates in **sandbox mode**: `q402_pay` returns a ran
 To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set, and `Q402_ENABLE_REAL_PAYMENTS=1`:
 
 ```bash
-# Two-key model (v0.4.6+) — set whichever applies. Both is best.
-# Auto-routing:
-#   q402_pay (single)  → BNB + Q402_TRIAL_API_KEY set ⇒ Trial; else Multichain.
-#   q402_batch_pay     → always Multichain (Trial cap=5 silently breaks 6+ row batches).
+# Two-key model (v0.4.7+) — set whichever applies. Both is best.
+# Auto-routing (same for q402_pay AND q402_batch_pay):
+#   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
+#   anything else                          → Multichain (paid 8-chain)
+# Batch ambiguity: 6+ recipient BNB batch with Trial set returns
+#   status="ambiguous" instead of executing — agent asks user to pick.
 # Override per call with keyScope: "auto" | "trial" | "multichain".
 Q402_TRIAL_API_KEY=q402_live_...           # BNB-only sponsored Trial key (from /event)
 Q402_MULTICHAIN_API_KEY=q402_live_...      # paid 8-chain key (per-chain Gas Tank)
 
 # Legacy fallback. Used for both scopes when the two above are unset —
-# pre-v0.4.6 users keep working without any config change.
+# pre-v0.4.7 users keep working without any config change.
 Q402_API_KEY=q402_live_...
 
 Q402_PRIVATE_KEY=0xabc...                  # signer for the payer EOA
@@ -175,9 +180,9 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 
 | Env var | Required for | Notes |
 |---|---|---|
-| `Q402_TRIAL_API_KEY` | live-pay (BNB) | BNB-only sponsored Trial key. Free at https://q402.quackai.ai/event. Used automatically for `chain="bnb"` when set. |
-| `Q402_MULTICHAIN_API_KEY` | live-pay (8-chain) | Paid 8-chain key. Get one at https://q402.quackai.ai/payment. Used for all non-BNB chains and for BNB when no Trial key is set. |
-| `Q402_API_KEY` | legacy fallback | Pre-v0.4.6 single-env path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
+| `Q402_TRIAL_API_KEY` | live-pay (BNB) | BNB-only sponsored Trial key. Free at https://q402.quackai.ai/event. Auto-routed for `chain="bnb"` in both `q402_pay` and `q402_batch_pay` (≤5 recipients) when set. 6+ recipient BNB batches return `status="ambiguous"` so the agent can ask the user how to split. |
+| `Q402_MULTICHAIN_API_KEY` | live-pay (8-chain) | Paid 8-chain key. Get one at https://q402.quackai.ai/payment. Auto-routed for non-BNB chains AND for BNB when no Trial key is set. Cap: 20 recipients per batch. |
+| `Q402_API_KEY` | legacy fallback | Pre-v0.4.7 single-env path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
 | `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
 | `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `5`. |

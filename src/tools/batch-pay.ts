@@ -12,11 +12,21 @@
  * Sandbox-default, same gating as q402_pay. Live mode requires the
  * resolved scope key (Q402_TRIAL_API_KEY / Q402_MULTICHAIN_API_KEY /
  * legacy Q402_API_KEY fallback) to be q402_live_* AND Q402_PRIVATE_KEY
- * set AND Q402_ENABLE_REAL_PAYMENTS=1. Note that auto-routing for
- * batches ALWAYS picks Multichain (trial cap=5 would silently break
- * 6+ row batches); pass keyScope="trial" to force the Trial key. The
- * per-call amount cap and recipient allowlist guards run *per recipient*
- * — every row in the batch must clear them independently.
+ * set AND Q402_ENABLE_REAL_PAYMENTS=1.
+ *
+ * Auto-routing follows the SAME rule as q402_pay: chain="bnb" +
+ * Q402_TRIAL_API_KEY set → Trial; else Multichain. The one extra
+ * twist is the ambiguity gate: when a 6+ recipient BNB batch arrives
+ * with a Trial key set AND no explicit keyScope, this tool does NOT
+ * execute — it returns status="ambiguous" with a setupHint listing
+ * three choices (trial-first-5, multichain-all, or split via two
+ * separate calls). The agent surfaces the choices to the human and
+ * re-invokes with an explicit keyScope. This avoids the two silent
+ * failure modes (paid-pool charged when user expected free; or 5-cap
+ * server error masking user intent).
+ *
+ * The per-call amount cap and recipient allowlist guards run *per
+ * recipient* — every row in the batch must clear them independently.
  *
  * Server-side execution is sequential. The first recipient installs
  * the EIP-7702 delegation on the owner's EOA; remaining recipients
@@ -79,11 +89,13 @@ export const BatchPayInputSchema = z.object({
     .enum(["auto", "trial", "multichain"])
     .optional()
     .describe(
-      'Which API key to use. "auto" (default) ALWAYS routes batches to the ' +
-        'Multichain key, even on BNB — the Trial cap of 5 recipients would ' +
-        'silently break any 6+ row batch. Use keyScope="trial" to force the ' +
-        'BNB-only sponsored Trial key (max 5 recipients). keyScope="multichain" ' +
-        'is the same as auto for batches.',
+      'Which API key to use. "auto" (default): chain="bnb" + ' +
+        'Q402_TRIAL_API_KEY set → Trial; else Multichain — same rule as ' +
+        'q402_pay. When auto would land on Trial AND recipients.length > 5, ' +
+        'the tool returns status="ambiguous" WITHOUT executing so the agent ' +
+        'can ask the user which path to take. Use keyScope="trial" to force ' +
+        'the BNB-only sponsored key (≤5 recipients). keyScope="multichain" ' +
+        'forces the paid 8-chain key (≤20 recipients).',
     ),
   confirm: z
     .literal(true)
@@ -98,8 +110,14 @@ export const BatchPayInputSchema = z.object({
 export type BatchPayInput = z.infer<typeof BatchPayInputSchema>;
 
 export interface BatchPaySummary {
-  mode: "sandbox" | "live";
-  status: "success" | "partial_failure" | "aborted" | "sandbox";
+  mode: "sandbox" | "live" | "none";
+  /**
+   * `ambiguous` is returned WITHOUT executing when a 6+ recipient BNB batch
+   * arrives with Q402_TRIAL_API_KEY set and no explicit `keyScope`. The
+   * agent should read `setupHint` for the choice list (trial-5, multichain-
+   * all, or split via two calls) and re-invoke with an explicit `keyScope`.
+   */
+  status: "success" | "partial_failure" | "aborted" | "sandbox" | "ambiguous";
   result?: BatchPayResult | { sandbox: PayResult[]; reason: string };
   guardsApplied: string[];
   setupHint?: string;
@@ -165,11 +183,45 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  // Two-key resolution (see pay.ts for rationale). Sandbox-default: never
-  // throws. Batches pass intent="batch" so auto routing prefers the
-  // multichain key (cap=20) over the trial key (cap=5).
+  // ── Ambiguity gate ─────────────────────────────────────────────────────────
+  // When the agent didn't pass an explicit keyScope AND we're on BNB AND a
+  // Trial key is configured AND the batch is too big to fit on a single
+  // Trial-scope call (Trial cap = RECIPIENT_LIMIT_TRIAL = 5), DON'T auto-
+  // route silently. The previous "always multichain for batches" rule meant
+  // a user expecting free Trial usage would silently charge the paid pool;
+  // the inverse "always trial on BNB" rule would silently return a 5-cap
+  // server error. Neither default is honest. Instead, return a structured
+  // ambiguous response that prompts the agent to ask the human which path
+  // they want — and re-call with explicit keyScope (or split via two calls).
   const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
-  const resolved = resolveApiKey(input.chain, scopeRequest, "batch");
+  if (
+    scopeRequest === "auto" &&
+    input.chain === "bnb" &&
+    CONFIG.trialApiKey &&
+    input.recipients.length > RECIPIENT_LIMIT_TRIAL
+  ) {
+    const overflow = input.recipients.length - RECIPIENT_LIMIT_TRIAL;
+    guardsApplied.push("batch_cap_ambiguous");
+    return {
+      mode: "none",
+      status: "ambiguous",
+      guardsApplied,
+      setupHint:
+        `Batch of ${input.recipients.length} on BNB exceeds the Trial cap of ${RECIPIENT_LIMIT_TRIAL}. ` +
+        `Ask the user to pick one and re-invoke q402_batch_pay with explicit keyScope:\n` +
+        `  • keyScope="trial" — keep only the first ${RECIPIENT_LIMIT_TRIAL} recipients ` +
+        `(free, sponsored). Drop the remaining ${overflow}.\n` +
+        `  • keyScope="multichain" — send all ${input.recipients.length} on the paid ` +
+        `Multichain key (charges the paid pool + Gas Tank).\n` +
+        `  • Split — two separate calls: keyScope="trial" with the first ` +
+        `${RECIPIENT_LIMIT_TRIAL} (free), then keyScope="multichain" with the remaining ` +
+        `${overflow} (paid). This maximises free Trial usage.`,
+    };
+  }
+
+  // Two-key resolution. Sandbox-default: never throws. Unified rule with
+  // q402_pay — BNB + Trial key set ⇒ Trial; else Multichain.
+  const resolved = resolveApiKey(input.chain, scopeRequest);
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
   const live = isLiveModeFor(resolved);
@@ -253,13 +305,15 @@ export const BATCH_PAY_TOOL = {
   name: "q402_batch_pay",
   description:
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
-    "Auto-routing ALWAYS picks the Multichain key (even on BNB) — the Trial cap " +
-    `of ${RECIPIENT_LIMIT_TRIAL} recipients would silently break 6+ row batches. ` +
-    "Set keyScope='trial' to force the BNB-only sponsored Trial key (≤5 recipients); " +
-    "keyScope='multichain' is the auto default. " +
+    "Auto-routing follows the same rule as q402_pay: chain='bnb' + Q402_TRIAL_API_KEY set " +
+    "→ Trial; else Multichain. " +
     `Trial keys: max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + USDC/USDT only. ` +
     `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 6 EIP-7702 default chains ` +
     "(avax, bnb, eth, mantle, injective, monad). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
+    "AMBIGUITY GATE: when auto would land on Trial AND recipients.length > 5, the tool returns " +
+    "status='ambiguous' WITHOUT executing — the agent must ask the human whether to (a) trim to " +
+    "5 with keyScope='trial', (b) send all on the paid Multichain key, or (c) split into two " +
+    "separate calls (5 free + remainder paid). Re-invoke with explicit keyScope after the choice. " +
     "SANDBOX BY DEFAULT — real on-chain TX only when the resolved key is live (q402_live_*), " +
     "Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. Every recipient receives the full amount; " +
     "the sender pays $0 in gas for the entire batch. ALWAYS get explicit user confirmation " +
@@ -310,9 +364,10 @@ export const BATCH_PAY_TOOL = {
         type: "string",
         enum: ["auto", "trial", "multichain"],
         description:
-          'Which API key to use. "auto" (default) ALWAYS picks Multichain ' +
-          'for batches — Trial cap=5 would silently break 6+ row batches. ' +
-          'Use keyScope="trial" to force the BNB-only sponsored key (≤5 rows).',
+          'Which API key to use. "auto" (default): BNB + trial key set → ' +
+          'Trial; else Multichain. When auto would land on Trial AND ' +
+          'recipients.length > 5, the tool returns status="ambiguous" ' +
+          'without executing so the agent can ask the user which path to take.',
       },
       confirm: {
         type: "boolean",
