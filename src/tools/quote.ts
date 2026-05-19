@@ -69,10 +69,11 @@ export function runQuote(input: QuoteInput): {
   const candidates = (filterChain ? [filterChain] : CHAIN_KEYS)
     .map(k => CHAIN_CONFIG[k])
     .filter(cfg => {
-      // Skip chains that have been narrowed to an empty supportedTokens list
-      // (BNB-focus sprint mutates non-BNB chains to []). Without this guard the
-      // quote tool would happily list "Ethereum: no tokens", which is a worse
-      // signal to the model than just omitting the chain entirely.
+      // Skip chains narrowed to an empty supportedTokens list — happens when
+      // BNB_FOCUS_MODE (emergency flag, currently false) mutates non-BNB
+      // chains to []. Without this guard the quote tool would happily list
+      // "Ethereum: no tokens", which is a worse signal to the model than
+      // just omitting the chain entirely.
       if (cfg.supportedTokens && cfg.supportedTokens.length === 0) return false;
       if (!filterToken) return true;
       if (cfg.supportedTokens && !cfg.supportedTokens.includes(filterToken)) return false;
