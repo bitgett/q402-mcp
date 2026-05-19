@@ -76,8 +76,11 @@ command = "npx"
 args = ["-y", "@quackai/q402-mcp"]
 startup_timeout_sec = 20.0
 env = {
-  # Two-key model (v0.4.5+): set whichever applies — both is best.
-  # The server auto-routes by chain: BNB → trial key, else multichain key.
+  # Two-key model (v0.4.6+): set whichever applies — both is best.
+  # Auto-routing:
+  #   q402_pay (single)  → BNB + trial key set ⇒ trial; else multichain.
+  #   q402_batch_pay     → ALWAYS multichain (trial cap=5 silently breaks
+  #                        6+ row batches; pass keyScope="trial" to force).
   # Both keys use the same q402_live_ prefix — the env var name is what
   # carries the scope, not the key string. Get the values from the
   # dashboard (each key has its own copy button per view).
@@ -128,19 +131,21 @@ The server has no client-specific code. If your client speaks stdio MCP, point i
 
 ## Sandbox vs live mode
 
-By default the MCP server operates in **sandbox mode**: `q402_pay` returns a deterministic-looking fake transaction hash, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an LLM hallucinating a payment.
+By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash (32-byte hex, no on-chain broadcast), no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an LLM hallucinating a payment.
 
 To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set, and `Q402_ENABLE_REAL_PAYMENTS=1`:
 
 ```bash
-# Two-key model (v0.4.5+) — set whichever applies. Both is best.
-# Auto-routing: chain="bnb" → trial key (if set), otherwise multichain key.
+# Two-key model (v0.4.6+) — set whichever applies. Both is best.
+# Auto-routing:
+#   q402_pay (single)  → BNB + Q402_TRIAL_API_KEY set ⇒ Trial; else Multichain.
+#   q402_batch_pay     → always Multichain (Trial cap=5 silently breaks 6+ row batches).
 # Override per call with keyScope: "auto" | "trial" | "multichain".
 Q402_TRIAL_API_KEY=q402_live_...           # BNB-only sponsored Trial key (from /event)
 Q402_MULTICHAIN_API_KEY=q402_live_...      # paid 8-chain key (per-chain Gas Tank)
 
 # Legacy fallback. Used for both scopes when the two above are unset —
-# pre-v0.4.5 users keep working without any config change.
+# pre-v0.4.6 users keep working without any config change.
 Q402_API_KEY=q402_live_...
 
 Q402_PRIVATE_KEY=0xabc...                  # signer for the payer EOA
@@ -151,7 +156,7 @@ Anything missing for the resolved scope → automatic sandbox fallback with a hi
 
 > ⚠️ **Sandbox returns a deterministic-looking fake `txHash` and a synthetic success result.** A user who *expected* a live transfer (e.g. forgot to set `Q402_ENABLE_REAL_PAYMENTS=1`, mis-typed a scoped env var, or hit an impossible chain×scope combination like `keyScope: "trial"` + `chain: "monad"`) gets a "success" back and may believe funds actually moved.
 >
-> Two-layer mitigation: every sandbox response carries a `setupHint` field on the tool result describing **exactly why** sandbox was selected, and the `q402_balance` tool's `apiKeyKind: "missing"` makes the same diagnosis explicit. Always check `setupHint` on the first call from a new install. The deterministic `txHash` pattern (`0x` + 64 hex derived from `keccak256(chain, to, amount, token, "sandbox")`) is intentional so the agent can recognise it post-hoc, but the safer habit is to inspect `setupHint` before showing the user a success message.
+> Two-layer mitigation: every sandbox response carries a `setupHint` field on the tool result describing **exactly why** sandbox was selected, and a `method: "sandbox"` field that makes the mode explicit independent of hash inspection. The `txHash` itself is a 32-byte random hex string — visually indistinguishable from a real hash but emitted only when no on-chain TX is broadcast — so don't rely on hash forensics. Always check `setupHint` (or `method`) before showing the user a success message.
 
 ### Hard caps
 
@@ -172,7 +177,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 |---|---|---|
 | `Q402_TRIAL_API_KEY` | live-pay (BNB) | BNB-only sponsored Trial key. Free at https://q402.quackai.ai/event. Used automatically for `chain="bnb"` when set. |
 | `Q402_MULTICHAIN_API_KEY` | live-pay (8-chain) | Paid 8-chain key. Get one at https://q402.quackai.ai/payment. Used for all non-BNB chains and for BNB when no Trial key is set. |
-| `Q402_API_KEY` | legacy fallback | Pre-v0.4.5 single-env path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
+| `Q402_API_KEY` | legacy fallback | Pre-v0.4.6 single-env path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
 | `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
 | `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `5`. |

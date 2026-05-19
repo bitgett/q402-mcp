@@ -9,11 +9,14 @@
  * sender pays $0 in gas regardless of batch size — Q402's relayer
  * covers gas for every transfer.
  *
- * Sandbox-default, same gating as q402_pay (live mode requires all
- * three env vars: Q402_API_KEY live-tier + Q402_PRIVATE_KEY +
- * Q402_ENABLE_REAL_PAYMENTS=1). The per-call amount cap and recipient
- * allowlist guards run *per recipient* — every row in the batch must
- * clear them independently.
+ * Sandbox-default, same gating as q402_pay. Live mode requires the
+ * resolved scope key (Q402_TRIAL_API_KEY / Q402_MULTICHAIN_API_KEY /
+ * legacy Q402_API_KEY fallback) to be q402_live_* AND Q402_PRIVATE_KEY
+ * set AND Q402_ENABLE_REAL_PAYMENTS=1. Note that auto-routing for
+ * batches ALWAYS picks Multichain (trial cap=5 would silently break
+ * 6+ row batches); pass keyScope="trial" to force the Trial key. The
+ * per-call amount cap and recipient allowlist guards run *per recipient*
+ * — every row in the batch must clear them independently.
  *
  * Server-side execution is sequential. The first recipient installs
  * the EIP-7702 delegation on the owner's EOA; remaining recipients
@@ -76,9 +79,11 @@ export const BatchPayInputSchema = z.object({
     .enum(["auto", "trial", "multichain"])
     .optional()
     .describe(
-      'Which API key to use. "auto" (default) picks Trial for BNB when ' +
-        'Q402_TRIAL_API_KEY is set, Multichain otherwise. Trial forces the ' +
-        'BNB-only sponsored key; "multichain" forces the paid 8-chain key.',
+      'Which API key to use. "auto" (default) ALWAYS routes batches to the ' +
+        'Multichain key, even on BNB — the Trial cap of 5 recipients would ' +
+        'silently break any 6+ row batch. Use keyScope="trial" to force the ' +
+        'BNB-only sponsored Trial key (max 5 recipients). keyScope="multichain" ' +
+        'is the same as auto for batches.',
     ),
   confirm: z
     .literal(true)
@@ -248,8 +253,10 @@ export const BATCH_PAY_TOOL = {
   name: "q402_batch_pay",
   description:
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
-    "Uses Q402_TRIAL_API_KEY for chain='bnb' when the Trial env is set, " +
-    "Q402_MULTICHAIN_API_KEY otherwise. Set keyScope='trial' or 'multichain' to force one. " +
+    "Auto-routing ALWAYS picks the Multichain key (even on BNB) — the Trial cap " +
+    `of ${RECIPIENT_LIMIT_TRIAL} recipients would silently break 6+ row batches. ` +
+    "Set keyScope='trial' to force the BNB-only sponsored Trial key (≤5 recipients); " +
+    "keyScope='multichain' is the auto default. " +
     `Trial keys: max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + USDC/USDT only. ` +
     `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 6 EIP-7702 default chains ` +
     "(avax, bnb, eth, mantle, injective, monad). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
@@ -303,8 +310,9 @@ export const BATCH_PAY_TOOL = {
         type: "string",
         enum: ["auto", "trial", "multichain"],
         description:
-          'Which API key to use. "auto" (default) picks Trial for BNB when ' +
-          'Q402_TRIAL_API_KEY is set, Multichain otherwise.',
+          'Which API key to use. "auto" (default) ALWAYS picks Multichain ' +
+          'for batches — Trial cap=5 would silently break 6+ row batches. ' +
+          'Use keyScope="trial" to force the BNB-only sponsored key (≤5 rows).',
       },
       confirm: {
         type: "boolean",
