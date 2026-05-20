@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 — gasless USDC, USDT, and RLUSD payments across 8 EVM chains, callable from any MCP client.",
+  "description": "Q402 — gasless USDC, USDT, and RLUSD payments across 9 EVM chains, callable from any MCP client.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.4.9",
+  "version": "0.5.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.4.9",
+      "version": "0.5.0",
       "transport": {
         "type": "stdio"
       },
@@ -25,7 +25,7 @@
         },
         {
           "name": "Q402_MULTICHAIN_API_KEY",
-          "description": "Paid Multichain API key from https://q402.quackai.ai/payment. Full 8-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments AND whenever keyScope='multichain' is chosen. Use it to send all rows in a 6+ recipient BNB batch after the ambiguity prompt.",
+          "description": "Paid Multichain API key from https://q402.quackai.ai/payment. Full 9-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments AND whenever keyScope='multichain' is chosen. Use it to send all rows in a 6+ recipient BNB batch after the ambiguity prompt.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"

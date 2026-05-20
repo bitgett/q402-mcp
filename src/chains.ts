@@ -1,5 +1,5 @@
 /**
- * Static chain registry — mirrors q402-landing/public/q402-sdk.js v1.7.x.
+ * Static chain registry — mirrors q402-landing/public/q402-sdk.js v1.8.x.
  *
  * The authoritative source for these values is contracts.manifest.json on the
  * q402-landing repo; this MCP package keeps a frozen copy so it can be used
@@ -9,7 +9,7 @@
  * this file *and* the @quackai/q402-mcp version in lock-step.
  *
  * Emergency BNB-only narrowing: `BNB_FOCUS_MODE` (defined below) is currently
- * false — the full 8-chain matrix is live. The flag stays in the module as a
+ * false — the full 9-chain matrix is live. The flag stays in the module as a
  * one-line revert path if a future incident requires temporarily collapsing
  * the supported set to BNB. Trial-key restrictions are enforced server-side
  * via TRIAL_BNB_ONLY (separate code path) and don't depend on this flag.
@@ -23,7 +23,8 @@ export type ChainKey =
   | "stable"
   | "mantle"
   | "injective"
-  | "monad";
+  | "monad"
+  | "scroll";
 
 export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "avax",
@@ -34,6 +35,7 @@ export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "mantle",
   "injective",
   "monad",
+  "scroll",
 ];
 
 export interface TokenInfo {
@@ -179,10 +181,26 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     supportedTokens: ["USDC", "USDT"],
     approxGasCostUsd: 0.002,
   },
+  scroll: {
+    key: "scroll",
+    name: "Scroll",
+    chainId: 534352,
+    domainName: "Q402 Scroll",
+    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    gasToken: "ETH",
+    explorer: "https://scrollscan.com",
+    // Native Circle USDC + canonical Tether on Scroll mainnet (addresses
+    // confirmed with Scroll team during integration handshake).
+    usdc: { address: "0x06eFdBFf2a14a7c8E15944D1F4A48F9F95F663A4", decimals: 6 },
+    usdt: { address: "0xf55BEC9cafDbE8730f096Aa55dad6D22d44099Df", decimals: 6 },
+    supportedTokens: ["USDC", "USDT"],
+    approxGasCostUsd: 0.001,
+    note: "zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). Data-availability cost dominates per-tx gas.",
+  },
 };
 
 // ─── BNB-only emergency flag (mirrors q402-landing app/lib/feature-flags.ts) ──
-// Currently false: the full 8-chain matrix is live. The flag exists as a
+// Currently false: the full 9-chain matrix is live. The flag exists as a
 // one-line revert path — flipping to true rewrites `supportedTokens` for
 // every non-BNB chain to [] at module load, which makes every non-BNB
 // quote/pay call produce a single deterministic rejection message. The

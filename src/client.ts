@@ -58,6 +58,7 @@ const DEFAULT_RPC: Record<number, string> = {
   1776: "https://sentry.evm-rpc.injective.network/",
   5000: "https://rpc.mantle.xyz",
   43114: "https://api.avax.network/ext/bc/C/rpc",
+  534352: "https://rpc.scroll.io",
 };
 
 const TRANSFER_AUTH_TYPES = {
@@ -219,7 +220,7 @@ export class Q402NodeClient {
     });
 
     // The /api/relay route accepts three nonce field names depending on chain
-    // (avax/bnb/eth/mantle/injective/monad → `nonce`, xlayer → `xlayerNonce`,
+    // (avax/bnb/eth/mantle/injective/monad/scroll → `nonce`, xlayer → `xlayerNonce`,
     // stable → `stableNonce`). The on-wire shape mirrors the browser SDK's
     // _payEIP7702 / _payXLayerEIP7702 / _payStableEIP7702 paths so the same
     // server route handles either client identically.
@@ -313,7 +314,7 @@ export class Q402NodeClient {
     }
 
     // Chain scope for batchPay — default EIP-7702 mode only (avax / bnb /
-    // eth / mantle / injective / monad). X Layer and Stable use chain-specific
+    // eth / mantle / injective / monad / scroll). X Layer and Stable use chain-specific
     // nonce field shapes (xlayerNonce / stableNonce) and the X Layer USDC
     // path has an EIP-3009 fallback that doesn't install a delegation at
     // all — none of those compose cleanly with sequential first-failure-
@@ -323,7 +324,7 @@ export class Q402NodeClient {
     if (chain.key === "xlayer" || chain.key === "stable") {
       throw new Error(
         `batchPay does not yet support chain "${chain.key}". Supported batch chains: ` +
-          `avax, bnb, eth, mantle, injective, monad (default EIP-7702 mode). ` +
+          `avax, bnb, eth, mantle, injective, monad, scroll (default EIP-7702 mode). ` +
           `For "${chain.key}" use pay() in a client-side loop.`,
       );
     }

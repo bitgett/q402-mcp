@@ -60,7 +60,7 @@ const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 // /api/relay/batch rejects those chains regardless, but failing here gets
 // the error in front of the agent instead of after a round-trip.
 export const BatchPayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad"]),
+  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll"]),
   token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
     "Stablecoin symbol. USDC / USDT supported on most chains (Injective is " +
       "USDT-only). RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
@@ -308,8 +308,8 @@ export const BATCH_PAY_TOOL = {
     "Auto-routing follows the same rule as q402_pay: chain='bnb' + Q402_TRIAL_API_KEY set " +
     "→ Trial; else Multichain. " +
     `Trial keys: max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + USDC/USDT only. ` +
-    `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 6 EIP-7702 default chains ` +
-    "(avax, bnb, eth, mantle, injective, monad). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
+    `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 7 EIP-7702 default chains ` +
+    "(avax, bnb, eth, mantle, injective, monad, scroll). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
     "AMBIGUITY GATE: when auto would land on Trial AND recipients.length > 5, the tool returns " +
     "status='ambiguous' WITHOUT executing — the agent must ask the human whether to (a) trim to " +
     "5 with keyScope='trial', (b) send all on the paid Multichain key, or (c) split into two " +
@@ -327,7 +327,7 @@ export const BATCH_PAY_TOOL = {
         // Narrower than the full chain set — xlayer and stable are NOT batchable
         // (chain-specific nonce field shapes). Use q402_pay in a loop for
         // those chains.
-        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad"],
+        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll"],
         description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here — use q402_pay in a loop.",
       },
       token: {

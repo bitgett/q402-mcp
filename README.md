@@ -1,15 +1,15 @@
 # @quackai/q402-mcp
 
-> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 8 EVM chains, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
+> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 9 EVM chains, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
 
 [![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
 [![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
 
 > **🎟️ Free trial available (2026-05-19 → 2026-06-30)** — 2,000 gasless transactions on BNB Chain (USDC + USDT), 30-day window, no card. One wallet signature: <https://q402.quackai.ai>.
 >
-> **Trial-scope policy:** API keys minted under the free-trial program (`plan: "trial"`) are restricted to BNB Chain with USDC/USDT — server-side enforcement, returns `403 TRIAL_BNB_ONLY` otherwise. **Paid API keys see the full 8-chain matrix at all times.**
+> **Trial-scope policy:** API keys minted under the free-trial program (`plan: "trial"`) are restricted to BNB Chain with USDC/USDT — server-side enforcement, returns `403 TRIAL_BNB_ONLY` otherwise. **Paid API keys see the full 9-chain matrix at all times.**
 
-Claude can now reason about stablecoin payments end to end — quote a transfer across 8 chains, pick the cheapest route, and (optionally) settle the transaction over [Q402](https://q402.quackai.ai)'s EIP-7702 relayer infrastructure. The recipient receives the full amount; the sender pays $0 in gas.
+Claude can now reason about stablecoin payments end to end — quote a transfer across 9 chains, pick the cheapest route, and (optionally) settle the transaction over [Q402](https://q402.quackai.ai)'s EIP-7702 relayer infrastructure. The recipient receives the full amount; the sender pays $0 in gas.
 
 ---
 
@@ -38,7 +38,7 @@ Or edit `claude_desktop_config.json` directly:
 
 Restart Claude Desktop and ask:
 
-> *"Compare gas costs to send 50 USDC to vitalik.eth across all 8 Q402 chains."*
+> *"Compare gas costs to send 50 USDC to vitalik.eth across all 9 Q402 chains."*
 
 ### OpenAI Codex CLI
 
@@ -79,7 +79,7 @@ env = {
   # Two-key model: set whichever applies — both is best.
   # Auto-routing rule (same for q402_pay AND q402_batch_pay):
   #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
-  #   anything else                          → Multichain (paid 8-chain)
+  #   anything else                          → Multichain (paid 9-chain)
   # Batch ambiguity: when auto would land on Trial AND recipients.length > 5,
   # q402_batch_pay returns status="ambiguous" WITHOUT executing so the agent
   # can ask the user — pass keyScope="trial" (first 5), "multichain" (all
@@ -88,7 +88,7 @@ env = {
   # carries the scope, not the key string. Get the values from the
   # dashboard (each key has its own copy button per view).
   Q402_TRIAL_API_KEY        = "q402_live_...",         # BNB-only sponsored (from /event)
-  Q402_MULTICHAIN_API_KEY   = "q402_live_...",         # paid 8-chain (from /payment)
+  Q402_MULTICHAIN_API_KEY   = "q402_live_...",         # paid 9-chain (from /payment)
   # Legacy fallback — used if neither scoped key above is set.
   Q402_API_KEY              = "q402_live_...",
   Q402_PRIVATE_KEY          = "0xabc...",
@@ -118,7 +118,7 @@ The server has no client-specific code. If your client speaks stdio MCP, point i
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
 | `q402_balance` | API key | Verify the API key and report its plan tier + remaining quota credits (live vs sandbox). |
 | `q402_pay` | API key + private key + flag | Send a gasless payment to a single recipient. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
-| `q402_batch_pay` | API key + private key + flag | Send a gasless payment to **multiple** recipients in one call on a single chain × token. Trial keys: 5 rows max. Paid keys: 20 rows max. **Auto-routing:** same rule as `q402_pay` (BNB + Trial key set ⇒ Trial, else Multichain). **Ambiguity gate:** 6+ recipient BNB batches with Trial set return `status="ambiguous"` instead of executing — the agent asks the user to pick `keyScope="trial"` (first 5), `"multichain"` (all paid), or two calls (5 free + remainder paid). **Supported chains: avax, bnb, eth, mantle, injective, monad** (default EIP-7702 mode). xlayer + stable are NOT batchable — use `q402_pay` in a loop for those. Same sandbox gating as `q402_pay`. **Rate-limit note:** the inner `/api/relay` budget (30/min per key) is consumed per row, so a paid 20-row batch leaves ~10 inner slots for the next minute. |
+| `q402_batch_pay` | API key + private key + flag | Send a gasless payment to **multiple** recipients in one call on a single chain × token. Trial keys: 5 rows max. Paid keys: 20 rows max. **Auto-routing:** same rule as `q402_pay` (BNB + Trial key set ⇒ Trial, else Multichain). **Ambiguity gate:** 6+ recipient BNB batches with Trial set return `status="ambiguous"` instead of executing — the agent asks the user to pick `keyScope="trial"` (first 5), `"multichain"` (all paid), or two calls (5 free + remainder paid). **Supported chains: avax, bnb, eth, mantle, injective, monad, scroll** (default EIP-7702 mode). xlayer + stable are NOT batchable — use `q402_pay` in a loop for those. Same sandbox gating as `q402_pay`. **Rate-limit note:** the inner `/api/relay` budget (30/min per key) is consumed per row, so a paid 20-row batch leaves ~10 inner slots for the next minute. |
 | `q402_receipt` | none | Look up a Trust Receipt by `rct_…` id and locally verify its ECDSA signature against the relayer EOA. Returns the public settlement record + a `verified` boolean. *receiptId-only today; tx-hash lookup reserved for a future release.* |
 
 `q402_pay` and `q402_batch_pay` follow a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address(es), amount(s), chain, and token. For batch calls the user must approve the **full batch**, not the individual rows.
@@ -142,12 +142,12 @@ To enable real on-chain transactions, the resolved API key must be live (`q402_l
 # Two-key model — set whichever applies. Both is best.
 # Auto-routing (same for q402_pay AND q402_batch_pay):
 #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
-#   anything else                          → Multichain (paid 8-chain)
+#   anything else                          → Multichain (paid 9-chain)
 # Batch ambiguity: 6+ recipient BNB batch with Trial set returns
 #   status="ambiguous" instead of executing — agent asks user to pick.
 # Override per call with keyScope: "auto" | "trial" | "multichain".
 Q402_TRIAL_API_KEY=q402_live_...           # BNB-only sponsored Trial key (from /event)
-Q402_MULTICHAIN_API_KEY=q402_live_...      # paid 8-chain key (per-chain Gas Tank)
+Q402_MULTICHAIN_API_KEY=q402_live_...      # paid 9-chain key (per-chain Gas Tank)
 
 # Legacy fallback. Used for both scopes when the two above are unset —
 # single-env setups (only Q402_API_KEY set) keep working unchanged.
@@ -181,7 +181,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 | Env var | Required for | Notes |
 |---|---|---|
 | `Q402_TRIAL_API_KEY` | live-pay (BNB) | BNB-only sponsored Trial key. Free at https://q402.quackai.ai/event. Auto-routed for `chain="bnb"` in both `q402_pay` and `q402_batch_pay` (≤5 recipients) when set. 6+ recipient BNB batches return `status="ambiguous"` so the agent can ask the user how to split. |
-| `Q402_MULTICHAIN_API_KEY` | live-pay (8-chain) | Paid 8-chain key. Get one at https://q402.quackai.ai/payment. Auto-routed for non-BNB chains AND for BNB when no Trial key is set. Cap: 20 recipients per batch. |
+| `Q402_MULTICHAIN_API_KEY` | live-pay (9-chain) | Paid 9-chain key. Get one at https://q402.quackai.ai/payment. Auto-routed for non-BNB chains AND for BNB when no Trial key is set. Cap: 20 recipients per batch. |
 | `Q402_API_KEY` | legacy fallback | Single-env legacy path. Used for both scopes when the two above are unset. Keep set if you only have one key. |
 | `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
@@ -203,6 +203,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 | Mantle | 5000 | USDC, USDT0 | LayerZero OFT USDT0 since 2025-11-27. |
 | Injective EVM | 1776 | USDT only | Native USDC via Circle CCTP announced for Q2 2026. |
 | Monad | 143 | USDC, USDT0 | Native Circle USDC (CCTP V2) + USDT0 (LayerZero OFT). |
+| Scroll | 534352 | USDC, USDT | zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). |
 
 ---
 

@@ -29,7 +29,7 @@ export type KeyScopeRequest = "auto" | KeyScope;
 export interface Config {
   /** Trial-scope key (BNB-only). Null if Q402_TRIAL_API_KEY unset. */
   trialApiKey: string | null;
-  /** Multichain-scope key (8 chains). Null if Q402_MULTICHAIN_API_KEY unset. */
+  /** Multichain-scope key (9 chains). Null if Q402_MULTICHAIN_API_KEY unset. */
   multichainApiKey: string | null;
   /** Legacy single-env fallback. Null if Q402_API_KEY unset. */
   legacyApiKey: string | null;

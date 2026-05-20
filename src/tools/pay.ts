@@ -22,7 +22,7 @@ import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest } from "../c
 import { Q402NodeClient, sandboxPay, type PayResult } from "../client.js";
 
 export const PayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad"]),
+  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll"]),
   to: z
     .string()
     .refine(isAddress, "to must be a valid 0x-prefixed EVM address")
@@ -166,10 +166,10 @@ export const PAY_TOOL = {
   description:
     "Send a gasless USDC, USDT, or RLUSD payment via Q402. " +
     "Auto-routing: chain='bnb' + Q402_TRIAL_API_KEY set → Trial (free sponsored); " +
-    "anything else → Multichain (paid 8-chain). Same rule for q402_batch_pay. " +
+    "anything else → Multichain (paid 9-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
-    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad — " +
+    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll — " +
     "USDC/USDT on most chains, RLUSD on Ethereum only, Injective USDT-only. " +
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. " +
