@@ -1,7 +1,7 @@
 /**
  * q402_quote — read-only, no API key required.
  *
- * Compares gas costs across the eight chains Q402 relays for, given a payment
+ * Compares gas costs across the nine chains Q402 relays for, given a payment
  * amount and (optional) target chain/token. Lets a Claude agent reason about
  * "where should I send this?" before any signing happens.
  */
