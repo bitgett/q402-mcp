@@ -54,7 +54,7 @@ const RECIPIENT_LIMIT_PAID  = 20;
 // reject them.
 const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 
-// Batch-supported chains: 6 of 8. xlayer + stable use chain-specific nonce
+// Batch-supported chains: 7 of 9. xlayer + stable use chain-specific nonce
 // field shapes (xlayerNonce / stableNonce / eip3009Nonce) that don't compose
 // cleanly with sequential first-fail-abort batching. The server's
 // /api/relay/batch rejects those chains regardless, but failing here gets
@@ -95,7 +95,7 @@ export const BatchPayInputSchema = z.object({
         'the tool returns status="ambiguous" WITHOUT executing so the agent ' +
         'can ask the user which path to take. Use keyScope="trial" to force ' +
         'the BNB-only sponsored key (≤5 recipients). keyScope="multichain" ' +
-        'forces the paid 8-chain key (≤20 recipients).',
+        'forces the paid 9-chain key (≤20 recipients).',
     ),
   confirm: z
     .literal(true)

@@ -97,7 +97,7 @@ export async function runBalance(): Promise<BalanceSummary> {
       dashboardUrl: "https://q402.quackai.ai/dashboard",
       setupHint:
         "Set Q402_TRIAL_API_KEY (BNB-only sponsored, free at /event) and/or " +
-        "Q402_MULTICHAIN_API_KEY (paid 8-chain from /dashboard). " +
+        "Q402_MULTICHAIN_API_KEY (paid 9-chain from /dashboard). " +
         "Single-env legacy: Q402_API_KEY also works.",
     };
   }

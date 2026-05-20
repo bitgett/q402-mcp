@@ -3,7 +3,7 @@
  *
  * Two-key model:
  *   Q402_TRIAL_API_KEY       BNB-only sponsored Trial key (free 2k TX).
- *   Q402_MULTICHAIN_API_KEY  Paid 8-chain key backed by per-chain Gas Tank.
+ *   Q402_MULTICHAIN_API_KEY  Paid 9-chain key backed by per-chain Gas Tank.
  *   Q402_API_KEY             Legacy single-key fallback. Used for both
  *                            scopes when the two scoped envs are unset.
  *

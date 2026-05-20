@@ -129,7 +129,7 @@ export const QUOTE_TOOL = {
       chain: {
         type: "string",
         enum: CHAIN_KEYS as readonly string[],
-        description: "Optional chain filter; omit to compare all 8.",
+        description: "Optional chain filter; omit to compare all 9.",
       },
     },
     required: ["amount"],

@@ -16,7 +16,7 @@
  *
  * Trial-scope policy (server-enforced via API key plan): trial keys are
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
- * batch. Paid keys get the full 8-chain surface and 20-recipient batches.
+ * batch. Paid keys get the full 9-chain surface and 20-recipient batches.
  *
  * Configuration is environment-only (no on-disk state); see README for the
  * full env reference.
@@ -37,7 +37,7 @@ import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js
 import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.5.0";
+const PACKAGE_VERSION = "0.5.1";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };

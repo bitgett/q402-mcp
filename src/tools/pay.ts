@@ -42,7 +42,7 @@ export const PayInputSchema = z.object({
       'Which API key to use. "auto" (default): chain="bnb" + ' +
         'Q402_TRIAL_API_KEY set → Trial (free sponsored); else Multichain. ' +
         '"trial" forces the BNB-only sponsored key. "multichain" forces ' +
-        'the paid 8-chain key. Same rule applies to q402_batch_pay.',
+        'the paid 9-chain key. Same rule applies to q402_batch_pay.',
     ),
   confirm: z
     .literal(true)
@@ -206,7 +206,7 @@ export const PAY_TOOL = {
         description:
           'Which API key to use. "auto" (default) picks Trial for BNB when ' +
           'Q402_TRIAL_API_KEY is set, Multichain otherwise. "trial" forces the ' +
-          'BNB-only sponsored key. "multichain" forces the paid 8-chain key.',
+          'BNB-only sponsored key. "multichain" forces the paid 9-chain key.',
       },
       confirm: {
         type: "boolean",
