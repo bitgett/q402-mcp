@@ -91,11 +91,25 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     if (eq < 0) continue;
     const k = t.slice(0, eq).trim();
     if (!k.startsWith("Q402_")) continue;          // namespace filter
-    // Strip optional surrounding single or double quotes; do NOT process
-    // escape sequences (a real key has no escapes — keeping the parser
-    // dumb means there's nothing to surprise a user pasting a value).
-    const v = t.slice(eq + 1).trim().replace(/^['"](.*)['"]$/, "$1");
-    out[k] = v;
+    // Raw value with inline-comment handling. Standard .env convention:
+    // an unquoted `#` followed by whitespace (or end of line) starts a
+    // trailing comment. Without this, `Q402_ENABLE_REAL_PAYMENTS=1 # live`
+    // would parse the value as the string `"1 # live"` and silently keep
+    // the server in sandbox (since "1 # live" !== "1"). For quoted
+    // values we leave `#` intact — a user who quoted the value clearly
+    // wants the literal characters.
+    let rawVal = t.slice(eq + 1).trim();
+    const quoted = /^(['"])(.*)\1\s*(?:#.*)?$/.exec(rawVal);
+    if (quoted) {
+      rawVal = quoted[2]!;
+    } else {
+      // Strip ` #` (or tab-#) onward; preserve `#` inside the value if
+      // not preceded by whitespace (e.g. a key that happens to contain
+      // `#` — unlikely, but cheap to preserve).
+      const hashIdx = rawVal.search(/\s#/);
+      if (hashIdx >= 0) rawVal = rawVal.slice(0, hashIdx).trimEnd();
+    }
+    out[k] = rawVal;
   }
   return out;
 }
@@ -130,6 +144,16 @@ export const Q402_ENV_FILE_KEYS: ReadonlySet<string> = Object.freeze(
   new Set(
     Object.keys(FILE_ENV).filter(k => process.env[k] === undefined),
   ),
+) as ReadonlySet<string>;
+
+/** EVERY key the file defines — even ones that process.env shadows.
+ *  q402_doctor uses this to surface the "your shell export is hiding
+ *  your edits to ~/.q402/mcp.env" footgun: if a key appears in both
+ *  process.env AND the file, the user editing the file gets nothing,
+ *  and Q402_ENV_FILE_KEYS alone hides the shadow because it filters
+ *  shadowed keys out. */
+export const Q402_ENV_FILE_KEYS_ALL: ReadonlySet<string> = Object.freeze(
+  new Set(Object.keys(FILE_ENV)),
 ) as ReadonlySet<string>;
 
 export type Mode = "sandbox" | "live";
@@ -324,15 +348,34 @@ export function resolveApiKey(
   return { apiKey: key, scope: "multichain", fromLegacyFallback: !CONFIG.multichainApiKey };
 }
 
+/** Exactly 0x + 64 hex chars. Used to reject placeholders like `0x...` that
+ *  would otherwise slip through the live-mode gate and explode inside
+ *  ethers' Wallet constructor on the first signing attempt. */
+const PRIVATE_KEY_RE = /^0x[a-fA-F0-9]{64}$/;
+
 /**
- * Live-mode gate for a specific resolved key. Returns true when the key
- * starts with `q402_live_` AND a private key is set AND the user has opted
- * into real payments. A null `apiKey` (sandbox-only resolution) always
- * returns false.
+ * Live-mode gate for a specific resolved key. Returns true ONLY when:
+ *   - `resolved.apiKey` starts with `q402_live_`
+ *   - `Q402_ENABLE_REAL_PAYMENTS=1`
+ *   - `Q402_PRIVATE_KEY` parses as a valid 32-byte hex private key
+ *
+ * The PK format check matters: the 0.5.6 doctor template shipped with
+ * `Q402_PRIVATE_KEY=0x...` as a placeholder, and the previous version of
+ * this function (which only checked `!CONFIG.privateKey`) let the literal
+ * string `"0x..."` through — q402_pay then threw inside `new Wallet()`
+ * instead of dropping into a friendly sandbox response. Validating the
+ * shape here means a placeholder-tripped live mode now resolves to
+ * sandbox + a clear setupHint, the same way a missing key would.
  */
 export function isLiveModeFor(resolved: ResolvedKey): boolean {
   if (!resolved.apiKey) return false;
   if (!CONFIG.realPaymentsRequested) return false;
   if (!CONFIG.privateKey) return false;
+  if (!PRIVATE_KEY_RE.test(CONFIG.privateKey)) return false;
   return resolved.apiKey.startsWith("q402_live_");
 }
+
+/** Exposed for `q402_doctor` so it can distinguish "PK missing" from
+ *  "PK set but malformed" without re-deriving the regex. */
+export const isValidPrivateKey = (s: string | null | undefined): boolean =>
+  typeof s === "string" && PRIVATE_KEY_RE.test(s);

@@ -29,8 +29,10 @@
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
  * batch. Paid keys get the full 9-chain surface and 20-recipient batches.
  *
- * Configuration is environment-only (no on-disk state); see README for the
- * full env reference.
+ * Configuration is read from `~/.q402/mcp.env` (created by q402_doctor
+ * on first install) AND from `process.env` (process.env wins on
+ * conflict). See README for the full env reference and the layered
+ * security story behind the file-based default.
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";

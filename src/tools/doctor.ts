@@ -41,6 +41,8 @@ import {
   Q402_ENV_FILE_PATH,
   Q402_ENV_FILE_PRESENT,
   Q402_ENV_FILE_KEYS,
+  Q402_ENV_FILE_KEYS_ALL,
+  isValidPrivateKey,
 } from "../config.js";
 import { CHAIN_KEYS }     from "../chains.js";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "../version.js";
@@ -130,8 +132,10 @@ export interface DoctorReport {
   /** Live-check phase only — per-scope key verification + quota. */
   keys?: KeyVerifyResult[];
 
-  /** Live-check phase only — per-chain EIP-7702 delegation snapshot. */
-  delegation?: DelegationState[];
+  /** Live-check phase only — per-chain EIP-7702 delegation snapshot.
+   *  `undefined` when wallet derivation failed (Q402_PRIVATE_KEY malformed);
+   *  empty array would falsely read as "all 9 chains undelegated". */
+  delegation?: DelegationState[] | undefined;
 
   /** Live-check phase only — relay reachability + latency. */
   relay?: { url: string; reachable: boolean; latencyMs?: number; error?: string };
@@ -151,10 +155,26 @@ export interface DoctorReport {
 }
 
 // ── Env file template ──────────────────────────────────────────────────────
-// Pre-fills the canonical relay URL so a user with a working API key + private
-// key gets a sensible default for self-host fallback. Trial key slot is the
-// uncommented default (most first-install users get a free Trial); paid users
-// uncomment Q402_MULTICHAIN_API_KEY instead (or in addition for auto-routing).
+// Every secret-bearing line is commented out and Q402_ENABLE_REAL_PAYMENTS
+// defaults to 0. Two reasons that combine to make this the only safe shape:
+//
+//   1. If the user saves the file as-is and restarts the MCP client before
+//      pasting real values, isLiveModeFor() WOULD have flipped to live with
+//      placeholder strings ("q402_live_..." passes the prefix check;
+//      "0x..." is non-empty so passes the existence check) — and the next
+//      q402_pay would throw inside ethers' Wallet constructor instead of
+//      dropping into a friendly sandbox response. The 0.5.6 template
+//      tripped exactly that bug.
+//
+//   2. Defense in depth: even if a user uncomments lines while leaving
+//      placeholder values, ENABLE_REAL_PAYMENTS=0 keeps mode=sandbox until
+//      they explicitly opt in. q402_doctor's verify pass will then loudly
+//      warn that the keys are still placeholders.
+//
+// Workflow becomes: uncomment ONE api-key line + paste real value,
+// uncomment Q402_PRIVATE_KEY + paste real value, flip
+// Q402_ENABLE_REAL_PAYMENTS to 1. Three deliberate edits — no
+// accidental-live state in between.
 const ENV_FILE_TEMPLATE = `# ──────────────────────────────────────────────────────────────────────
 # Q402 MCP — secrets
 # Read automatically by @quackai/q402-mcp on startup.
@@ -162,24 +182,25 @@ const ENV_FILE_TEMPLATE = `# ─────────────────
 # After editing, restart your MCP client (Codex / Claude / Cursor / Cline).
 # ──────────────────────────────────────────────────────────────────────
 
-# ─── API key — pick ONE (uncomment the one you have) ──────────────────
+# ─── API key — uncomment ONE (or both for auto-routing) ───────────────
 # Free Trial:        BNB Chain only, 2,000 sponsored TX
 # Get one at:        https://q402.quackai.ai/event
-Q402_TRIAL_API_KEY=q402_live_...
+# Q402_TRIAL_API_KEY=q402_live_...
 
 # Paid Multichain:   all 9 chains, per-chain Gas Tank
 # Get one at:        https://q402.quackai.ai/payment
 # Q402_MULTICHAIN_API_KEY=q402_live_...
 
 # ─── Your wallet ──────────────────────────────────────────────────────
-# Hex EVM private key. Signs payments LOCALLY on your machine.
-# Never leaves your device, never sent to any server.
-Q402_PRIVATE_KEY=0x...
+# Hex EVM private key (0x + 64 hex chars). Signs payments LOCALLY on
+# your machine — never leaves your device, never sent to any server.
+# Q402_PRIVATE_KEY=0x...
 
 # ─── Live mode flag ───────────────────────────────────────────────────
-# Must be exactly "1" to allow real on-chain transactions.
-# Anything else = test response (fake hash, no funds move).
-Q402_ENABLE_REAL_PAYMENTS=1
+# Default 0 = sandbox (test responses, no funds move). Flip to 1 only
+# AFTER you've pasted real values into the lines above — otherwise the
+# server will refuse the placeholders.
+Q402_ENABLE_REAL_PAYMENTS=0
 
 # ─── Q402 relay endpoint ──────────────────────────────────────────────
 # Default canonical Q402 deployment. Only change for self-hosted.
@@ -240,12 +261,25 @@ async function verifyOneKey(
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ apiKey }),
+      signal:  AbortSignal.timeout(10_000),
     });
+    // 429 means the user (or their tooling) is hammering verify, not that
+    // the key is invalid. The previous behaviour folded both cases into
+    // the generic "HTTP 429 → verified as invalid" warning, which sent
+    // users on a wild-goose chase to rotate a perfectly good key. Split
+    // the message so the agent can tell the user to wait instead.
+    if (resp.status === 429) {
+      return {
+        scope, envVar, apiKeyMasked: mask(apiKey), valid: false,
+        error: "rate limited by relay — wait 60s and re-run q402_doctor",
+      };
+    }
     if (!resp.ok) {
       return { scope, envVar, apiKeyMasked: mask(apiKey), valid: false, error: `HTTP ${resp.status}` };
     }
     const body = await resp.json() as {
       valid?:           boolean;
+      error?:           string;        // surfaced on rotated / sub-expired / trial-expired
       plan?:            string;
       remainingCredits?: number;
       isTrial?:         boolean;
@@ -257,6 +291,10 @@ async function verifyOneKey(
       envVar,
       apiKeyMasked:    mask(apiKey),
       valid:           body.valid ?? false,
+      // Propagate the relay's specific reason ("API key has been rotated",
+      // "Subscription expired", "Trial expired") so the user gets the
+      // exact failure mode instead of a generic "verified as invalid".
+      error:           body.valid === false ? body.error : undefined,
       plan:            body.plan,
       remainingCredits: body.remainingCredits,
       isTrial:         body.isTrial,
@@ -290,14 +328,27 @@ async function verifyOneKey(
   }
 }
 
+/** Probes /keys/verify with a deliberately-invalid body. Q402's relay
+ *  exists on every deployment, including self-hosts, so this is a more
+ *  honest "is the relay actually responding?" check than hitting a
+ *  /health endpoint that might not be wired up. We expect a 400 (missing
+ *  apiKey) — anything in [400, 500) confirms the host is alive and the
+ *  Next.js handler is mounted. 5xx or network errors mark it unreachable. */
 async function pingRelay(): Promise<DoctorReport["relay"]> {
-  const url = `${CONFIG.relayBaseUrl}/health`;
+  const url = `${CONFIG.relayBaseUrl}/keys/verify`;
   const t0  = Date.now();
   try {
-    const resp = await fetch(url, { method: "GET" });
-    // /api/health may not exist on older deployments — fall back to "any 2xx
-    // or 404 means the host is up; only network errors mark it unreachable".
-    const reachable = resp.status < 500;
+    const resp = await fetch(url, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    "{}",
+      signal:  AbortSignal.timeout(10_000),
+    });
+    // 400 = "apiKey required" — the route is alive and rejecting our
+    // intentionally-empty body. 429 also counts as alive (rate-limited
+    // means the route exists). Only 5xx (or a thrown fetch) marks it
+    // unreachable.
+    const reachable = resp.status >= 200 && resp.status < 500;
     return { url, reachable, latencyMs: Date.now() - t0 };
   } catch (e) {
     return {
@@ -312,7 +363,7 @@ async function pingRelay(): Promise<DoctorReport["relay"]> {
 async function fetchDelegation(address: string): Promise<DelegationState[]> {
   const url = `${CONFIG.relayBaseUrl}/wallet/delegation-status?address=${address}`;
   try {
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!resp.ok) {
       return CHAIN_KEYS.map(chain => ({ chain, delegated: false, error: `HTTP ${resp.status}` }));
     }
@@ -371,14 +422,23 @@ export async function runDoctor(): Promise<DoctorReport> {
       "~/.q402/mcp.env when convenient.";
   }
 
-  // Missing list — what's needed for live mode.
+  // Missing list — what's needed for live mode. Includes the placeholder
+  // case: a string like "0x..." is technically set but won't pass the
+  // private-key format check, so the user still has work to do.
   const missing: string[] = [];
   if (!CONFIG.trialApiKey && !CONFIG.multichainApiKey && !CONFIG.legacyApiKey) {
     missing.push(
       "An API key (Q402_TRIAL_API_KEY for free BNB OR Q402_MULTICHAIN_API_KEY for paid 9-chain)",
     );
   }
-  if (!CONFIG.privateKey)           missing.push("Q402_PRIVATE_KEY");
+  if (!CONFIG.privateKey) {
+    missing.push("Q402_PRIVATE_KEY");
+  } else if (!isValidPrivateKey(CONFIG.privateKey)) {
+    missing.push(
+      "Q402_PRIVATE_KEY is set but malformed (expected 0x + 64 hex chars). " +
+      "Looks like the placeholder '0x...' is still in ~/.q402/mcp.env — paste a real key in your editor.",
+    );
+  }
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
 
   // Recommended actions for the client to execute. First-install gets a
@@ -398,6 +458,19 @@ export async function runDoctor(): Promise<DoctorReport> {
   }
 
   const warnings: string[] = [];
+
+  // Shadow warning: a process.env export silently hides any value in
+  // ~/.q402/mcp.env for the same key. Users who think editing the file
+  // will help are about to be very confused, so flag it loudly.
+  for (const name of Q402_ENV_FILE_KEYS_ALL) {
+    if (process.env[name] !== undefined && Q402_ENV_FILE_KEYS_ALL.has(name) && !Q402_ENV_FILE_KEYS.has(name)) {
+      warnings.push(
+        `${name} is set in both your shell (process.env) AND ~/.q402/mcp.env — ` +
+        "the shell value wins. Editing the file will have NO effect until you " +
+        `\`unset ${name}\` in your shell (or update the shell value to match).`,
+      );
+    }
+  }
 
   // Short-circuit phases that don't need live RPC calls.
   if (phase !== "live-check") {
@@ -425,12 +498,23 @@ export async function runDoctor(): Promise<DoctorReport> {
   }
 
   // ── live-check phase: hit the relay ────────────────────────────────────
-  // Derive wallet from private key (still local — no network).
+  // Derive wallet from private key (still local — no network). Preserve
+  // the underlying ethers parse error so the user sees "invalid hex"
+  // instead of a generic "wallet derivation failed" — those messages save
+  // real debugging time (e.g. "got 65 chars not 64" tells you you pasted
+  // an extra char; "non-hex character" tells you you copied a stray
+  // smart-quote from a chat client).
   let walletAddress: string | undefined;
+  let walletError:   string | undefined;
   try {
     walletAddress = new Wallet(CONFIG.privateKey!).address;
-  } catch {
-    warnings.push("Q402_PRIVATE_KEY is set but does not parse as a 32-byte hex key. Live calls will fail.");
+  } catch (e) {
+    walletError = e instanceof Error ? e.message : String(e);
+    warnings.push(
+      `Q402_PRIVATE_KEY is set but does not parse as a 32-byte hex key: ${walletError}. ` +
+      "Open ~/.q402/mcp.env in your editor and paste a real key (0x + 64 hex chars). " +
+      "Live calls will fail until this is fixed.",
+    );
   }
 
   // Verify each present key in parallel.
@@ -441,16 +525,19 @@ export async function runDoctor(): Promise<DoctorReport> {
     verifyTargets.push({ scope: "legacy", envVar: "Q402_API_KEY", key: CONFIG.legacyApiKey });
   }
 
+  // delegation stays `undefined` (not `[]`) when wallet derivation failed,
+  // so the AI can distinguish "9 chains all undelegated" from "we couldn't
+  // even ask because the private key is bad".
   const [keys, delegation, relay] = await Promise.all([
     Promise.all(verifyTargets.map(t => verifyOneKey(t.scope, t.envVar, t.key))),
-    walletAddress ? fetchDelegation(walletAddress) : Promise.resolve<DelegationState[]>([]),
+    walletAddress ? fetchDelegation(walletAddress) : Promise.resolve<DelegationState[] | undefined>(undefined),
     pingRelay(),
   ]);
 
   // Promote slot-mismatch warnings into the top-level warnings array so the
   // AI sees them without having to walk the keys[] array.
   for (const k of keys) if (k.slotWarning) warnings.push(k.slotWarning);
-  // Low quota guidance.
+  // Low quota guidance + propagated relay errors.
   for (const k of keys) {
     if (typeof k.remainingCredits === "number" && k.remainingCredits === 0) {
       warnings.push(
@@ -464,8 +551,16 @@ export async function runDoctor(): Promise<DoctorReport> {
         `${k.envVar} has only ${k.remainingCredits} credits left — top up before you run out.`,
       );
     }
-    if (!k.valid && !k.error) {
-      warnings.push(`${k.envVar} verified as invalid by the relay — check the key value in ~/.q402/mcp.env.`);
+    if (!k.valid) {
+      // body.error from the relay carries the specific reason (rotated /
+      // sub-expired / trial-expired / rate limited). Surface it instead
+      // of the generic "check the key value" message, which sent users
+      // chasing the wrong fix in earlier versions.
+      warnings.push(
+        k.error
+          ? `${k.envVar}: ${k.error}.`
+          : `${k.envVar} verified as invalid by the relay — check the key value in ~/.q402/mcp.env.`,
+      );
     }
   }
   if (relay && !relay.reachable) {

@@ -4,4 +4,4 @@
  * the two stay in sync at publish time.
  */
 export const PACKAGE_NAME    = "@quackai/q402-mcp";
-export const PACKAGE_VERSION = "0.5.6";
+export const PACKAGE_VERSION = "0.5.7";
