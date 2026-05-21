@@ -49,16 +49,26 @@ The agent calls `q402_doctor`. On first install, the tool tells the agent to:
 
 ### Manual setup (no AI)
 
-Create `~/.q402/mcp.env` yourself:
+Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor` writes — every secret line is commented out and `Q402_ENABLE_REAL_PAYMENTS` defaults to `0`. Uncomment the lines you need, paste real values, then flip the live flag to `1`. (Saving the template as-is is safe: invalid placeholders won't trip live mode.)
 
 ```bash
 # ~/.q402/mcp.env
-# Pick ONE of these:
-Q402_TRIAL_API_KEY=q402_live_...
+
+# Free Trial — BNB only, 2,000 sponsored TX (from /event)
+# Q402_TRIAL_API_KEY=q402_live_...
+
+# Paid Multichain — all 9 chains (from /payment)
 # Q402_MULTICHAIN_API_KEY=q402_live_...
 
-Q402_PRIVATE_KEY=0x...
-Q402_ENABLE_REAL_PAYMENTS=1
+# Hex EVM private key (0x + 64 hex). Use a FRESH wallet, NOT your main
+# one — Q402 delegates this EOA via EIP-7702 on first payment.
+# Hardware wallets (Ledger / Trezor) are not supported yet.
+# Q402_PRIVATE_KEY=0x...
+
+# Start at 0 (sandbox). Flip to 1 only after real values are pasted above.
+Q402_ENABLE_REAL_PAYMENTS=0
+
+# Default Q402 deployment. Only change for self-hosted.
 Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
 
 # Optional safety guards:
@@ -66,7 +76,7 @@ Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
 # Q402_ALLOWED_RECIPIENTS=0xabc...,0xdef...
 ```
 
-Then `chmod 600 ~/.q402/mcp.env` (Unix) and restart your client. That's the full configuration.
+Then `chmod 600 ~/.q402/mcp.env` (Unix) and restart your client. That's the full configuration. **Heads up on the EIP-7702 side effect:** after your first live payment on a chain, your wallet will show 'Smart account' in MetaMask / OKX — that's the delegation Q402 uses for gasless settlement, reversible anytime via `q402_clear_delegation`.
 
 ### Advanced — explicit env injection
 

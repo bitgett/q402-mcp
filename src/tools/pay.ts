@@ -59,6 +59,16 @@ export interface PaySummary {
   result: PayResult;
   guardsApplied: string[];
   setupHint?: string;
+  /**
+   * Live payments only — heads-up the AI should forward to the user
+   * proactively. Currently used to flag the EIP-7702 delegation side-effect
+   * after the first payment on a chain ("your wallet now shows 'Smart
+   * account' in MetaMask, here's why, and here's how to clear it if you
+   * ever want to receive native gas tokens to that EOA"). The post-payment
+   * tip is a tiny piece of context that heads off a predictable support
+   * ticket — without it users open MetaMask, see the new badge, and panic.
+   */
+  postPaymentTip?: string;
 }
 
 function maxAmountGuard(amount: string, cap: number): void {
@@ -145,7 +155,23 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     token: input.token,
   });
   guardsApplied.push("mode=live");
-  return { result, guardsApplied };
+  // Always surface the post-payment tip on successful live payments. The AI
+  // can decide whether to display it (typically: yes on the first payment,
+  // optional thereafter) — we always include it so the AI has the context
+  // without us needing to track per-chain "did the user already see this".
+  return {
+    result,
+    guardsApplied,
+    postPaymentTip: result.success
+      ? "After this payment your EOA is EIP-7702-delegated to Q402's impl on " +
+        `${chain.name} — MetaMask / OKX will show it as a 'Smart account'. ` +
+        "That's normal and reversible: q402_clear_delegation removes the " +
+        `delegation on a specific chain (Q402 sponsors the gas, so you pay $0). ` +
+        "If you ever try to receive native gas tokens directly to this EOA " +
+        "and the transfer reverts, the delegation is the cause — clear it for " +
+        "that chain first."
+      : undefined,
+  };
 }
 
 function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
@@ -182,11 +208,28 @@ export const PAY_TOOL = {
     "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll — " +
     "USDC/USDT on most chains, RLUSD on Ethereum only, Injective USDT-only. " +
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
-    "(q402_live_*), Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. " +
+    "(q402_live_*), Q402_PRIVATE_KEY is set as a valid 32-byte hex key, and " +
+    "Q402_ENABLE_REAL_PAYMENTS=1. Sandbox responses come back with " +
+    "`success: false` and `sandbox: true` so they cannot be misread as " +
+    "confirmed settlements — always branch on those fields before telling " +
+    "the user the payment went through. " +
     "The recipient receives the full amount; the sender pays $0 in gas. " +
-    "After the first payment on a chain, follow-up payments on the same " +
-    "chain are faster and cheaper (Q402 reuses the wallet's setup); " +
-    "q402_clear_delegation resets it if the user ever asks. " +
+    "\n\n" +
+    "EIP-7702 SIDE EFFECT — surface this to the user proactively after the " +
+    "FIRST live payment on a chain: their wallet now shows up as a 'Smart " +
+    "account' in MetaMask / OKX. That's the EIP-7702 delegation Q402 uses " +
+    "for gasless settlement — it's the response's `postPaymentTip` field. " +
+    "Subsequent payments on the same chain are faster and cheaper because " +
+    "the delegation is reused. " +
+    "\n\n" +
+    "If the user EVER reports that native gas tokens (BNB / ETH / AVAX / " +
+    "etc.) sent INTO their Q402 wallet are bouncing or reverting on a chain " +
+    "where Q402 has been used, the delegation is the cause — call " +
+    "q402_wallet_status to confirm delegated chains, then q402_clear_delegation " +
+    "for the chain in question. Q402 sponsors the gas for the clear, so the " +
+    "user pays $0. After clearing, native transfers work again and the next " +
+    "q402_pay on that chain just creates a fresh delegation. " +
+    "\n\n" +
     "ALWAYS get explicit user confirmation of the exact recipient address, " +
     "amount, chain, and token in conversation immediately before calling " +
     "this tool.",

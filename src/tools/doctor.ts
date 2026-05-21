@@ -83,19 +83,25 @@ interface DelegationState {
   error?:    string;
 }
 
+type RecommendedActionType = "shell" | "write_file";
+
 interface RecommendedAction {
   id:           string;
-  type:         "write_file";
-  path:         string;
-  /** When true, create the parent dir before writing. */
-  createParentDirs: boolean;
-  content:      string;
+  type:         RecommendedActionType;
+  /** For "shell": the command to run. For "write_file": the destination path. */
+  path?:        string;
+  shell?:       string;
+  /** Cross-platform shell variants — AI picks one matching the host OS.
+   *  When omitted, `shell` is assumed POSIX-compatible. */
+  shellWindows?: string;
+  /** For "write_file" — body to write. */
+  content?:     string;
   /** Whether to ask the user before executing this action. */
   requiresUserConfirm: boolean;
   /** Short label the AI uses when offering the action. */
   description:  string;
-  /** If file already exists at `path`, what should the AI do. */
-  ifExists:     "skip" | "ask-before-overwrite";
+  /** For "write_file" only: what to do when the file already exists. */
+  ifExists?:    "skip" | "ask-before-overwrite";
 }
 
 export interface DoctorReport {
@@ -153,6 +159,11 @@ export interface DoctorReport {
 
   /** Canonical security notice — AI MUST forward this when walking through setup. */
   securityNotice: string;
+
+  /** First-install advisories — fresh-wallet reminder, EIP-7702 "Smart account"
+   *  heads-up, hardware-wallet caveat, MetaMask private-key export breadcrumb.
+   *  Populated only on the `first-install` phase. */
+  advisories?: string[];
 }
 
 // ── Env file template ──────────────────────────────────────────────────────
@@ -221,6 +232,35 @@ const SECURITY_NOTICE =
   "never goes to a remote server. If a key was already pasted in chat by mistake, " +
   "treat the wallet as exposed: move funds to a fresh wallet and use that new " +
   "key in ~/.q402/mcp.env going forward.";
+
+/**
+ * One-shot setup advisory the AI surfaces during the first-install walkthrough.
+ * Three things first-time users hit that are not obvious from the install
+ * command alone:
+ *   1. The wallet they'll paste a key for should be a FRESH wallet, not the
+ *      one holding their main funds. Q402 delegates the EOA via EIP-7702
+ *      after the first payment, and that's irreversible without an explicit
+ *      q402_clear_delegation step.
+ *   2. Hardware wallets (Ledger / Trezor) don't sign EIP-7702 type-4
+ *      authorizations yet (as of 2026-Q2). The MCP server takes a raw hex
+ *      private key — it can't talk to a Ledger.
+ *   3. After the first payment on a chain, MetaMask / OKX show that EOA as
+ *      a "Smart account". That's the EIP-7702 delegation marker. We've seen
+ *      users panic at this exact moment; flagging it BEFORE the first
+ *      payment heads off the support ticket.
+ */
+const FIRST_INSTALL_ADVISORY = [
+  "Use a FRESH wallet for Q402 — don't reuse the one with your main funds.",
+  "After your first payment, that wallet will show 'Smart account' in MetaMask / OKX. " +
+    "That's EIP-7702 delegation (Q402's gasless settlement mechanism), reversible anytime with q402_clear_delegation.",
+  "Hardware wallets (Ledger / Trezor) are NOT supported yet — they don't sign EIP-7702 type-4 authorizations.",
+  "To get a hex private key from MetaMask: ··· (3-dot menu) → Account details → Show private key → enter password.",
+];
+
+// The "after a live payment" version of this heads-up lives on the
+// PaySummary itself (see tools/pay.ts) so each tool returns the copy
+// inline with its own response shape. Keeping the first-install
+// advisory here, the post-payment one in pay.ts.
 
 
 // Internal helpers ───────────────────────────────────────────────────────
@@ -437,15 +477,28 @@ export async function runDoctor(): Promise<DoctorReport> {
   }
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
 
-  // Recommended actions for the client to execute. First-install gets a
-  // single file-creation action; later phases get none (manual edits only).
+  // Recommended actions for the client to execute. First-install gets two
+  // actions: (1) make the parent dir explicit so weaker AI clients on
+  // Windows don't trip on a missing `~/.q402/`, (2) write the env file.
+  // Later phases get none — env edits are manual.
   const recommendedActions: RecommendedAction[] = [];
   if (!envFile.exists) {
+    // Belt-and-suspenders: even if the client's write_file tool honors a
+    // create-parent-dir flag, emit an explicit shell action so every client
+    // (including ones that only have bash, not a structured fs.write tool)
+    // has a path forward. Windows variant uses New-Item -ItemType Directory.
+    recommendedActions.push({
+      id:                  "ensure-q402-dir",
+      type:                "shell",
+      shell:               'mkdir -p "$HOME/.q402"',
+      shellWindows:        'powershell -Command "New-Item -ItemType Directory -Force -Path $env:USERPROFILE\\.q402 | Out-Null"',
+      requiresUserConfirm: false,
+      description:         "Ensure the ~/.q402 directory exists before writing the secrets file.",
+    });
     recommendedActions.push({
       id:                  "create-env-file",
       type:                "write_file",
       path:                Q402_ENV_FILE_PATH,
-      createParentDirs:    true,
       content:             ENV_FILE_TEMPLATE,
       requiresUserConfirm: true,
       description:         "Create ~/.q402/mcp.env with placeholder values, then open it in the user's editor.",
@@ -486,9 +539,10 @@ export async function runDoctor(): Promise<DoctorReport> {
           : `Q402 MCP is installed (v${PACKAGE_VERSION}) — partially configured.`,
       nextStep:
         phase === "first-install"
-          ? "Offer to create ~/.q402/mcp.env. After yes, run the recommendedActions[].write_file action, then open the file in the user's editor (e.g. via `code` / `open` / `start` / `xdg-open`). Then walk through filling in the API key and private key, one at a time. Do NOT accept key values via chat — direct the user to edit the file in their editor."
-          : `Tell the user which env vars are still missing (from the 'missing' list) and how to add them to ~/.q402/mcp.env. Restart needed after editing.`,
+          ? "Offer to create ~/.q402/mcp.env. After yes, execute recommendedActions in order: first the `ensure-q402-dir` shell action (use bash on macOS/Linux, PowerShell on Windows via the shellWindows variant), then the `create-env-file` write_file action. Then open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. Walk through filling in the API key (from /event for free Trial or /payment for paid Multichain) and private key one at a time. Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste a private key, surface the `advisories` array: use a fresh wallet (not their main one), heads-up that the wallet will show 'Smart account' in MetaMask after the first payment (that's normal — EIP-7702 delegation), hardware wallets aren't supported, MetaMask key export path."
+          : `Tell the user which env vars are still missing (from the 'missing' list) and how to add them to ~/.q402/mcp.env. Restart needed after editing. Per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → "Developer: Reload Window"; Cline → reload VS Code window.`,
       securityNotice: SECURITY_NOTICE,
+      advisories: phase === "first-install" ? FIRST_INSTALL_ADVISORY : undefined,
     };
   }
 

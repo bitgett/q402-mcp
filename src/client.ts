@@ -20,7 +20,26 @@ import type { ChainConfig } from "./chains.js";
 import { tokenFor } from "./chains.js";
 
 export interface PayResult {
+  /**
+   * Was a real on-chain transaction broadcast and settled? Strictly `true`
+   * only when funds actually moved. Sandbox responses now return `false`
+   * here so a downstream chatbot summary that lifts just this field doesn't
+   * tell the user "payment succeeded" when nothing happened.
+   *
+   * Earlier versions set `success: true` even for sandbox + carried the
+   * disclosure on the wrapping PaySummary's `setupHint`. The README warned
+   * about that risk, but if a model strips the wrapper before showing the
+   * result the warning was lost. Splitting `success` (did funds move?) from
+   * `sandbox` (was this a simulation?) makes the safe interpretation
+   * survive any reasonable summarization pass.
+   */
   success: boolean;
+  /**
+   * Explicit sandbox marker. `true` on every simulated response, regardless
+   * of method. AI clients should branch on this before showing the user a
+   * confirmation message. Stays `false` (or undefined) on real settlements.
+   */
+  sandbox?: boolean;
   txHash: string;
   blockNumber?: string;
   tokenAmount: string;
@@ -517,7 +536,11 @@ export function sandboxPay(
   const fakeHash = "0x" + hexlify(randomBytes(32)).slice(2);
 
   return {
-    success: true,
+    // `success: false` because no funds moved. The `sandbox: true` flag is
+    // the canonical "this was a simulation" marker — downstream callers
+    // should branch on EITHER field to avoid misreporting a settlement.
+    success: false,
+    sandbox: true,
     txHash: fakeHash,
     tokenAmount,
     token: input.token,
