@@ -1,9 +1,14 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes seven tools to any MCP-compatible AI client (Claude Desktop,
- * Claude Code, OpenAI Codex CLI, Cline, …):
+ * Exposes eight tools to any MCP-compatible AI client (Claude Desktop,
+ * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
+ *   q402_doctor             read-only, no key — first-install onboarding +
+ *                           ongoing health check. AI calls this BEFORE pay /
+ *                           balance whenever the user mentions setup or "is
+ *                           Q402 working". Returns recommendedActions[] for
+ *                           creating ~/.q402/mcp.env on first install.
  *   q402_quote              read-only, no key, no funds — gas comparison
  *   q402_balance            read-only, requires key — verify + remaining quota
  *   q402_pay                single-recipient settlement. Sandbox-default — real
@@ -36,6 +41,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { CONFIG } from "./config.js";
+import { PACKAGE_NAME, PACKAGE_VERSION } from "./version.js";
 import { QUOTE_TOOL, QuoteInputSchema, runQuote } from "./tools/quote.js";
 import { PAY_TOOL, PayInputSchema, runPay } from "./tools/pay.js";
 import { BATCH_PAY_TOOL, BatchPayInputSchema, runBatchPay } from "./tools/batch-pay.js";
@@ -47,9 +53,7 @@ import {
   ClearDelegationInputSchema,
   runClearDelegation,
 } from "./tools/clear-delegation.js";
-
-const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.5.5";
+import { DOCTOR_TOOL, DoctorInputSchema, runDoctor } from "./tools/doctor.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -63,6 +67,9 @@ async function main(): Promise<void> {
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
+      // doctor first — it's the bootstrap tool: any "set up Q402" / "is Q402
+      // working" prompt should land here before quote/balance/pay are tried.
+      DOCTOR_TOOL,
       QUOTE_TOOL,
       BALANCE_TOOL,
       PAY_TOOL,
@@ -77,6 +84,10 @@ async function main(): Promise<void> {
     const { name, arguments: args } = req.params;
     try {
       switch (name) {
+        case "q402_doctor": {
+          DoctorInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runDoctor())] };
+        }
         case "q402_quote": {
           const parsed = QuoteInputSchema.parse(args ?? {});
           return { content: [jsonText(runQuote(parsed))] };

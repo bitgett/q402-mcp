@@ -15,95 +15,89 @@ AI agents — Claude (Desktop / Code), OpenAI Codex CLI, Cursor, Cline, and any 
 
 ## Quick start
 
-The server speaks stdio MCP, so any MCP-compatible client can use it. The two paths verified end-to-end today are **Claude (Desktop / Code)** and **OpenAI Codex CLI**.
+Two steps:
 
-### Claude Desktop / Claude Code
+1. Register the MCP server with your client (one-line install per client).
+2. Open your client and say: **"Set up Q402"**. The agent calls `q402_doctor` which walks you through creating a single secrets file at `~/.q402/mcp.env` and pasting in your API key + private key. Nothing else.
+
+### 1. Register the server
+
+| Client | Command / config |
+|---|---|
+| **Claude Desktop / Claude Code** | `claude mcp add q402 -- npx -y @quackai/q402-mcp` |
+| **OpenAI Codex CLI** | `codex mcp add q402 -- npx -y @quackai/q402-mcp` |
+| **Cursor** | Add to `~/.cursor/mcp.json`: `{ "mcpServers": { "q402": { "command": "npx", "args": ["-y", "@quackai/q402-mcp"] } } }` |
+| **Cline** | Cline → Settings → MCP Servers → Edit JSON. Same shape as Cursor. |
+| **Any other stdio MCP client** | Point it at `npx -y @quackai/q402-mcp`. No client-specific code. |
+
+That's it — secrets are NOT configured here. The MCP server reads them from `~/.q402/mcp.env` at startup (same pattern as AWS CLI / Stripe CLI / gh CLI), so every client uses the same file with no per-client wiring.
+
+### 2. First-time setup
+
+Restart your client, then ask your agent:
+
+> *"Set up Q402"*
+
+The agent calls `q402_doctor`. On first install, the tool tells the agent to:
+
+1. Offer to create `~/.q402/mcp.env` (placeholder values only)
+2. Open the file in your editor (`code` / `open` / `start` / `xdg-open`)
+3. Walk you through pasting in (a) your API key from <https://q402.quackai.ai/event> (free Trial) or <https://q402.quackai.ai/payment> (paid Multichain), and (b) your wallet private key — **into the file, not into chat**
+4. Restart the client and run `q402_doctor` again to verify
+
+🔒 **Q402 never asks you to paste your private key into chat.** The MCP server signs payments LOCALLY on your machine — your key never leaves your device.
+
+### Manual setup (no AI)
+
+Create `~/.q402/mcp.env` yourself:
 
 ```bash
-claude mcp add q402 -- npx -y @quackai/q402-mcp
+# ~/.q402/mcp.env
+# Pick ONE of these:
+Q402_TRIAL_API_KEY=q402_live_...
+# Q402_MULTICHAIN_API_KEY=q402_live_...
+
+Q402_PRIVATE_KEY=0x...
+Q402_ENABLE_REAL_PAYMENTS=1
+Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
+
+# Optional safety guards:
+# Q402_MAX_AMOUNT_PER_CALL=5
+# Q402_ALLOWED_RECIPIENTS=0xabc...,0xdef...
 ```
 
-Or edit `claude_desktop_config.json` directly:
+Then `chmod 600 ~/.q402/mcp.env` (Unix) and restart your client. That's the full configuration.
 
-```json
-{
-  "mcpServers": {
-    "q402": {
-      "command": "npx",
-      "args": ["-y", "@quackai/q402-mcp"]
-    }
-  }
-}
+### Advanced — explicit env injection
+
+If you'd rather skip the file and inject env vars yourself (e.g. via Codex `env_vars` allow-list, a secrets manager, or shell exports), the server falls through to `process.env` — and `process.env` wins over file values on conflicts. So existing shell-export setups keep working unchanged.
+
+<details>
+<summary>Codex <code>env_vars</code> allow-list example</summary>
+
+```toml
+[mcp_servers.q402]
+command = "npx"
+args = ["-y", "@quackai/q402-mcp"]
+startup_timeout_sec = 20.0
+env_vars = [
+  "Q402_TRIAL_API_KEY",
+  "Q402_MULTICHAIN_API_KEY",
+  "Q402_PRIVATE_KEY",
+  "Q402_ENABLE_REAL_PAYMENTS",
+  "Q402_RELAY_BASE_URL",
+]
 ```
 
-Restart Claude Desktop and ask:
+Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config reference](https://developers.openai.com/codex/config-reference) for the full schema.
+
+</details>
+
+### Try it without any setup
+
+`q402_quote` works with zero configuration — no API key, no private key, no env file. Ask:
 
 > *"Compare gas costs to send 50 USDC to vitalik.eth across all 9 Q402 chains."*
-
-### OpenAI Codex CLI
-
-Three install paths — pick the one that matches your workflow.
-
-**(a) Codex plugin marketplace** (recommended — bundles the MCP config so users don't write TOML):
-
-```bash
-codex plugin marketplace add bitgett/q402-mcp
-codex /plugins        # browse and install "q402"
-```
-
-This repo carries a Codex plugin manifest at [`.codex-plugin/plugin.json`](./.codex-plugin/plugin.json) and a marketplace catalog at [`.agents/plugins/marketplace.json`](./.agents/plugins/marketplace.json), so any signed-in Codex user can register it as a marketplace source and install with one click.
-
-**(b) Single MCP server via `codex mcp add`** (no plugin wrapper — just register the stdio server):
-
-```bash
-codex mcp add q402 -- npx -y @quackai/q402-mcp
-```
-
-**(c) Direct `~/.codex/config.toml` edit** (`.codex/config.toml` for per-project scope):
-
-```toml
-[mcp_servers.q402]
-command = "npx"
-args = ["-y", "@quackai/q402-mcp"]
-startup_timeout_sec = 20.0
-```
-
-To enable real on-chain payments, pass the three live-mode env vars **explicitly** under `env` — Codex does **not** forward host env vars by default:
-
-```toml
-[mcp_servers.q402]
-command = "npx"
-args = ["-y", "@quackai/q402-mcp"]
-startup_timeout_sec = 20.0
-env = {
-  # Two-key model: set whichever applies — both is best.
-  # Auto-routing rule (same for q402_pay AND q402_batch_pay):
-  #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
-  #   anything else                          → Multichain (paid 9-chain)
-  # Batch ambiguity: when auto would land on Trial AND recipients.length > 5,
-  # q402_batch_pay returns status="ambiguous" WITHOUT executing so the agent
-  # can ask the user — pass keyScope="trial" (first 5), "multichain" (all
-  # paid), or call twice (5 free + remainder paid).
-  # Both keys use the same q402_live_ prefix — the env var name is what
-  # carries the scope, not the key string. Get the values from the
-  # dashboard (each key has its own copy button per view).
-  Q402_TRIAL_API_KEY        = "q402_live_...",         # BNB-only sponsored (from /event)
-  Q402_MULTICHAIN_API_KEY   = "q402_live_...",         # paid 9-chain (from /payment)
-  # Legacy fallback — used if neither scoped key above is set.
-  Q402_API_KEY              = "q402_live_...",
-  Q402_PRIVATE_KEY          = "0xabc...",
-  Q402_ENABLE_REAL_PAYMENTS = "1",
-  Q402_MAX_AMOUNT_PER_CALL  = "5",
-}
-```
-
-> If you'd rather not inline secrets in `config.toml`, use the `env_vars` allow-list form to forward specific names from your shell environment instead — see the [Codex config reference](https://developers.openai.com/codex/config-reference) for the full schema.
-
-Then run `codex` and ask the same kind of question. The first call may take a few seconds while `npx` warms its cache; subsequent calls are instant.
-
-### Any other MCP client
-
-The server has no client-specific code. If your client speaks stdio MCP, point it at `npx -y @quackai/q402-mcp` and the seven tools listed below will appear.
 
 ---
 
@@ -115,6 +109,7 @@ The server has no client-specific code. If your client speaks stdio MCP, point i
 
 | Tool | Auth | Purpose |
 |---|---|---|
+| `q402_doctor` | none | Health check covering BOTH first-install onboarding AND ongoing operational diagnostics. AI calls this when the user says "set up Q402" / "verify Q402" / "why isn't Q402 working". On first install, returns a `recommendedActions[]` payload telling the client to create `~/.q402/mcp.env` and open it in the user's editor. Later phases verify per-scope quota, EIP-7702 delegation state per chain, relay reachability, and surface slot-mismatch warnings (e.g. Trial-tier key sitting in `Q402_MULTICHAIN_API_KEY` would silently burn paid quota). Read-only — no signing, no on-chain action. |
 | `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
 | `q402_balance` | API key | Verify the API key and report its plan tier + remaining quota credits (live vs sandbox). |
 | `q402_pay` | API key + private key + flag | Send a gasless payment to a single recipient. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
@@ -136,7 +131,7 @@ The server has no client-specific code. If your client speaks stdio MCP, point i
 
 ## Sandbox vs live mode
 
-By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash (32-byte hex, no on-chain broadcast), no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an LLM hallucinating a payment.
+By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash (32-byte hex, no on-chain broadcast), no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an accidental payment — if the agent misreads the conversation and fires `q402_pay` before you intended, nothing moves.
 
 To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set, and `Q402_ENABLE_REAL_PAYMENTS=1`:
 
@@ -211,11 +206,11 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 
 ## Why this exists
 
-x402 standardised "402 Payment Required" semantics for AI agents but the official Coinbase facilitator only covers a few chains and assumes ERC-3009 token support — which excludes BNB USDT, Mantle USDT0, Injective USDT, and the chains where most stablecoin volume actually lives.
+AI agents are becoming the default interface for software, but the moment they need to move money the stack breaks: holding gas tokens, signing every transaction, managing wallets across many chains. None of that scales when the agent is supposed to act on its own.
 
-Q402 implements the same payer experience (single signature, $0 gas, instant settlement) on all 9 of those chains using EIP-7702 delegated execution, which works with any ERC-20. This MCP server makes that infrastructure addressable from Claude itself.
+Q402 is the payment layer for that gap. A single signing primitive (EIP-712 + EIP-7702) settles gasless stablecoin payments across 9 EVM chains, with an ECDSA-signed Trust Receipt for every transaction. The MCP package exposes that surface inside Claude, Codex, Cursor, and Cline — your agent can quote, send, batch, and audit payments from a natural-language prompt.
 
-If you want to dig into how the wire protocol differs from x402, see [Q402 docs](https://q402.quackai.ai/docs).
+Single transfers and multi-recipient batches ship today. The next layer — recurring payouts, conditional execution, and policy-gated treasury automation — is the same primitive composed differently. We're building toward agents that operate real budgets, settle among themselves, and move value through workflows no human triggers manually.
 
 ---
 

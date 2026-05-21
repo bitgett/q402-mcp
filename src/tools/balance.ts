@@ -96,9 +96,12 @@ export async function runBalance(): Promise<BalanceSummary> {
       scopes: [],
       dashboardUrl: "https://q402.quackai.ai/dashboard",
       setupHint:
-        "Set Q402_TRIAL_API_KEY (BNB-only sponsored, free at /event) and/or " +
-        "Q402_MULTICHAIN_API_KEY (paid 9-chain from /dashboard). " +
-        "Single-env legacy: Q402_API_KEY also works.",
+        "No API key configured. Call q402_doctor for guided setup — it will " +
+        "offer to create ~/.q402/mcp.env with placeholders that the user can " +
+        "fill in. (Manual path: set Q402_TRIAL_API_KEY for BNB-only sponsored " +
+        "(free at https://q402.quackai.ai/event) and/or Q402_MULTICHAIN_API_KEY " +
+        "for paid 9-chain (https://q402.quackai.ai/payment). Q402_API_KEY is " +
+        "the legacy single-env fallback.)",
     };
   }
 

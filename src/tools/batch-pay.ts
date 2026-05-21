@@ -304,7 +304,8 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   return (
     "Sandbox mode is active because the following env vars are missing or not yet set: " +
     missing.join(", ") +
-    `. Get a live ${tier} key at ${url}.`
+    `. Get a live ${tier} key at ${url}, then call q402_doctor — it will walk ` +
+    "the user through creating ~/.q402/mcp.env and pasting the key into the right slot."
   );
 }
 

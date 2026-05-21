@@ -18,7 +18,119 @@
  * relay credit is consumed.
  */
 
-import { isAddress } from "ethers";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir }                            from "node:os";
+import { join }                               from "node:path";
+import { isAddress }                          from "ethers";
+
+/**
+ * Optional dotenv-style file at `~/.q402/mcp.env`. When present, its
+ * `Q402_*` entries are merged into the process env that `loadConfig()`
+ * reads. Process env wins on conflicts so existing shell-export setups
+ * (and Codex `env_vars` allow-lists) stay authoritative.
+ *
+ * Why we read this directly instead of asking the user to wire shell
+ * sourcing through every MCP client:
+ *   - The MCP server is spawned as a subprocess by Claude / Codex /
+ *     Cursor / Cline. Subprocesses inherit env from their parent, not
+ *     from arbitrary files on disk — so a `~/.q402/mcp.env` would be
+ *     invisible without each client either inlining secrets in config
+ *     or the user maintaining shell-source plumbing per client.
+ *   - Reading the file here gives a single, client-agnostic install
+ *     pattern: drop one file in your home dir, every MCP client just
+ *     works. Same approach AWS CLI / Stripe CLI / gh CLI use.
+ *   - The `q402_doctor` tool generates and seeds this file on first
+ *     install via a `recommendedActions` payload the client executes
+ *     with its own filesystem tool.
+ *
+ * Filter: only `Q402_*` keys are imported, so a stray `PATH=...` in
+ * the file can't poison the MCP server's environment.
+ */
+const Q402_ENV_FILE = join(homedir(), ".q402", "mcp.env");
+
+/**
+ * Dotenv-style parser for the Q402 secrets file. Exported with a path
+ * argument so tests can drive it against tmpdir fixtures without having
+ * to monkey-patch `os.homedir()`. Production callers use the no-arg
+ * `loadQ402EnvFile()` below, which targets the canonical
+ * `~/.q402/mcp.env` location.
+ */
+export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
+  if (!existsSync(path)) return {};
+
+  // World-readable perms on a secrets file is a footgun. Warn (best-
+  // effort) on Unix; Windows uses ACLs so the bit check is meaningless
+  // there and would just produce false-positive warnings.
+  if (process.platform !== "win32") {
+    try {
+      const mode = statSync(path).mode & 0o777;
+      if (mode & 0o077) {
+        process.stderr.write(
+          `[q402-mcp] warning: ${path} is readable by group/other ` +
+          `(mode ${mode.toString(8)}). Run: chmod 600 ${path}\n`,
+        );
+      }
+    } catch { /* stat failure is non-fatal — just skip the warning */ }
+  }
+
+  const out: Record<string, string> = {};
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf-8");
+  } catch (e) {
+    process.stderr.write(
+      `[q402-mcp] warning: could not read ${path}: ${e instanceof Error ? e.message : String(e)}\n`,
+    );
+    return {};
+  }
+
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const eq = t.indexOf("=");
+    if (eq < 0) continue;
+    const k = t.slice(0, eq).trim();
+    if (!k.startsWith("Q402_")) continue;          // namespace filter
+    // Strip optional surrounding single or double quotes; do NOT process
+    // escape sequences (a real key has no escapes — keeping the parser
+    // dumb means there's nothing to surprise a user pasting a value).
+    const v = t.slice(eq + 1).trim().replace(/^['"](.*)['"]$/, "$1");
+    out[k] = v;
+  }
+  return out;
+}
+
+function loadQ402EnvFile(): Record<string, string> {
+  return loadQ402EnvFileFromPath(Q402_ENV_FILE);
+}
+
+/**
+ * Effective env: file values, then process env overrides on top. Frozen
+ * so downstream `loadConfig()` reads a stable snapshot — and so tests
+ * can patch `process.env` for one-shot scenarios without us silently
+ * recomputing under their feet.
+ */
+const FILE_ENV = loadQ402EnvFile();
+export const ENV: Readonly<Record<string, string | undefined>> = Object.freeze({
+  ...FILE_ENV,
+  ...process.env,
+});
+
+/** Path the doctor + tests reference. Exposed so callers don't re-derive it. */
+export const Q402_ENV_FILE_PATH = Q402_ENV_FILE;
+
+/** True when ~/.q402/mcp.env was readable at module load. Tracked separately
+ *  from `ENV` because once values are merged, the per-key origin is lost. */
+export const Q402_ENV_FILE_PRESENT = existsSync(Q402_ENV_FILE);
+
+/** Set of env-var names whose value came from the file (i.e. not from
+ *  process.env). Useful for `q402_doctor` to label sources without
+ *  recomputing the file parse. */
+export const Q402_ENV_FILE_KEYS: ReadonlySet<string> = Object.freeze(
+  new Set(
+    Object.keys(FILE_ENV).filter(k => process.env[k] === undefined),
+  ),
+) as ReadonlySet<string>;
 
 export type Mode = "sandbox" | "live";
 export type KeyScope = "trial" | "multichain";
@@ -79,15 +191,15 @@ function parseMaxAmount(raw: string | undefined): number {
 }
 
 export function loadConfig(): Config {
-  const trialApiKey      = process.env.Q402_TRIAL_API_KEY      ?? null;
-  const multichainApiKey = process.env.Q402_MULTICHAIN_API_KEY ?? null;
-  const legacyApiKey     = process.env.Q402_API_KEY            ?? null;
+  const trialApiKey      = ENV.Q402_TRIAL_API_KEY      ?? null;
+  const multichainApiKey = ENV.Q402_MULTICHAIN_API_KEY ?? null;
+  const legacyApiKey     = ENV.Q402_API_KEY            ?? null;
   // Prefer the multichain key for the legacy `apiKey` slot so existing
   // callers default to the broader scope. Falls back to trial then legacy.
   const apiKey = multichainApiKey ?? trialApiKey ?? legacyApiKey;
   const apiKeyKind = classifyApiKey(apiKey);
-  const privateKey = process.env.Q402_PRIVATE_KEY ?? null;
-  const realPaymentsRequested = process.env.Q402_ENABLE_REAL_PAYMENTS === "1";
+  const privateKey = ENV.Q402_PRIVATE_KEY ?? null;
+  const realPaymentsRequested = ENV.Q402_ENABLE_REAL_PAYMENTS === "1";
 
   const live =
     realPaymentsRequested &&
@@ -104,9 +216,9 @@ export function loadConfig(): Config {
     privateKey,
     realPaymentsRequested,
     mode: live ? "live" : "sandbox",
-    relayBaseUrl: (process.env.Q402_RELAY_BASE_URL ?? DEFAULT_RELAY_BASE).replace(/\/$/, ""),
-    maxAmountPerCallUsd: parseMaxAmount(process.env.Q402_MAX_AMOUNT_PER_CALL),
-    allowedRecipients: parseAllowedRecipients(process.env.Q402_ALLOWED_RECIPIENTS),
+    relayBaseUrl: (ENV.Q402_RELAY_BASE_URL ?? DEFAULT_RELAY_BASE).replace(/\/$/, ""),
+    maxAmountPerCallUsd: parseMaxAmount(ENV.Q402_MAX_AMOUNT_PER_CALL),
+    allowedRecipients: parseAllowedRecipients(ENV.Q402_ALLOWED_RECIPIENTS),
   };
 }
 
