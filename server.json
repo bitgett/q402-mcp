@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.5.9",
+  "version": "0.5.10",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.5.9",
+      "version": "0.5.10",
       "transport": {
         "type": "stdio"
       },
@@ -26,13 +26,6 @@
         {
           "name": "Q402_MULTICHAIN_API_KEY",
           "description": "Paid Multichain API key from https://q402.quackai.ai/payment. Full 9-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments AND whenever keyScope='multichain' is chosen. Use it to send all rows in a 6+ recipient BNB batch after the ambiguity prompt.",
-          "isRequired": false,
-          "isSecret": true,
-          "format": "string"
-        },
-        {
-          "name": "Q402_API_KEY",
-          "description": "Legacy fallback for older integrations only. New setups should use Q402_TRIAL_API_KEY (BNB-only free trial) and/or Q402_MULTICHAIN_API_KEY (paid 9-chain) instead — the two-key model is what q402_doctor walks new users through. This env var still resolves silently for back-compat when neither scoped key is set.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
