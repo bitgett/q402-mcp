@@ -163,35 +163,46 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
     };
   }
 
-  if (!res.ok) {
-    const errBody = json as { error?: string; reason?: string };
+  // The endpoint returns 422 (not 200) when the TX confirmed but the
+  // on-chain state didn't actually clear — typically a stale authorization
+  // nonce. In that case `json` still carries the diagnostic fields
+  // (txHash, finalCode) so we surface them alongside the error.
+  const payload = json as {
+    ok?:          boolean;
+    txHash?:      string;
+    blockNumber?: number;
+    gasUsed?:     string;
+    finalCode?:   string;
+    cleared?:     boolean;
+    explorerUrl?: string;
+    error?:       string;
+    reason?:      string;
+  };
+
+  if (!res.ok || payload.cleared !== true) {
     return {
-      ok:      false,
+      ok:          false,
+      chain:       input.chain,
       address,
-      chain:   input.chain,
-      error:   errBody.error ?? `HTTP ${res.status}`,
-      hint:    errBody.reason,
+      txHash:      payload.txHash,
+      blockNumber: payload.blockNumber,
+      gasUsed:     payload.gasUsed,
+      cleared:     payload.cleared ?? false,
+      explorerUrl: payload.explorerUrl,
+      error:       payload.error ?? `HTTP ${res.status}`,
+      hint:        payload.reason ?? "The sponsored TX did not clear the delegation. If a txHash is present, the broadcast confirmed but the EOA's code is still non-empty (commonly a stale nonce) — refresh and retry.",
     };
   }
-
-  const ok = json as {
-    txHash:       string;
-    blockNumber:  number;
-    gasUsed:      string;
-    finalCode:    string;
-    cleared:      boolean;
-    explorerUrl:  string;
-  };
 
   return {
     ok:          true,
     chain:       input.chain,
     address,
-    txHash:      ok.txHash,
-    blockNumber: ok.blockNumber,
-    gasUsed:     ok.gasUsed,
-    cleared:     ok.cleared,
-    explorerUrl: ok.explorerUrl,
+    txHash:      payload.txHash!,
+    blockNumber: payload.blockNumber!,
+    gasUsed:     payload.gasUsed!,
+    cleared:     true,
+    explorerUrl: payload.explorerUrl!,
   };
 }
 
