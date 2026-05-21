@@ -316,7 +316,11 @@ export const BATCH_PAY_TOOL = {
     "separate calls (5 free + remainder paid). Re-invoke with explicit keyScope after the choice. " +
     "SANDBOX BY DEFAULT — real on-chain TX only when the resolved key is live (q402_live_*), " +
     "Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. Every recipient receives the full amount; " +
-    "the sender pays $0 in gas for the entire batch. ALWAYS get explicit user confirmation " +
+    "the sender pays $0 in gas for the entire batch. " +
+    "Note: same EIP-7702 delegation behaviour as q402_pay — the first call on a chain " +
+    "creates a persistent set-code delegation on the sender's EOA, reused by subsequent " +
+    "calls. Use q402_clear_delegation to remove. " +
+    "ALWAYS get explicit user confirmation " +
     "of the complete recipient + amount list, chain, and token in conversation immediately " +
     "before calling this tool — the user must approve the full batch, not the individual rows.",
   inputSchema: {

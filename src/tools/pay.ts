@@ -174,6 +174,10 @@ export const PAY_TOOL = {
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. " +
     "The recipient receives the full amount; the sender pays $0 in gas. " +
+    "Note: the first q402_pay on a chain creates a persistent EIP-7702 " +
+    "delegation on the sender's EOA (set-code TX, Pectra). Subsequent " +
+    "payments on the same chain reuse it (gas-efficient). To remove the " +
+    "delegation later, call q402_clear_delegation. " +
     "ALWAYS get explicit user confirmation of the exact recipient address, " +
     "amount, chain, and token in conversation immediately before calling " +
     "this tool.",

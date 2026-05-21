@@ -1,18 +1,24 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes five tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes seven tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cline, …):
  *
- *   q402_quote      read-only, no key, no funds — gas comparison
- *   q402_balance    read-only, requires key — verify + remaining quota
- *   q402_pay        single-recipient settlement. Sandbox-default — real TX
- *                   only when API key (live tier), private key, and
- *                   Q402_ENABLE_REAL_PAYMENTS=1 all set
- *   q402_batch_pay  multi-recipient settlement (trial: 5 / paid: 20 per call).
- *                   Same chain + token across all recipients. Same sandbox
- *                   gating as q402_pay
- *   q402_receipt    read-only, no key — fetch + locally verify a Trust Receipt
+ *   q402_quote              read-only, no key, no funds — gas comparison
+ *   q402_balance            read-only, requires key — verify + remaining quota
+ *   q402_pay                single-recipient settlement. Sandbox-default — real
+ *                           TX only when API key (live tier), private key, and
+ *                           Q402_ENABLE_REAL_PAYMENTS=1 all set
+ *   q402_batch_pay          multi-recipient settlement (trial: 5 / paid: 20 per
+ *                           call). Same chain + token across all recipients.
+ *                           Same sandbox gating as q402_pay
+ *   q402_receipt            read-only, no key — fetch + locally verify a Trust
+ *                           Receipt
+ *   q402_wallet_status      read-only, requires key — per-chain EIP-7702
+ *                           delegation state across all 9 chains
+ *   q402_clear_delegation   write, requires key — clears the EIP-7702
+ *                           delegation on a chain (Q402-sponsored gas, local
+ *                           signing)
  *
  * Trial-scope policy (server-enforced via API key plan): trial keys are
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
@@ -35,9 +41,15 @@ import { PAY_TOOL, PayInputSchema, runPay } from "./tools/pay.js";
 import { BATCH_PAY_TOOL, BatchPayInputSchema, runBatchPay } from "./tools/batch-pay.js";
 import { BALANCE_TOOL, BalanceInputSchema, runBalance } from "./tools/balance.js";
 import { RECEIPT_TOOL, ReceiptInputSchema, runReceipt } from "./tools/receipt.js";
+import { WALLET_STATUS_TOOL, WalletStatusInputSchema, runWalletStatus } from "./tools/wallet-status.js";
+import {
+  CLEAR_DELEGATION_TOOL,
+  ClearDelegationInputSchema,
+  runClearDelegation,
+} from "./tools/clear-delegation.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.5.1";
+const PACKAGE_VERSION = "0.5.2";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -50,7 +62,15 @@ async function main(): Promise<void> {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [QUOTE_TOOL, BALANCE_TOOL, PAY_TOOL, BATCH_PAY_TOOL, RECEIPT_TOOL],
+    tools: [
+      QUOTE_TOOL,
+      BALANCE_TOOL,
+      PAY_TOOL,
+      BATCH_PAY_TOOL,
+      RECEIPT_TOOL,
+      WALLET_STATUS_TOOL,
+      CLEAR_DELEGATION_TOOL,
+    ],
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async req => {
@@ -76,6 +96,14 @@ async function main(): Promise<void> {
         case "q402_receipt": {
           const parsed = ReceiptInputSchema.parse(args ?? {});
           return { content: [jsonText(await runReceipt(parsed))] };
+        }
+        case "q402_wallet_status": {
+          WalletStatusInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runWalletStatus())] };
+        }
+        case "q402_clear_delegation": {
+          const parsed = ClearDelegationInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runClearDelegation(parsed))] };
         }
         default:
           return {
