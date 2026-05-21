@@ -116,15 +116,16 @@ export interface DoctorReport {
     warning?: string;
   };
 
-  /** Per-env-var slot state. Trial / Multichain are the canonical two; the
-   *  legacy Q402_API_KEY slot is only included when actually set. */
+  /** Per-env-var slot state. Trial + Multichain are the canonical two — the
+   *  legacy single-env fallback (`Q402_API_KEY`) is intentionally NOT
+   *  surfaced here. The two-key model is the only one users should reason
+   *  about; the fallback exists in config.ts to keep older integrations
+   *  working without forcing a flag-day migration, and the doctor stays
+   *  silent about it so first-install mental models stay clean. */
   envState: Record<string, EnvSlot>;
 
   /** Human-readable list of what's still required for live mode. */
   missing: string[];
-
-  /** When set: legacy Q402_API_KEY detected — works but worth migrating. */
-  legacyDetected?: string;
 
   /** Live-check phase only — derived wallet address from Q402_PRIVATE_KEY. */
   wallet?: { address: string };
@@ -411,16 +412,11 @@ export async function runDoctor(): Promise<DoctorReport> {
     ),
   };
 
-  // Q402_API_KEY (legacy) is only shown when actually set — keeps the
-  // first-install diagnostic clean (Trial OR Multichain mental model).
-  let legacyDetected: string | undefined;
-  if (CONFIG.legacyApiKey) {
-    legacyDetected =
-      "Q402_API_KEY is set — works as a fallback for both scopes, but the newer " +
-      "two-key model (Q402_TRIAL_API_KEY + Q402_MULTICHAIN_API_KEY) gives you " +
-      "auto-routing between free Trial (BNB) and paid Multichain. Rename in " +
-      "~/.q402/mcp.env when convenient.";
-  }
+  // Note: CONFIG.legacyApiKey IS still consulted by detectPhase + verify
+  // dispatch so an old integration setting Q402_API_KEY keeps working
+  // unchanged. We deliberately don't surface it in the diagnostic —
+  // teaching a third env var to first-time users only muddies the
+  // Trial-vs-Multichain decision they actually have to make.
 
   // Missing list — what's needed for live mode. Includes the placeholder
   // case: a string like "0x..." is technically set but won't pass the
@@ -482,7 +478,6 @@ export async function runDoctor(): Promise<DoctorReport> {
       envFile,
       envState,
       missing,
-      legacyDetected,
       warnings,
       recommendedActions,
       greeting:
@@ -580,7 +575,6 @@ export async function runDoctor(): Promise<DoctorReport> {
     envFile,
     envState,
     missing,
-    legacyDetected,
     wallet:            walletAddress ? { address: walletAddress } : undefined,
     keys,
     delegation,

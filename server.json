@@ -32,7 +32,7 @@
         },
         {
           "name": "Q402_API_KEY",
-          "description": "Legacy single-env fallback. Used for both scopes when neither Q402_TRIAL_API_KEY nor Q402_MULTICHAIN_API_KEY is set. q402_test_* keys keep sandbox mode; q402_live_* keys are required for real on-chain transactions.",
+          "description": "Legacy fallback for older integrations only. New setups should use Q402_TRIAL_API_KEY (BNB-only free trial) and/or Q402_MULTICHAIN_API_KEY (paid 9-chain) instead — the two-key model is what q402_doctor walks new users through. This env var still resolves silently for back-compat when neither scoped key is set.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
