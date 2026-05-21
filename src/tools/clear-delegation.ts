@@ -8,13 +8,6 @@
  * endpoint which broadcasts the type-0x04 TX from the sponsor wallet
  * (gas paid by Q402 — the user pays nothing).
  *
- * This tool exists because some browser wallets (OKX as of 2026-Q2,
- * pre-12.x MetaMask) don't yet implement the wallet_signAuthorization
- * RPC that the dashboard's clear flow needs. The MCP path skips that
- * gap entirely — it signs locally with the user's already-configured
- * Q402_PRIVATE_KEY (same key q402_pay uses), so any wallet vendor's
- * EIP-7702 support status is irrelevant here.
- *
  * After clearing, `eth_getCode` for that EOA on that chain returns
  * `0x` again. The next q402_pay on the same chain auto-creates a fresh
  * delegation (no permanent state change).
@@ -210,21 +203,13 @@ export const CLEAR_DELEGATION_TOOL = {
   name: "q402_clear_delegation",
   description:
     "Clear the EIP-7702 delegation on a Q402 chain for the configured wallet. " +
-    "After your first q402_pay on a chain, Q402 delegates your EOA to a vetted " +
-    "implementation contract (Pectra set-code transaction) so subsequent " +
-    "payments are gasless without redoing the authorization each time. The " +
-    "delegation persists until explicitly cleared. " +
-    "Call this when: (a) the user wants to receive native gas tokens (BNB/ " +
-    "ETH/etc.) directly to their EOA without revert, (b) the wallet UI is " +
-    "showing a 'Smart account' indicator the user wants to remove, or (c) " +
-    "the user explicitly asks to 'clean up' or 'reset' the delegation. " +
-    "Do NOT call this immediately before another q402_pay on the same chain " +
-    "— the next payment would just re-create the delegation, wasting one TX. " +
-    "Pair with q402_wallet_status first to see which chains actually have " +
-    "an active delegation. " +
-    "Signing happens locally with Q402_PRIVATE_KEY; the signed authorization " +
-    "is POSTed to Q402 which broadcasts the type-0x04 TX from a sponsor " +
-    "wallet — the user pays zero gas. Requires Q402_PRIVATE_KEY in env.",
+    "Call this only when the user explicitly asks to reset or clean up their " +
+    "Q402 wallet on a chain — the next q402_pay will recreate the delegation " +
+    "automatically, so calling clear right before another payment just wastes " +
+    "a TX. Pair with q402_wallet_status first to see which chains actually " +
+    "have an active delegation. " +
+    "Signing happens locally with Q402_PRIVATE_KEY (same key q402_pay uses); " +
+    "Q402 sponsors the on-chain TX so the user pays zero gas.",
   inputSchema: {
     type: "object" as const,
     properties: {

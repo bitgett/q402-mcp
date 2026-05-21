@@ -49,7 +49,7 @@ import {
 } from "./tools/clear-delegation.js";
 
 const PACKAGE_NAME = "@quackai/q402-mcp";
-const PACKAGE_VERSION = "0.5.3";
+const PACKAGE_VERSION = "0.5.4";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };

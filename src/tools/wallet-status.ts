@@ -7,9 +7,8 @@
  *
  * Useful as the diagnostic companion to `q402_clear_delegation` —
  * agents call this first to see which chains have an active
- * delegation, then call clear_delegation for the chains that need
- * it. Also handy when the user's wallet UI is showing a "Smart
- * account" indicator and they want to understand why.
+ * delegation, then call clear_delegation for the chains the user
+ * wants to reset.
  */
 
 import { z } from "zod";
@@ -85,9 +84,8 @@ export const WALLET_STATUS_TOOL = {
     "Report the EIP-7702 delegation status of your Q402 wallet (the EOA " +
     "derived from Q402_PRIVATE_KEY) across all 9 Q402-supported chains. " +
     "Returns per-chain { delegated, impl } and a one-line summary. Read-" +
-    "only — no signing, no on-chain TX, no quota consumption. Use this " +
-    "before q402_clear_delegation to figure out which chains need a " +
-    "cleanup, or when answering 'why is my wallet showing Smart account?' " +
+    "only — no signing, no on-chain TX, no quota consumption. Pair with " +
+    "q402_clear_delegation when the user wants to reset a specific chain. " +
     "Requires Q402_PRIVATE_KEY in env (same as q402_pay).",
   inputSchema: {
     type: "object" as const,
