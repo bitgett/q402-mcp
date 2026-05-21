@@ -37,7 +37,7 @@
 import { isAddress } from "ethers";
 import { z } from "zod";
 import { getChain, tokenFor } from "../chains.js";
-import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest } from "../config.js";
+import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest, type KeyScope } from "../config.js";
 import {
   BatchPayError,
   Q402NodeClient,
@@ -231,7 +231,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     );
     guardsApplied.push("mode=sandbox");
     const reason =
-      resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "");
+      resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "", resolved.scope);
     return {
       mode: "sandbox",
       status: "sandbox",
@@ -288,16 +288,23 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   }
 }
 
-function describeSandboxReason(resolvedKey: string): string {
+function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   const missing: string[] = [];
   if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
   if (!CONFIG.privateKey) missing.push("Q402_PRIVATE_KEY");
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
+  // Route to the right tier: trial scope → /event (free 2k TX, BNB only),
+  // multichain scope → /payment (paid plan, all 9 chains).
+  const tier = scope === "trial" ? "Free Trial" : "Multichain";
+  const url  =
+    scope === "trial"
+      ? "https://q402.quackai.ai/event"
+      : "https://q402.quackai.ai/payment";
   return (
     "Sandbox mode is active because the following env vars are missing or not yet set: " +
     missing.join(", ") +
-    ". Get a live API key at https://q402.quackai.ai/dashboard."
+    `. Get a live ${tier} key at ${url}.`
   );
 }
 
@@ -308,7 +315,7 @@ export const BATCH_PAY_TOOL = {
     "Auto-routing follows the same rule as q402_pay: chain='bnb' + Q402_TRIAL_API_KEY set " +
     "→ Trial; else Multichain. " +
     `Trial keys: max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + USDC/USDT only. ` +
-    `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 7 EIP-7702 default chains ` +
+    `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 7 batchable chains ` +
     "(avax, bnb, eth, mantle, injective, monad, scroll). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
     "AMBIGUITY GATE: when auto would land on Trial AND recipients.length > 5, the tool returns " +
     "status='ambiguous' WITHOUT executing — the agent must ask the human whether to (a) trim to " +
@@ -317,9 +324,9 @@ export const BATCH_PAY_TOOL = {
     "SANDBOX BY DEFAULT — real on-chain TX only when the resolved key is live (q402_live_*), " +
     "Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. Every recipient receives the full amount; " +
     "the sender pays $0 in gas for the entire batch. " +
-    "Note: same EIP-7702 delegation behaviour as q402_pay — the first call on a chain " +
-    "creates a persistent set-code delegation on the sender's EOA, reused by subsequent " +
-    "calls. Use q402_clear_delegation to remove. " +
+    "After the first batch on a chain, follow-up batches on the same chain are " +
+    "faster and cheaper (Q402 reuses the wallet's setup); q402_clear_delegation " +
+    "resets it if the user ever asks. " +
     "ALWAYS get explicit user confirmation " +
     "of the complete recipient + amount list, chain, and token in conversation immediately " +
     "before calling this tool — the user must approve the full batch, not the individual rows.",

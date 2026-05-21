@@ -25,13 +25,17 @@ interface ChainState {
 }
 
 interface WalletStatusResult {
-  address?:  string;
-  chains?:   Record<string, ChainState>;
-  summary?:  string;
-  /** Set when Q402_PRIVATE_KEY isn't available — the tool can't infer the
-   *  EOA to query for, so it short-circuits with a clear hint. */
-  error?:    string;
-  hint?:     string;
+  address?:       string;
+  chains?:        Record<string, ChainState>;
+  summary?:       string;
+  /** Set when Q402_PRIVATE_KEY isn't available or the relay endpoint
+   *  rejected the request — the tool short-circuits with a clear hint. */
+  error?:         string;
+  hint?:          string;
+  /** When the relay returned 429 RATE_LIMITED, this carries the cooldown
+   *  in seconds so the agent can tell the user when to retry instead of
+   *  silently swallowing the limit. */
+  retryAfterSec?: number;
 }
 
 export async function runWalletStatus(): Promise<WalletStatusResult> {
@@ -54,27 +58,35 @@ export async function runWalletStatus(): Promise<WalletStatusResult> {
 
   const url = `${CONFIG.relayBaseUrl.replace(/\/$/, "")}/wallet/delegation-status?address=${address}`;
   let body: unknown;
+  let res:  Response;
   try {
-    const res = await fetch(url);
+    res  = await fetch(url);
     body = await res.json();
-    if (!res.ok) {
-      return {
-        address,
-        error: typeof body === "object" && body && "error" in body ? String((body as { error: unknown }).error) : `HTTP ${res.status}`,
-      };
-    }
   } catch (e) {
     return {
       address,
-      error: e instanceof Error ? e.message : String(e),
+      error: "RELAY_UNREACHABLE",
+      hint:  `Could not reach Q402 at ${url}: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+  if (!res.ok) {
+    // Propagate the relay's structured fields (retryAfterSec, hint) so the
+    // agent can tell the user something useful — e.g. "try again in N
+    // seconds" on a 429 instead of a bare HTTP code.
+    const errBody = body as { error?: string; reason?: string; hint?: string; retryAfterSec?: number };
+    return {
+      address,
+      error:         errBody.error ?? `HTTP ${res.status}`,
+      hint:          errBody.hint ?? errBody.reason,
+      retryAfterSec: errBody.retryAfterSec,
     };
   }
 
   const parsed = body as { address: string; chains: Record<string, ChainState>; summary: string };
   return {
-    address:  parsed.address,
-    chains:   parsed.chains,
-    summary:  parsed.summary,
+    address: parsed.address,
+    chains:  parsed.chains,
+    summary: parsed.summary,
   };
 }
 

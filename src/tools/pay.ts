@@ -18,7 +18,7 @@
 import { isAddress } from "ethers";
 import { z } from "zod";
 import { CHAIN_KEYS, getChain, tokenFor } from "../chains.js";
-import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest } from "../config.js";
+import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest, type KeyScope } from "../config.js";
 import { Q402NodeClient, sandboxPay, type PayResult } from "../client.js";
 
 export const PayInputSchema = z.object({
@@ -129,7 +129,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     // over the generic missing-env message. Falls back to the generic when
     // the resolver returned a key but live mode failed on its own gates.
     const setupHint =
-      resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "");
+      resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "", resolved.scope);
     return { result, guardsApplied, setupHint };
   }
 
@@ -148,16 +148,25 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   return { result, guardsApplied };
 }
 
-function describeSandboxReason(resolvedKey: string): string {
+function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   const missing: string[] = [];
   if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
   if (!CONFIG.privateKey) missing.push("Q402_PRIVATE_KEY");
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
+  // Route the user to the right tier: trial scope → /event (free 2k TX,
+  // BNB only), multichain scope → /payment (paid plan, all 9 chains).
+  // Earlier copy always pointed at /dashboard which under-served Trial
+  // users by sending them toward the paid funnel.
+  const tier = scope === "trial" ? "Free Trial" : "Multichain";
+  const url  =
+    scope === "trial"
+      ? "https://q402.quackai.ai/event"
+      : "https://q402.quackai.ai/payment";
   return (
     "Sandbox mode is active because the following env vars are missing or not yet set: " +
     missing.join(", ") +
-    ". Get a live API key at https://q402.quackai.ai/dashboard."
+    `. Get a live ${tier} key at ${url}.`
   );
 }
 
@@ -174,10 +183,9 @@ export const PAY_TOOL = {
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. " +
     "The recipient receives the full amount; the sender pays $0 in gas. " +
-    "Note: the first q402_pay on a chain creates a persistent EIP-7702 " +
-    "delegation on the sender's EOA (set-code TX, Pectra). Subsequent " +
-    "payments on the same chain reuse it (gas-efficient). To remove the " +
-    "delegation later, call q402_clear_delegation. " +
+    "After the first payment on a chain, follow-up payments on the same " +
+    "chain are faster and cheaper (Q402 reuses the wallet's setup); " +
+    "q402_clear_delegation resets it if the user ever asks. " +
     "ALWAYS get explicit user confirmation of the exact recipient address, " +
     "amount, chain, and token in conversation immediately before calling " +
     "this tool.",
