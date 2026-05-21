@@ -141,30 +141,33 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Sandbox vs live mode
 
-By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash (32-byte hex, no on-chain broadcast), no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an accidental payment — if the agent misreads the conversation and fires `q402_pay` before you intended, nothing moves.
+By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash with `success: false` and `sandbox: true`, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an accidental payment — if the agent misreads the conversation and fires `q402_pay` before you intended, nothing moves AND the response cannot be mistaken for a confirmed settlement.
 
-To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set, and `Q402_ENABLE_REAL_PAYMENTS=1`:
+To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set to a valid 32-byte hex key, and `Q402_ENABLE_REAL_PAYMENTS=1`. The block below is the template `q402_doctor` writes to `~/.q402/mcp.env` — every secret line is commented out and the live flag defaults to `0`. Uncomment the lines you need, paste real values in your editor, then flip the flag to `1`:
 
 ```bash
-# Two-key model — set whichever applies (or both for auto-routing).
+# Two-key model — uncomment ONE (or both for auto-routing).
 # Auto-routing (same for q402_pay AND q402_batch_pay):
 #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
 #   anything else                          → Multichain (paid 9-chain)
 # Batch ambiguity: 6+ recipient BNB batch with Trial set returns
 #   status="ambiguous" instead of executing — agent asks user to pick.
 # Override per call with keyScope: "auto" | "trial" | "multichain".
-Q402_TRIAL_API_KEY=q402_live_...           # BNB-only sponsored Trial key (from /event)
-Q402_MULTICHAIN_API_KEY=q402_live_...      # paid 9-chain key (per-chain Gas Tank)
 
-Q402_PRIVATE_KEY=0xabc...                  # signer for the payer EOA
-Q402_ENABLE_REAL_PAYMENTS=1                # explicit opt-in
+# Q402_TRIAL_API_KEY=q402_live_...         # BNB-only sponsored Trial key (from /event)
+# Q402_MULTICHAIN_API_KEY=q402_live_...    # paid 9-chain key (per-chain Gas Tank)
+
+# Q402_PRIVATE_KEY=0x...                   # signer for the payer EOA (32-byte hex)
+
+# Start at 0 (sandbox). Flip to 1 only after real values are pasted above —
+# a malformed Q402_PRIVATE_KEY (e.g. the "0x..." placeholder) is rejected at
+# the live-mode gate, so partial setups stay in sandbox with a clear hint.
+Q402_ENABLE_REAL_PAYMENTS=0
 ```
 
 Anything missing for the resolved scope → automatic sandbox fallback with a hint pointing at what to set.
 
-> ⚠️ **Sandbox returns a deterministic-looking fake `txHash` and a synthetic success result.** A user who *expected* a live transfer (e.g. forgot to set `Q402_ENABLE_REAL_PAYMENTS=1`, mis-typed a scoped env var, or hit an impossible chain×scope combination like `keyScope: "trial"` + `chain: "monad"`) gets a "success" back and may believe funds actually moved.
->
-> Two-layer mitigation: every sandbox response carries a `setupHint` field on the tool result describing **exactly why** sandbox was selected, and a `method: "sandbox"` field that makes the mode explicit independent of hash inspection. The `txHash` itself is a 32-byte random hex string — visually indistinguishable from a real hash but emitted only when no on-chain TX is broadcast — so don't rely on hash forensics. Always check `setupHint` (or `method`) before showing the user a success message.
+> ⚠️ **Sandbox returns a deterministic-looking fake `txHash` but explicitly NOT a success.** Since v0.5.8 every sandbox response carries `success: false` and `sandbox: true` at the top level of the `PayResult` — so a downstream chatbot summary that lifts the `success` field cannot mistakenly tell the user "payment succeeded" when nothing happened. The `txHash` itself is a 32-byte random hex string (visually indistinguishable from a real hash but emitted only when no on-chain TX is broadcast). Combined with the `mode: "sandbox"` and `method: "sandbox"` markers + the `setupHint` field on the wrapping `PaySummary` describing **exactly why** sandbox was selected, you have four independent signals to branch on before showing the user a confirmation message.
 
 ### Hard caps
 
