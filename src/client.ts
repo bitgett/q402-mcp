@@ -174,7 +174,15 @@ export class Q402NodeClient {
     // 10s timeout — facilitator info is a small read; if it takes longer
     // than that, the relay is unhealthy and we should fail the tool call
     // explicitly rather than hang the whole MCP session waiting.
-    const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    let resp: Response;
+    try {
+      resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    } catch (e) {
+      if (e instanceof Error && (e.name === "TimeoutError" || /aborted/i.test(e.message))) {
+        throw new Error("Q402 relay didn't respond within 10s while reading facilitator info — the relay may be temporarily degraded. Safe to retry.");
+      }
+      throw e;
+    }
     if (!resp.ok) {
       throw new Error(
         `failed to fetch relay facilitator info from ${url} (${resp.status})`,
@@ -268,12 +276,23 @@ export class Q402NodeClient {
     // 30s timeout — single-recipient relay path. Real settlements typically
     // resolve in 1-3s; 30s is a generous ceiling so a stalled relay can't
     // hang the MCP tool indefinitely (which would block the whole AI turn).
-    const resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
-    });
+    let resp: Response;
+    try {
+      resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (e) {
+      // Turn the raw `TimeoutError: signal timed out` into something an
+      // agent can actually relay to the user. Same translation applied
+      // on batchPay() + fetchFacilitator() to keep the surface uniform.
+      if (e instanceof Error && (e.name === "TimeoutError" || /aborted/i.test(e.message))) {
+        throw new Error("Q402 relay didn't respond within 30s — the relay may be temporarily degraded. Safe to retry.");
+      }
+      throw e;
+    }
     const data = (await resp.json()) as PayResult & { error?: string };
     if (!resp.ok) {
       throw new Error(data.error ?? `relay failed (HTTP ${resp.status})`);
@@ -423,18 +442,26 @@ export class Q402NodeClient {
     // so a 20-row paid batch can legitimately take 10-20s. 60s ceiling
     // keeps a stalled relay from pinning the MCP tool for the whole AI
     // turn while still allowing healthy batches to complete.
-    const resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay/batch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        apiKey,
-        chain: chain.key,
-        token,
-        facilitator,
-        recipients: signedRows,
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+    let resp: Response;
+    try {
+      resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey,
+          chain: chain.key,
+          token,
+          facilitator,
+          recipients: signedRows,
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (e) {
+      if (e instanceof Error && (e.name === "TimeoutError" || /aborted/i.test(e.message))) {
+        throw new Error("Q402 relay didn't respond within 60s on the batch path — the relay may be temporarily degraded. Safe to retry.");
+      }
+      throw e;
+    }
     const data = (await resp.json()) as BatchPayResult & { error?: string };
 
     // Aborted batches (server returns 424) and partial failures (207) must

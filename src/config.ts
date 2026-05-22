@@ -55,7 +55,28 @@ const Q402_ENV_FILE = join(homedir(), ".q402", "mcp.env");
  * `loadQ402EnvFile()` below, which targets the canonical
  * `~/.q402/mcp.env` location.
  */
+/** Module-level read-error capture. The loader doesn't throw on read
+ *  failure (we want sandbox fallback to stay safe), but the doctor needs
+ *  to surface "your file is unreadable" to the user — so we stash the
+ *  error message here at module load. `null` = no error / not yet loaded. */
+let lastReadError: string | null = null;
+
+/** Exposed so the doctor can surface a stderr warning to the user via
+ *  `envFile.warning` instead of leaving a silent gap. */
+export function getQ402EnvFileReadError(): string | null {
+  return lastReadError;
+}
+
+/** Hard cap on the file size we'll buffer into memory. The file is
+ *  expected to be ~1 KB of flat key=value pairs; anything larger is
+ *  either malicious or pointed at the wrong path. Without this guard a
+ *  symlink at `~/.q402/mcp.env` aimed at a 1 GB log file would OOM-
+ *  crash the MCP server on every spawn. 64 KB is several thousand env
+ *  rows — fine ceiling. */
+const MAX_ENV_FILE_BYTES = 64 * 1024;
+
 export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
+  lastReadError = null;
   if (!existsSync(path)) return {};
 
   // World-readable perms on a secrets file is a footgun. Warn (best-
@@ -73,14 +94,26 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     } catch { /* stat failure is non-fatal — just skip the warning */ }
   }
 
+  // Bail before allocating an unbounded buffer if the file is too large.
+  try {
+    const size = statSync(path).size;
+    if (size > MAX_ENV_FILE_BYTES) {
+      const msg = `file is ${size} bytes (max ${MAX_ENV_FILE_BYTES}); refusing to load. ` +
+        "Check ~/.q402/mcp.env — is it a misdirected log file or symlink?";
+      lastReadError = msg;
+      process.stderr.write(`[q402-mcp] warning: ${msg}\n`);
+      return {};
+    }
+  } catch { /* if stat fails here, readFileSync below will report a clearer error */ }
+
   const out: Record<string, string> = {};
   let raw: string;
   try {
     raw = readFileSync(path, "utf-8");
   } catch (e) {
-    process.stderr.write(
-      `[q402-mcp] warning: could not read ${path}: ${e instanceof Error ? e.message : String(e)}\n`,
-    );
+    const msg = `could not read ${path}: ${e instanceof Error ? e.message : String(e)}`;
+    lastReadError = msg;
+    process.stderr.write(`[q402-mcp] warning: ${msg}\n`);
     return {};
   }
 

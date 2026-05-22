@@ -322,8 +322,21 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
 }
 
 function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
+  // True-first-install case — route to q402_doctor in plain language
+  // rather than enumerating env vars to a beginner.
+  const noApiKey  = !resolvedKey.startsWith("q402_live_");
+  const noPk      = !CONFIG.privateKey;
+  const noEnable  = !CONFIG.realPaymentsRequested;
+  if (noApiKey && noPk && noEnable) {
+    return (
+      "You haven't configured Q402 yet. Say \"Set up Q402\" and I'll walk " +
+      "you through it (creates a settings file in your editor, you paste " +
+      "an API key from https://q402.quackai.ai/event, done)."
+    );
+  }
+
   const missing: string[] = [];
-  if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
+  if (noApiKey) missing.push("a live API key (must start with q402_live_)");
   if (!CONFIG.privateKey) {
     missing.push("Q402_PRIVATE_KEY");
   } else if (!isValidPrivateKey(CONFIG.privateKey)) {
@@ -335,7 +348,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
       "0x + 64-hex key into ~/.q402/mcp.env)",
     );
   }
-  if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
+  if (noEnable) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route to the right tier: trial scope → /event (free 2k TX, BNB only),
   // multichain scope → /payment (paid plan, all 9 chains).

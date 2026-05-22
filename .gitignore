@@ -5,6 +5,11 @@ dist
 .env
 .env.*
 
+# TypeScript incremental build state — written when contributors run
+# `tsc --incremental` while iterating. Out of the npm tarball already
+# (`.npmignore` whitelist), this just keeps it out of git too.
+*.tsbuildinfo
+
 # MCP registry publisher binary — extracted locally from
 # github.com/modelcontextprotocol/registry releases for `mcp-publisher publish`.
 # Kept out of git; download fresh per release.

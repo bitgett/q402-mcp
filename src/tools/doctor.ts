@@ -43,6 +43,7 @@ import {
   Q402_ENV_FILE_KEYS,
   Q402_ENV_FILE_KEYS_ALL,
   isValidPrivateKey,
+  getQ402EnvFileReadError,
 } from "../config.js";
 import { CHAIN_KEYS }     from "../chains.js";
 import { PACKAGE_NAME, PACKAGE_VERSION } from "../version.js";
@@ -211,6 +212,12 @@ const ENV_FILE_TEMPLATE = `# ─────────────────
 # Read automatically by @quackai/q402-mcp on startup.
 # Edit this file in your editor. NEVER paste your private key into chat.
 # After editing, restart your MCP client (Codex / Claude / Cursor / Cline).
+#
+# SAFE-BY-DEFAULT: this template ships with both api-key + private-key
+# lines COMMENTED OUT. Even though Q402_ENABLE_REAL_PAYMENTS defaults
+# to 1, the live-mode gate refuses to settle until BOTH a real api key
+# AND a valid 32-byte private key are configured. Saving this template
+# as-is and restarting your client just leaves you in sandbox.
 # ──────────────────────────────────────────────────────────────────────
 
 # ─── API key — uncomment ONE (or both for auto-routing) ───────────────
@@ -453,11 +460,16 @@ export async function runDoctor(): Promise<DoctorReport> {
   const phase = detectPhase();
 
   // Env file diagnostic. The file's perm warning is already printed to stderr
-  // at module load by loadQ402EnvFile(); here we just surface whether the
-  // file exists so the AI can decide whether to offer creation.
+  // at module load by loadQ402EnvFile(); here we surface (a) whether the file
+  // exists so the AI can decide whether to offer creation, and (b) any read
+  // error captured by config.ts — e.g. permission denied or size cap hit.
+  // Without (b), `envFile.exists: true` paired with an unreadable file would
+  // leave the user with "the file is there, why doesn't anything work?".
+  const envFileReadError = getQ402EnvFileReadError();
   const envFile: DoctorReport["envFile"] = {
     path:   Q402_ENV_FILE_PATH,
     exists: Q402_ENV_FILE_PRESENT,
+    warning: envFileReadError ?? undefined,
   };
 
   const envState: Record<string, EnvSlot> = {
@@ -557,14 +569,36 @@ export async function runDoctor(): Promise<DoctorReport> {
   // Shadow warning: a process.env export silently hides any value in
   // ~/.q402/mcp.env for the same key. Users who think editing the file
   // will help are about to be very confused, so flag it loudly.
+  // `Q402_ENV_FILE_KEYS_ALL` = every key in the file. `Q402_ENV_FILE_KEYS`
+  // = the subset whose process.env wasn't already set — i.e. the keys
+  // that survived the merge. The shadowed set is the complement.
   for (const name of Q402_ENV_FILE_KEYS_ALL) {
-    if (process.env[name] !== undefined && Q402_ENV_FILE_KEYS_ALL.has(name) && !Q402_ENV_FILE_KEYS.has(name)) {
+    if (process.env[name] !== undefined && !Q402_ENV_FILE_KEYS.has(name)) {
       warnings.push(
         `${name} is set in both your shell (process.env) AND ~/.q402/mcp.env — ` +
         "the shell value wins. Editing the file will have NO effect until you " +
         `\`unset ${name}\` in your shell (or update the shell value to match).`,
       );
     }
+  }
+
+  // Legacy upgrade landmine: if the user has Q402_API_KEY set (pre-0.5.0
+  // single-env model) AND Q402_ENABLE_REAL_PAYMENTS was *not* explicitly
+  // set by them (i.e. it's coming from the registry default of 1 since
+  // v0.5.11), warn them. The 0.5.12+ default flip means their next
+  // q402_pay can silently settle real funds on the legacy key. They
+  // didn't opt into that — it became opt-out behind their back.
+  const enableExplicit =
+    process.env.Q402_ENABLE_REAL_PAYMENTS !== undefined ||
+    Q402_ENV_FILE_KEYS_ALL.has("Q402_ENABLE_REAL_PAYMENTS");
+  if (CONFIG.legacyApiKey && CONFIG.realPaymentsRequested && !enableExplicit) {
+    warnings.push(
+      "You have a legacy Q402_API_KEY set, and Q402_ENABLE_REAL_PAYMENTS " +
+      "wasn't explicitly set by you — so it's defaulting to 1 (real payments) " +
+      "since v0.5.11. To stay in sandbox while you check this, add " +
+      "`Q402_ENABLE_REAL_PAYMENTS=0` to ~/.q402/mcp.env (or your shell) and " +
+      "restart the MCP client.",
+    );
   }
 
   // Short-circuit phases that don't need live RPC calls.
@@ -589,8 +623,8 @@ export async function runDoctor(): Promise<DoctorReport> {
           : "Tell the user which env vars are still missing (from the 'missing' list) and how to add them to ~/.q402/mcp.env. Show userInstructions for the human-readable steps.",
       agentInstructions:
         phase === "first-install"
-          ? "Multi-turn flow: (1) Briefly tell the user MCP is installed. (2) Ask one yes/no question — 'Want me to create your Q402 settings file?'. (3) On yes, execute recommendedActions IN ORDER: first `ensure-q402-dir` shell action (bash on macOS/Linux, PowerShell on Windows via shellWindows variant), then `create-env-file` write_file action. (4) Open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. (5) Walk through filling in the API key (from /event for free Trial or /payment for paid Multichain) and private key one at a time. (6) Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste a private key, surface the `advisories` array: fresh wallet, Smart-account-in-MetaMask heads-up, hardware wallets unsupported, MetaMask key-export path. (7) After they save, tell them to restart the MCP client — per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window. (8) Have them re-invoke 'Set up Q402' to confirm. Keep the conversation tight: one decision per turn, plain language, never echo this paragraph."
-          : "User has SOME env set. List the missing items (from `missing`) in plain language. Tell them to edit ~/.q402/mcp.env and uncomment / fill the relevant line, then restart the MCP client. Restart verb per client: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window.",
+          ? "[AI-ONLY — do not show this paragraph to the user verbatim] Multi-turn flow: (1) Briefly tell the user MCP is installed. (2) Ask one yes/no question — 'Want me to create your Q402 settings file?'. (3) On yes, execute recommendedActions IN ORDER: first `ensure-q402-dir` shell action (bash on macOS/Linux, PowerShell on Windows via shellWindows variant), then `create-env-file` write_file action. (4) Open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. (5) Walk through filling in the API key (from /event for free Trial or /payment for paid Multichain) and private key one at a time. (6) Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste a private key, surface the `advisories` array: fresh wallet, Smart-account-in-MetaMask heads-up, hardware wallets unsupported, MetaMask key-export path. (7) After they save, tell them to restart the MCP client — per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window. (8) Have them re-invoke 'Set up Q402' to confirm. Keep the conversation tight: one decision per turn, plain language, never echo this paragraph."
+          : "[AI-ONLY — do not show this paragraph to the user verbatim] User has SOME env set. List the missing items (from `missing`) in plain language. Tell them to edit ~/.q402/mcp.env and uncomment / fill the relevant line, then restart the MCP client. Restart verb per client: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window.",
       userInstructions:
         phase === "first-install"
           ? [
@@ -649,11 +683,26 @@ export async function runDoctor(): Promise<DoctorReport> {
   // delegation stays `undefined` (not `[]`) when wallet derivation failed,
   // so the AI can distinguish "9 chains all undelegated" from "we couldn't
   // even ask because the private key is bad".
-  const [keys, delegation, relay] = await Promise.all([
+  //
+  // F9 mitigation: don't issue a redundant pingRelay() call here when we're
+  // already going to verify keys against /keys/verify. If at least one
+  // verify gets a response (even an invalid-key 200), the relay is
+  // demonstrably reachable. The extra ping was burning a 3rd /keys/verify
+  // call against a 20/min IP cap that fast-iterating users were tripping.
+  const [keys, delegation] = await Promise.all([
     Promise.all(verifyTargets.map(t => verifyOneKey(t.scope, t.envVar, t.key))),
     walletAddress ? fetchDelegation(walletAddress) : Promise.resolve<DelegationState[] | undefined>(undefined),
-    pingRelay(),
   ]);
+  // Derive a relay snapshot from the verify responses we already have.
+  // If even one verify returned a response (k.error doesn't pattern-match
+  // a network failure), the relay is up — no separate ping needed. If all
+  // verifies failed with a network error OR we had no verify targets at all,
+  // fall back to an explicit pingRelay() so the user still gets reachability
+  // info on a totally-unconfigured-key system.
+  const anyResponse = keys.some(k => !k.error || !/timeout|unreachable|ENOTFOUND|ECONN/i.test(k.error));
+  const relay = anyResponse && keys.length > 0
+    ? { url: `${CONFIG.relayBaseUrl}/keys/verify`, reachable: true }
+    : await pingRelay();
 
   // Promote slot-mismatch warnings into the top-level warnings array so the
   // AI sees them without having to walk the keys[] array.
@@ -676,12 +725,26 @@ export async function runDoctor(): Promise<DoctorReport> {
       // body.error from the relay carries the specific reason (rotated /
       // sub-expired / trial-expired / rate limited). Surface it instead
       // of the generic "check the key value" message, which sent users
-      // chasing the wrong fix in earlier versions.
-      warnings.push(
-        k.error
-          ? `${k.envVar}: ${k.error}.`
-          : `${k.envVar} verified as invalid by the relay — check the key value in ~/.q402/mcp.env.`,
-      );
+      // chasing the wrong fix in earlier versions. For Trial expired
+      // specifically, the relay now returns trialExpiresAt on the invalid
+      // branch too — fold it into the user-visible message so "expired"
+      // gets paired with the exact date.
+      const isTrialExpired = (k.error ?? "").toLowerCase().includes("trial expired");
+      if (isTrialExpired && k.trialExpiresAt) {
+        const exp = new Date(k.trialExpiresAt);
+        const days = Math.floor((Date.now() - exp.getTime()) / 86_400_000);
+        const ago = days > 0 ? ` (${days} day${days === 1 ? "" : "s"} ago)` : "";
+        warnings.push(
+          `${k.envVar}: Trial expired on ${exp.toISOString().slice(0, 10)}${ago}. ` +
+          "Upgrade to a Multichain plan at https://q402.quackai.ai/payment.",
+        );
+      } else {
+        warnings.push(
+          k.error
+            ? `${k.envVar}: ${k.error}.`
+            : `${k.envVar} verified as invalid by the relay — check the key value in ~/.q402/mcp.env.`,
+        );
+      }
     }
   }
   if (relay && !relay.reachable) {
@@ -714,8 +777,8 @@ export async function runDoctor(): Promise<DoctorReport> {
       ? "Show userInstructions verbatim. Then offer to make a small test quote (q402_quote) to confirm everything works end-to-end."
       : "Walk the user through each warning in order. Show userInstructions verbatim for the cleanup steps.",
     agentInstructions: ready
-      ? "Live mode is fully configured. Summarize the wallet address (mask middle), plan tier(s), remaining quota, and any non-zero delegation counts to the user as a checklist. Offer a tiny test (q402_quote, not q402_pay) to confirm. Don't echo the full keys array verbatim — pick the most useful 2-3 fields per scope."
-      : "Walk the user through each warning IN ORDER, plain language. For slot-mismatch warnings, the fix is editing ~/.q402/mcp.env and restarting the client (Cursor / Cline: reload window; Claude / Codex: quit + relaunch). Surface body.error strings from any verify failure as the user-visible reason (e.g. 'your Trial expired 3 days ago', 'API key has been rotated') — don't generic-out to 'check the key value'.",
+      ? "[AI-ONLY — do not show this paragraph to the user verbatim] Live mode is fully configured. Summarize the wallet address (mask middle), plan tier(s), remaining quota, and any non-zero delegation counts to the user as a checklist. Offer a tiny test (q402_quote, not q402_pay) to confirm. Don't echo the full keys array verbatim — pick the most useful 2-3 fields per scope."
+      : "[AI-ONLY — do not show this paragraph to the user verbatim] Walk the user through each warning IN ORDER, plain language. For slot-mismatch warnings, the fix is editing ~/.q402/mcp.env and restarting the client (Cursor / Cline: reload window; Claude / Codex: quit + relaunch). Surface body.error strings from any verify failure as the user-visible reason (e.g. 'your Trial expired 3 days ago', 'API key has been rotated') — don't generic-out to 'check the key value'.",
     userInstructions: ready
       ? [
           `Your wallet: ${walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : "(derive failed — check Q402_PRIVATE_KEY)"}`,
