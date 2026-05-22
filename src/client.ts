@@ -171,7 +171,10 @@ export class Q402NodeClient {
 
   async fetchFacilitator(): Promise<string> {
     const url = `${this.opts.relayBaseUrl.replace(/\/$/, "")}/relay/info`;
-    const resp = await fetch(url);
+    // 10s timeout — facilitator info is a small read; if it takes longer
+    // than that, the relay is unhealthy and we should fail the tool call
+    // explicitly rather than hang the whole MCP session waiting.
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!resp.ok) {
       throw new Error(
         `failed to fetch relay facilitator info from ${url} (${resp.status})`,
@@ -262,10 +265,14 @@ export class Q402NodeClient {
           ? { ...baseBody, stableNonce: paymentNonce.toString() }
           : { ...baseBody, nonce: paymentNonce.toString() };
 
+    // 30s timeout — single-recipient relay path. Real settlements typically
+    // resolve in 1-3s; 30s is a generous ceiling so a stalled relay can't
+    // hang the MCP tool indefinitely (which would block the whole AI turn).
     const resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
     });
     const data = (await resp.json()) as PayResult & { error?: string };
     if (!resp.ok) {
@@ -412,7 +419,10 @@ export class Q402NodeClient {
       });
     }
 
-    // Send the batch.
+    // Send the batch. 60s timeout — relay loops recipients sequentially,
+    // so a 20-row paid batch can legitimately take 10-20s. 60s ceiling
+    // keeps a stalled relay from pinning the MCP tool for the whole AI
+    // turn while still allowing healthy batches to complete.
     const resp = await fetch(`${relayBaseUrl.replace(/\/$/, "")}/relay/batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -423,6 +433,7 @@ export class Q402NodeClient {
         facilitator,
         recipients: signedRows,
       }),
+      signal: AbortSignal.timeout(60_000),
     });
     const data = (await resp.json()) as BatchPayResult & { error?: string };
 

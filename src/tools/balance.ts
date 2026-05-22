@@ -83,10 +83,14 @@ export async function runBalance(): Promise<BalanceSummary> {
   const targets: Array<{ scope: ScopedVerifyResult["scope"]; key: string }> = [];
   if (CONFIG.trialApiKey)      targets.push({ scope: "trial",      key: CONFIG.trialApiKey });
   if (CONFIG.multichainApiKey) targets.push({ scope: "multichain", key: CONFIG.multichainApiKey });
-  // Only emit the legacy entry when neither scoped key is set — otherwise
-  // it'd duplicate one of the entries above.
+  // Only emit the legacy fallback entry when neither scoped key is set —
+  // otherwise it'd duplicate one of the entries above. We label it as
+  // "multichain" (the broader scope it falls into) rather than "legacy"
+  // because the user-facing surfaces hide the legacy var (see 0.5.7+
+  // policy in doctor.ts) — exposing "legacy" here would re-introduce
+  // the third env-name to first-time readers.
   if (targets.length === 0 && CONFIG.legacyApiKey) {
-    targets.push({ scope: "legacy", key: CONFIG.legacyApiKey });
+    targets.push({ scope: "multichain", key: CONFIG.legacyApiKey });
   }
 
   if (targets.length === 0) {

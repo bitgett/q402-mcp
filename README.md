@@ -65,8 +65,12 @@ Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor`
 # Hardware wallets (Ledger / Trezor) are not supported yet.
 # Q402_PRIVATE_KEY=0x...
 
-# Start at 0 (sandbox). Flip to 1 only after real values are pasted above.
-Q402_ENABLE_REAL_PAYMENTS=0
+# Live mode switch:
+#   0 = sandbox (test mode, no funds move)
+#   1 = real on-chain payments
+# Default 1 — safe because mode only flips to live when BOTH a live
+# API key AND a valid 32-byte private key are uncommented above.
+Q402_ENABLE_REAL_PAYMENTS=1
 
 # Default Q402 deployment. Only change for self-hosted.
 Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
@@ -132,8 +136,10 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 `q402_receipt` is the natural follow-up: after `q402_pay` returns a `receiptUrl`, hand the agent the `rct_…` id and ask *"verify this receipt"* — the tool re-runs the same canonical-JSON + EIP-191 recovery the receipt page does in the browser, so the verification doesn't depend on trusting any UI. Example prompts that work today:
 
-> *"Pay 0.10 USDT on BNB to vitalik.eth, then verify the receipt."*  
+> *"Pay 0.10 USDT on BNB to 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045, then verify the receipt."*  
 > *"Is `rct_afa5f50bc49a65ebba3b28ab` a real Q402 receipt? Verify the signature."*
+
+> ℹ️ `q402_pay` takes a 0x-prefixed EVM address — ENS names are not resolved by the tool. If your prompt mentions a name like `vitalik.eth`, your AI client needs to resolve it client-side before invoking the tool.
 
 > Per-chain gas tank balances and full transaction history live in the [dashboard](https://q402.quackai.ai/dashboard) — those endpoints require a wallet signature, not a bare API key, so the MCP server points the agent there instead of exposing them.
 
@@ -159,10 +165,16 @@ To enable real on-chain transactions, the resolved API key must be live (`q402_l
 
 # Q402_PRIVATE_KEY=0x...                   # signer for the payer EOA (32-byte hex)
 
-# Start at 0 (sandbox). Flip to 1 only after real values are pasted above —
-# a malformed Q402_PRIVATE_KEY (e.g. the "0x..." placeholder) is rejected at
-# the live-mode gate, so partial setups stay in sandbox with a clear hint.
-Q402_ENABLE_REAL_PAYMENTS=0
+# Live mode switch:
+#   0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash)
+#   1 = real on-chain payments (live mode)
+# Default is 1: real payments enabled. Safe because mode only flips
+# to live when BOTH a live API key (q402_live_*) AND a valid 32-byte
+# private key are set above. Placeholders ("0x...") are rejected by
+# the live-mode gate, so partial setups stay in sandbox with a hint.
+# Change to 0 to force sandbox even with real keys (e.g. for chained
+# testing on a paid plan).
+Q402_ENABLE_REAL_PAYMENTS=1
 ```
 
 Anything missing for the resolved scope → automatic sandbox fallback with a hint pointing at what to set.
@@ -194,7 +206,12 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 | `Q402_ALLOWED_RECIPIENTS` | optional | Comma-separated lowercase addresses. Defaults to no allowlist. |
 | `Q402_RELAY_BASE_URL` | optional | Defaults to `https://q402.quackai.ai/api`. Override for self-hosted Q402. |
 
-> Older integrations may still set `Q402_API_KEY` as a single-env fallback — that still works silently for back-compat. New setups should use the two-key model above; `q402_doctor` only guides users to those two.
+<details>
+<summary>Migrating from legacy single-key setups</summary>
+
+If you set up Q402 before v0.5.0 you may have a single `Q402_API_KEY` env var. The server still resolves that silently — your existing integration won't break. New installs should use the two-key model above (`Q402_TRIAL_API_KEY` and/or `Q402_MULTICHAIN_API_KEY`); `q402_doctor` and the rest of the docs only guide users to those two. To migrate, rename your existing var to `Q402_MULTICHAIN_API_KEY` in `~/.q402/mcp.env` and restart your MCP client.
+
+</details>
 
 ---
 

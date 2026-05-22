@@ -153,9 +153,28 @@ export interface DoctorReport {
   /** Structured actions the client can execute on the user's filesystem. */
   recommendedActions: RecommendedAction[];
 
-  /** Multi-turn conversation framing — what the AI should say next. */
+  /** Multi-turn conversation framing — what the AI should say next.
+   *  Kept for back-compat with clients that read `nextStep` directly,
+   *  but new code should branch on the structured
+   *  `agentInstructions` / `userInstructions` pair below. */
   greeting:  string;
   nextStep:  string;
+
+  /** Detailed prescription for the AI itself — the multi-turn flow,
+   *  recommendedActions ordering, what to ask the user, what NOT to
+   *  echo. This is internal tooling-prose; the AI should consult it
+   *  but NOT show it verbatim to the user. (The 0.5.10 doctor's
+   *  nextStep field mixed both audiences in one paragraph; clients
+   *  that surface raw output showed users "execute the write_file
+   *  action via the client's filesystem tool" which is meaningless
+   *  noise for a non-developer.) */
+  agentInstructions: string;
+
+  /** Plain-language steps the AI CAN show the user verbatim. Three or
+   *  four bullets, no `recommendedActions[]` jargon, no env-var
+   *  vocabulary unless the user has already asked about it. AI clients
+   *  with a UI surface should render this as an ordered list. */
+  userInstructions: string[];
 
   /** Canonical security notice — AI MUST forward this when walking through setup. */
   securityNotice: string;
@@ -167,26 +186,26 @@ export interface DoctorReport {
 }
 
 // ── Env file template ──────────────────────────────────────────────────────
-// Every secret-bearing line is commented out and Q402_ENABLE_REAL_PAYMENTS
-// defaults to 0. Two reasons that combine to make this the only safe shape:
+// Secret-bearing lines (API key + PRIVATE_KEY) are commented out so
+// saving + restarting the file as-is can't trip live mode by accident.
+// Q402_ENABLE_REAL_PAYMENTS=1 IS the default, however — this is safe
+// because the live-mode gate (config.ts:isLiveModeFor) requires BOTH:
 //
-//   1. If the user saves the file as-is and restarts the MCP client before
-//      pasting real values, isLiveModeFor() WOULD have flipped to live with
-//      placeholder strings ("q402_live_..." passes the prefix check;
-//      "0x..." is non-empty so passes the existence check) — and the next
-//      q402_pay would throw inside ethers' Wallet constructor instead of
-//      dropping into a friendly sandbox response. The 0.5.6 template
-//      tripped exactly that bug.
+//   (a) the resolved API key starts with "q402_live_"
+//   (b) PRIVATE_KEY_RE matches Q402_PRIVATE_KEY (0x + exactly 64 hex)
 //
-//   2. Defense in depth: even if a user uncomments lines while leaving
-//      placeholder values, ENABLE_REAL_PAYMENTS=0 keeps mode=sandbox until
-//      they explicitly opt in. q402_doctor's verify pass will then loudly
-//      warn that the keys are still placeholders.
+// With the secret lines commented, neither is set → mode = sandbox
+// regardless of the flag. With placeholders ("q402_live_..." /
+// "0x..."), the API key passes the prefix check BUT the PK regex
+// rejects "0x..." → still sandbox, with a clear "PK malformed" hint.
 //
 // Workflow becomes: uncomment ONE api-key line + paste real value,
-// uncomment Q402_PRIVATE_KEY + paste real value, flip
-// Q402_ENABLE_REAL_PAYMENTS to 1. Three deliberate edits — no
-// accidental-live state in between.
+// uncomment Q402_PRIVATE_KEY + paste real value, save, restart. Two
+// edits — when both are real, you're live. Earlier versions of this
+// template required a third edit (flip the flag from 0 to 1), but
+// users who'd finished the API key + PK paste kept getting stuck in
+// sandbox without realising the flag was still 0. The PK regex
+// makes that extra friction unnecessary.
 const ENV_FILE_TEMPLATE = `# ──────────────────────────────────────────────────────────────────────
 # Q402 MCP — secrets
 # Read automatically by @quackai/q402-mcp on startup.
@@ -208,11 +227,15 @@ const ENV_FILE_TEMPLATE = `# ─────────────────
 # your machine — never leaves your device, never sent to any server.
 # Q402_PRIVATE_KEY=0x...
 
-# ─── Live mode flag ───────────────────────────────────────────────────
-# Default 0 = sandbox (test responses, no funds move). Flip to 1 only
-# AFTER you've pasted real values into the lines above — otherwise the
-# server will refuse the placeholders.
-Q402_ENABLE_REAL_PAYMENTS=0
+# ─── Live mode switch ─────────────────────────────────────────────────
+#   0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash)
+#   1 = real on-chain payments (live mode)
+# Default is 1: real payments enabled. This is safe because mode only
+# flips to live when BOTH a live API key (q402_live_*) AND a valid
+# 32-byte private key are set above. Until you uncomment + paste both,
+# you stay in sandbox. Change to 0 to force sandbox even with real
+# keys (e.g. for chained testing on a paid plan).
+Q402_ENABLE_REAL_PAYMENTS=1
 
 # ─── Q402 relay endpoint ──────────────────────────────────────────────
 # Default canonical Q402 deployment. Only change for self-hosted.
@@ -539,8 +562,28 @@ export async function runDoctor(): Promise<DoctorReport> {
           : `Q402 MCP is installed (v${PACKAGE_VERSION}) — partially configured.`,
       nextStep:
         phase === "first-install"
-          ? "Offer to create ~/.q402/mcp.env. After yes, execute recommendedActions in order: first the `ensure-q402-dir` shell action (use bash on macOS/Linux, PowerShell on Windows via the shellWindows variant), then the `create-env-file` write_file action. Then open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. Walk through filling in the API key (from /event for free Trial or /payment for paid Multichain) and private key one at a time. Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste a private key, surface the `advisories` array: use a fresh wallet (not their main one), heads-up that the wallet will show 'Smart account' in MetaMask after the first payment (that's normal — EIP-7702 delegation), hardware wallets aren't supported, MetaMask key export path."
-          : `Tell the user which env vars are still missing (from the 'missing' list) and how to add them to ~/.q402/mcp.env. Restart needed after editing. Per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → "Developer: Reload Window"; Cline → reload VS Code window.`,
+          ? "Show userInstructions verbatim to the user; do NOT show agentInstructions verbatim (it's prescription for you, the AI)."
+          : "Tell the user which env vars are still missing (from the 'missing' list) and how to add them to ~/.q402/mcp.env. Show userInstructions for the human-readable steps.",
+      agentInstructions:
+        phase === "first-install"
+          ? "Multi-turn flow: (1) Briefly tell the user MCP is installed. (2) Ask one yes/no question — 'Want me to create your Q402 settings file?'. (3) On yes, execute recommendedActions IN ORDER: first `ensure-q402-dir` shell action (bash on macOS/Linux, PowerShell on Windows via shellWindows variant), then `create-env-file` write_file action. (4) Open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. (5) Walk through filling in the API key (from /event for free Trial or /payment for paid Multichain) and private key one at a time. (6) Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste a private key, surface the `advisories` array: fresh wallet, Smart-account-in-MetaMask heads-up, hardware wallets unsupported, MetaMask key-export path. (7) After they save, tell them to restart the MCP client — per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window. (8) Have them re-invoke 'Set up Q402' to confirm. Keep the conversation tight: one decision per turn, plain language, never echo this paragraph."
+          : "User has SOME env set. List the missing items (from `missing`) in plain language. Tell them to edit ~/.q402/mcp.env and uncomment / fill the relevant line, then restart the MCP client. Restart verb per client: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window.",
+      userInstructions:
+        phase === "first-install"
+          ? [
+              "Q402 is installed. To start sending payments you need an API key and a wallet.",
+              "I'll create a settings file for you — say yes and I'll set it up + open it in your editor.",
+              "Get a free API key at https://q402.quackai.ai/event (BNB Chain only, 2,000 sponsored transactions).",
+              "Use a FRESH wallet for Q402 — don't use your main wallet. The wallet will be marked 'Smart account' in MetaMask after your first payment (that's normal — Q402 reverses it on demand).",
+              "Paste your key + wallet private key INTO THE FILE (in your editor) — never paste a private key into this chat.",
+              "Save the file, restart your MCP client, then ask me 'Verify Q402' to confirm.",
+            ]
+          : [
+              "Q402 is installed but a few env vars are still missing.",
+              "Open ~/.q402/mcp.env in your editor and fill in the lines I list below.",
+              "Save the file, then restart your MCP client (close + reopen Claude/Codex, or Cmd/Ctrl+Shift+P → Reload Window for Cursor/Cline).",
+              "Then ask me 'Verify Q402' to re-check.",
+            ],
       securityNotice: SECURITY_NOTICE,
       advisories: phase === "first-install" ? FIRST_INSTALL_ADVISORY : undefined,
     };
@@ -639,9 +682,26 @@ export async function runDoctor(): Promise<DoctorReport> {
       ? `Q402 MCP is ready (v${PACKAGE_VERSION}).`
       : `Q402 MCP is installed but has ${warnings.length} issue${warnings.length === 1 ? "" : "s"} to address.`,
     nextStep: ready
-      ? "Summarize the wallet address, plan tier(s), remaining quota, and any non-zero delegation counts to the user as a checklist. Then offer to make a test payment via q402_quote."
-      : "Walk the user through each warning in order. For slot-mismatch warnings, the fix is editing ~/.q402/mcp.env and restarting the client.",
+      ? "Show userInstructions verbatim. Then offer to make a small test quote (q402_quote) to confirm everything works end-to-end."
+      : "Walk the user through each warning in order. Show userInstructions verbatim for the cleanup steps.",
+    agentInstructions: ready
+      ? "Live mode is fully configured. Summarize the wallet address (mask middle), plan tier(s), remaining quota, and any non-zero delegation counts to the user as a checklist. Offer a tiny test (q402_quote, not q402_pay) to confirm. Don't echo the full keys array verbatim — pick the most useful 2-3 fields per scope."
+      : "Walk the user through each warning IN ORDER, plain language. For slot-mismatch warnings, the fix is editing ~/.q402/mcp.env and restarting the client (Cursor / Cline: reload window; Claude / Codex: quit + relaunch). Surface body.error strings from any verify failure as the user-visible reason (e.g. 'your Trial expired 3 days ago', 'API key has been rotated') — don't generic-out to 'check the key value'.",
+    userInstructions: ready
+      ? [
+          `Your wallet: ${walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : "(derive failed — check Q402_PRIVATE_KEY)"}`,
+          "Q402 is live. You can now ask me to quote, pay, batch-pay, or check Trust Receipts.",
+          "Want me to run a quick gas comparison across all 9 chains as a smoke test?",
+        ]
+      : [
+          `Q402 has ${warnings.length} issue${warnings.length === 1 ? "" : "s"} to fix:`,
+          ...warnings.map(w => `• ${w}`),
+          "Open ~/.q402/mcp.env, fix the lines above, save, then restart your MCP client (Cursor/Cline: Cmd/Ctrl+Shift+P → Reload Window; Claude/Codex: quit + relaunch). Then ask me 'Verify Q402' to re-check.",
+        ],
     securityNotice: SECURITY_NOTICE,
+    // advisories are first-install-only by design — explicitly set to undefined
+    // here so future maintainers see the conditional rather than an absent key.
+    advisories: undefined,
   };
 }
 
@@ -660,17 +720,25 @@ export const DOCTOR_TOOL = {
     "tool to call after install, BEFORE q402_pay or q402_balance — it tells " +
     "the agent what state the user is in. " +
     "\n\n" +
+    "Output uses TWO instruction surfaces — `agentInstructions` (prescription " +
+    "for you, the AI — do NOT echo verbatim) and `userInstructions` (plain " +
+    "language array you CAN show the user as a numbered list). Always show " +
+    "userInstructions; consult agentInstructions privately to decide what to " +
+    "ask next + which `recommendedActions` to execute. " +
+    "\n\n" +
     "Multi-turn pattern the AI should follow when phase = first-install: " +
     "(1) Tell user MCP is installed. (2) Ask one yes/no question: 'Want me " +
-    "to create your secrets file at ~/.q402/mcp.env?' (3) On yes, execute " +
-    "the recommendedActions[].write_file action using the client's own " +
-    "filesystem tool, then open the file in the user's editor (e.g. `code " +
-    "~/.q402/mcp.env`, `open` on macOS, `start` on Windows, `xdg-open` on " +
-    "Linux). (4) Guide the user through getting an API key (free Trial at " +
+    "to create your secrets file?' (3) On yes, execute recommendedActions IN " +
+    "ORDER — first the `ensure-q402-dir` shell action (use shellWindows on " +
+    "Windows), then the `create-env-file` write_file action. Then open the " +
+    "file in the user's editor (e.g. `code` for VS Code / Cursor / Cline, " +
+    "`open` on macOS, `start` on Windows, `xdg-open` on Linux). (4) Guide " +
+    "the user through getting an API key (free Trial at " +
     "https://q402.quackai.ai/event OR paid Multichain at /payment) and " +
     "pasting it into the file (in their editor — NEVER in chat). (5) Same " +
-    "for the private key. (6) Tell them to save + restart the MCP client. " +
-    "(7) Call q402_doctor again to verify. " +
+    "for the private key. (6) Tell them to save + restart the MCP client " +
+    "(per-client restart verb is in agentInstructions). (7) Call q402_doctor " +
+    "again to verify. " +
     "\n\n" +
     "Security policy carried in the response: AI MUST surface the " +
     "securityNotice when first walking through setup. If the user pastes a " +
