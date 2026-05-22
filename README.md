@@ -91,8 +91,8 @@ Q402_ENABLE_REAL_PAYMENTS=1
 # Default Q402 deployment. Only change for self-hosted.
 Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
 
-# Optional safety guards:
-# Q402_MAX_AMOUNT_PER_CALL=5
+# Safety guards (max-amount ships uncommented at $200; lower for tighter caps):
+Q402_MAX_AMOUNT_PER_CALL=200
 # Q402_ALLOWED_RECIPIENTS=0xabc...,0xdef...
 ```
 
@@ -202,7 +202,7 @@ Two additional guards run before every payment regardless of mode:
 
 | Env var | Default | Effect |
 |---|---|---|
-| `Q402_MAX_AMOUNT_PER_CALL` | `5` | Reject any single call where `amount > N` USD-equivalent. |
+| `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject any single call where `amount > N` USD-equivalent. |
 | `Q402_ALLOWED_RECIPIENTS` | (empty = off) | Comma-separated address allowlist. When set, all other recipients are rejected. |
 
 Combined with the `confirm: true` argument the tool requires, this means the model needs (a) explicit user OK in chat, (b) amount ≤ cap, (c) recipient on allowlist if one exists, (d) all three live-mode env vars set, before a single wei moves.
@@ -217,7 +217,7 @@ Combined with the `confirm: true` argument the tool requires, this means the mod
 | `Q402_MULTICHAIN_API_KEY` | live-pay (9-chain) | Paid 9-chain key. Get one at https://q402.quackai.ai/payment. Auto-routed for non-BNB chains AND for BNB when no Trial key is set. Cap: 20 recipients per batch. |
 | `Q402_PRIVATE_KEY` | live-pay | Signer for the payer EOA. **Never share. Never paste in chat.** |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
-| `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `5`. |
+| `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `200`. Lower for tighter agent blast-radius. |
 | `Q402_ALLOWED_RECIPIENTS` | optional | Comma-separated lowercase addresses. Defaults to no allowlist. |
 | `Q402_RELAY_BASE_URL` | optional | Defaults to `https://q402.quackai.ai/api`. Override for self-hosted Q402. |
 

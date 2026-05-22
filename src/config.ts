@@ -237,7 +237,7 @@ export interface Config {
 // running against a self-hosted Q402 deployment or a non-canonical
 // environment.
 const DEFAULT_RELAY_BASE = "https://q402.quackai.ai/api";
-const DEFAULT_MAX_AMOUNT = 5;
+const DEFAULT_MAX_AMOUNT = 200;
 
 /**
  * Classify an API key string by its visible prefix. Exported so

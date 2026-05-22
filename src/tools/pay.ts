@@ -1,6 +1,6 @@
 /**
  * q402_pay — sandbox-default, with three layered guards before any real TX:
- *   1. Per-call max-amount (Q402_MAX_AMOUNT_PER_CALL, default $5)
+ *   1. Per-call max-amount (Q402_MAX_AMOUNT_PER_CALL, default $200)
  *   2. Recipient allowlist (Q402_ALLOWED_RECIPIENTS, optional)
  *   3. Live mode requires:
  *        - the resolved scope key (Q402_TRIAL_API_KEY for BNB-auto-routed

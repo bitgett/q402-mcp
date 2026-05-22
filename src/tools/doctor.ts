@@ -261,11 +261,12 @@ Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Optional safety guards (uncomment + edit to enable)
+# Safety guards
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Max USD per single q402_pay call (default: 5)
-# Q402_MAX_AMOUNT_PER_CALL=5
-#
+# Max USD per single q402_pay call. Any request above this is rejected
+# before signing. Lower this if you want a tighter agent blast-radius.
+Q402_MAX_AMOUNT_PER_CALL=200
+
 # Comma-separated lowercase recipient allowlist (unset = any address OK)
 # Q402_ALLOWED_RECIPIENTS=0xabc...,0xdef...
 `;
