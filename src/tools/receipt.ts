@@ -188,7 +188,12 @@ export async function runReceipt(input: ReceiptInput): Promise<ReceiptSummary> {
     };
   }
 
-  const resp = await fetch(`${apiBase}/receipt/${receiptId}`);
+  // 10s timeout — receipt read is a small static lookup; a stall longer
+  // than that means the relay is unhealthy and we should fail the tool
+  // call explicitly instead of hanging the MCP session indefinitely.
+  const resp = await fetch(`${apiBase}/receipt/${receiptId}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (resp.status === 404) {
     return {
       receiptId, url: null, pageUrl: null, verified: false,

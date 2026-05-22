@@ -141,10 +141,15 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
   let res: Response;
   let json: unknown;
   try {
+    // 30s timeout — write path: sponsor wallet has to mine the
+    // type-0x04 TX. Real BNB confirmation is 3-5s, headroom for
+    // congested chains; anything beyond 30s means the relay or
+    // chain is degraded and the user should retry.
     res  = await fetch(url, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(30_000),
     });
     json = await res.json();
   } catch (e) {

@@ -273,11 +273,15 @@ const SECURITY_NOTICE =
  *      payment heads off the support ticket.
  */
 const FIRST_INSTALL_ADVISORY = [
-  "Use a FRESH wallet for Q402 — don't reuse the one with your main funds.",
-  "After your first payment, that wallet will show 'Smart account' in MetaMask / OKX. " +
-    "That's EIP-7702 delegation (Q402's gasless settlement mechanism), reversible anytime with q402_clear_delegation.",
-  "Hardware wallets (Ledger / Trezor) are NOT supported yet — they don't sign EIP-7702 type-4 authorizations.",
-  "To get a hex private key from MetaMask: ··· (3-dot menu) → Account details → Show private key → enter password.",
+  "Tip: a separate MetaMask account dedicated to Q402 keeps your existing balances and history " +
+    "tidy — it's a quick \"+ Add account\" in MetaMask. Q402 works with any EOA you control, though.",
+  "After your first payment, that wallet will show 'Smart account' in MetaMask / OKX. That's " +
+    "EIP-7702 delegation (Q402's gasless settlement mechanism), reversible anytime via " +
+    "q402_clear_delegation.",
+  "Hardware wallets (Ledger / Trezor) can't sign EIP-7702 type-4 authorizations yet, so they're " +
+    "not supported in Q402 today — a hot wallet works.",
+  "To export the key in MetaMask: open the account menu → Account details → Show private key. " +
+    "Paste the 0x... string into ~/.q402/mcp.env in your editor (never into chat).",
 ];
 
 // The "after a live payment" version of this heads-up lives on the
@@ -498,7 +502,26 @@ export async function runDoctor(): Promise<DoctorReport> {
       "Looks like the placeholder '0x...' is still in ~/.q402/mcp.env — paste a real key in your editor.",
     );
   }
-  if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
+  if (!CONFIG.realPaymentsRequested) {
+    // server.json declares `default: "1"` for this var as of v0.5.11, but
+    // not every MCP client passes registry defaults through — Codex without
+    // an explicit env_vars allow-list, raw stdio bridges, etc. won't.
+    // When the user's API key + PK are otherwise fine but the flag is
+    // unset, the most likely cause is "client stripped the default" — so
+    // tell them to pin it explicitly in the file rather than chase the
+    // registry layer.
+    const haveAnyApi = !!(CONFIG.trialApiKey || CONFIG.multichainApiKey || CONFIG.legacyApiKey);
+    const havePk    = isValidPrivateKey(CONFIG.privateKey);
+    if (haveAnyApi && havePk) {
+      missing.push(
+        "Q402_ENABLE_REAL_PAYMENTS=1 — your other config looks fine, but your MCP " +
+        "client isn't passing the registry default through. Add the line " +
+        "Q402_ENABLE_REAL_PAYMENTS=1 to ~/.q402/mcp.env explicitly and restart.",
+      );
+    } else {
+      missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
+    }
+  }
 
   // Recommended actions for the client to execute. First-install gets two
   // actions: (1) make the parent dir explicit so weaker AI clients on
@@ -585,7 +608,13 @@ export async function runDoctor(): Promise<DoctorReport> {
               "Then ask me 'Verify Q402' to re-check.",
             ],
       securityNotice: SECURITY_NOTICE,
-      advisories: phase === "first-install" ? FIRST_INSTALL_ADVISORY : undefined,
+      // Advisories are useful in BOTH first-install and needs-completion:
+      // a user who already pasted an API key but hasn't yet added their
+      // private key is exactly the audience that needs the "MetaMask
+      // export path" + "Smart-account-is-normal" heads-up. Suppressing
+      // them once any env was set (the pre-0.5.12 behaviour) left a
+      // gap right at the moment they were most useful.
+      advisories: FIRST_INSTALL_ADVISORY,
     };
   }
 
@@ -692,6 +721,7 @@ export async function runDoctor(): Promise<DoctorReport> {
           `Your wallet: ${walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : "(derive failed — check Q402_PRIVATE_KEY)"}`,
           "Q402 is live. You can now ask me to quote, pay, batch-pay, or check Trust Receipts.",
           "Want me to run a quick gas comparison across all 9 chains as a smoke test?",
+          "Need to chain-test against sandbox without changing keys? Set Q402_ENABLE_REAL_PAYMENTS=0 in ~/.q402/mcp.env and restart — every q402_pay returns a fake hash until you flip it back to 1.",
         ]
       : [
           `Q402 has ${warnings.length} issue${warnings.length === 1 ? "" : "s"} to fix:`,
@@ -699,9 +729,10 @@ export async function runDoctor(): Promise<DoctorReport> {
           "Open ~/.q402/mcp.env, fix the lines above, save, then restart your MCP client (Cursor/Cline: Cmd/Ctrl+Shift+P → Reload Window; Claude/Codex: quit + relaunch). Then ask me 'Verify Q402' to re-check.",
         ],
     securityNotice: SECURITY_NOTICE,
-    // advisories are first-install-only by design — explicitly set to undefined
-    // here so future maintainers see the conditional rather than an absent key.
-    advisories: undefined,
+    // Carry advisories through live-check too — even a fully-configured
+    // user benefits from the "Smart-account in MetaMask is normal" line
+    // appearing alongside their first ready state.
+    advisories: FIRST_INSTALL_ADVISORY,
   };
 }
 

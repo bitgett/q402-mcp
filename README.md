@@ -49,7 +49,7 @@ The agent calls `q402_doctor`. On first install, the tool tells the agent to:
 
 ### Manual setup (no AI)
 
-Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor` writes — every secret line is commented out and `Q402_ENABLE_REAL_PAYMENTS` defaults to `0`. Uncomment the lines you need, paste real values, then flip the live flag to `1`. (Saving the template as-is is safe: invalid placeholders won't trip live mode.)
+Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor` writes — every secret line is commented out and `Q402_ENABLE_REAL_PAYMENTS` defaults to `1`. Uncomment the lines you need and paste real values; the server only flips into live mode once both a `q402_live_*` API key AND a valid 32-byte private key are configured, so saving the template as-is is safe (placeholders stay in sandbox). Change the flag to `0` if you want to force sandbox even with real keys (e.g. for chained testing).
 
 ```bash
 # ~/.q402/mcp.env
@@ -149,7 +149,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash with `success: false` and `sandbox: true`, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an accidental payment — if the agent misreads the conversation and fires `q402_pay` before you intended, nothing moves AND the response cannot be mistaken for a confirmed settlement.
 
-To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set to a valid 32-byte hex key, and `Q402_ENABLE_REAL_PAYMENTS=1`. The block below is the template `q402_doctor` writes to `~/.q402/mcp.env` — every secret line is commented out and the live flag defaults to `0`. Uncomment the lines you need, paste real values in your editor, then flip the flag to `1`:
+To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set to a valid 32-byte hex key, and `Q402_ENABLE_REAL_PAYMENTS=1`. The block below is the template `q402_doctor` writes to `~/.q402/mcp.env` — every secret line is commented out and the live flag defaults to `1`. Uncomment the lines you need and paste real values in your editor; the live-mode gate only flips once a real key + valid PK are present, so saving the template as-is stays in sandbox. Change the flag to `0` if you want to force sandbox even with real keys (e.g. for chained testing on a paid plan):
 
 ```bash
 # Two-key model — uncomment ONE (or both for auto-routing).

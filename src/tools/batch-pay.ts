@@ -34,10 +34,17 @@
  * failures are surfaced in the result array without aborting.
  */
 
-import { isAddress } from "ethers";
+import { isAddress, Wallet } from "ethers";
 import { z } from "zod";
 import { getChain, tokenFor } from "../chains.js";
-import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest, type KeyScope } from "../config.js";
+import {
+  CONFIG,
+  resolveApiKey,
+  isLiveModeFor,
+  isValidPrivateKey,
+  type KeyScopeRequest,
+  type KeyScope,
+} from "../config.js";
 import {
   BatchPayError,
   Q402NodeClient,
@@ -122,6 +129,15 @@ export interface BatchPaySummary {
   guardsApplied: string[];
   setupHint?: string;
   error?: string;
+  /**
+   * Echoes the sender wallet (the EOA derived from Q402_PRIVATE_KEY). AI
+   * shows this alongside recipients/amount in the batch-confirm message so
+   * the user can sanity-check which wallet is signing the full batch.
+   */
+  senderWallet?: {
+    address:      string;
+    addressShort: string;
+  };
 }
 
 function maxAmountGuardBatch(recipients: BatchPayInput["recipients"], cap: number): void {
@@ -183,6 +199,20 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
+  // Derive sender wallet so we can echo it back on every response shape
+  // (ambiguous / sandbox / live). Same regex gate as q402_pay — skip if
+  // PK missing or placeholder.
+  let senderWallet: BatchPaySummary["senderWallet"];
+  if (CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey)) {
+    try {
+      const addr = new Wallet(CONFIG.privateKey).address;
+      senderWallet = {
+        address:      addr,
+        addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+      };
+    } catch { /* unreachable given regex check */ }
+  }
+
   // ── Ambiguity gate ─────────────────────────────────────────────────────────
   // When the agent didn't pass an explicit keyScope AND we're on BNB AND a
   // Trial key is configured AND the batch is too big to fit on a single
@@ -206,6 +236,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       mode: "none",
       status: "ambiguous",
       guardsApplied,
+      senderWallet,
       setupHint:
         `Batch of ${input.recipients.length} on BNB exceeds the Trial cap of ${RECIPIENT_LIMIT_TRIAL}. ` +
         `Ask the user to pick one and re-invoke q402_batch_pay with explicit keyScope:\n` +
@@ -236,6 +267,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       mode: "sandbox",
       status: "sandbox",
       result: { sandbox: sandboxResults, reason },
+      senderWallet,
       guardsApplied,
       setupHint: reason,
     };
@@ -261,7 +293,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push("mode=live");
     guardsApplied.push(`scope=${result.scope} (server enforced)`);
     guardsApplied.push(`batch_size=${input.recipients.length}/${result.limit}`);
-    return { mode: "live", status: "success", result, guardsApplied };
+    return { mode: "live", status: "success", result, guardsApplied, senderWallet };
   } catch (err) {
     if (err instanceof BatchPayError) {
       guardsApplied.push("mode=live");
@@ -281,6 +313,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
           results: err.results,
         },
         guardsApplied,
+        senderWallet,
         error: err.message,
       };
     }
@@ -291,7 +324,17 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
 function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   const missing: string[] = [];
   if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
-  if (!CONFIG.privateKey) missing.push("Q402_PRIVATE_KEY");
+  if (!CONFIG.privateKey) {
+    missing.push("Q402_PRIVATE_KEY");
+  } else if (!isValidPrivateKey(CONFIG.privateKey)) {
+    // PK set but rejected by the live-mode regex — typically the literal
+    // `0x...` placeholder. Surface the real reason or the user thinks
+    // they already configured the key.
+    missing.push(
+      "Q402_PRIVATE_KEY (currently the placeholder '0x...' — paste a real " +
+      "0x + 64-hex key into ~/.q402/mcp.env)",
+    );
+  }
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route to the right tier: trial scope → /event (free 2k TX, BNB only),

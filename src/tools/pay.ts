@@ -15,10 +15,17 @@
  * confirmation before invoking; that is the fourth (procedural) guard.
  */
 
-import { isAddress } from "ethers";
+import { isAddress, Wallet } from "ethers";
 import { z } from "zod";
 import { CHAIN_KEYS, getChain, tokenFor } from "../chains.js";
-import { CONFIG, resolveApiKey, isLiveModeFor, type KeyScopeRequest, type KeyScope } from "../config.js";
+import {
+  CONFIG,
+  resolveApiKey,
+  isLiveModeFor,
+  isValidPrivateKey,
+  type KeyScopeRequest,
+  type KeyScope,
+} from "../config.js";
 import { Q402NodeClient, sandboxPay, type PayResult } from "../client.js";
 
 export const PayInputSchema = z.object({
@@ -59,6 +66,20 @@ export interface PaySummary {
   result: PayResult;
   guardsApplied: string[];
   setupHint?: string;
+  /**
+   * Echoes back the sender wallet (the EOA derived from Q402_PRIVATE_KEY)
+   * so the AI surfaces "signing from 0xabc…1234 on bnb" alongside the
+   * recipient / amount confirmation. Lets the user verify the wallet
+   * matches what they configured before any signature is collected.
+   * Always present on live calls; on sandbox calls it's still populated
+   * when a PK is configured so test runs preview the same address.
+   */
+  senderWallet?: {
+    /** Full 0x address — used for verification, NOT for display. */
+    address:      string;
+    /** Short masked form (`0xabc…1234`) — the AI's preferred display. */
+    addressShort: string;
+  };
   /**
    * Live payments only — heads-up the AI should forward to the user
    * proactively. Currently used to flag the EIP-7702 delegation side-effect
@@ -110,6 +131,20 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
   const guardsApplied: string[] = [];
 
+  // Derive the sender address locally so we can echo it back on every
+  // response (sandbox + live). When the key is missing or malformed we
+  // skip — the doctor's diagnostics already cover that path.
+  let senderWallet: PaySummary["senderWallet"];
+  if (CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey)) {
+    try {
+      const addr = new Wallet(CONFIG.privateKey).address;
+      senderWallet = {
+        address:      addr,
+        addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+      };
+    } catch { /* unreachable given the regex check, but defensive */ }
+  }
+
   maxAmountGuard(input.amount, CONFIG.maxAmountPerCallUsd);
   guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd}`);
 
@@ -140,7 +175,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     // the resolver returned a key but live mode failed on its own gates.
     const setupHint =
       resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "", resolved.scope);
-    return { result, guardsApplied, setupHint };
+    return { result, guardsApplied, setupHint, senderWallet };
   }
 
   const client = new Q402NodeClient({
@@ -162,6 +197,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   return {
     result,
     guardsApplied,
+    senderWallet,
     postPaymentTip: result.success
       ? "After this payment your EOA is EIP-7702-delegated to Q402's impl on " +
         `${chain.name} — MetaMask / OKX will show it as a 'Smart account'. ` +
@@ -177,7 +213,18 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   const missing: string[] = [];
   if (!resolvedKey.startsWith("q402_live_")) missing.push("a live API key (must start with q402_live_)");
-  if (!CONFIG.privateKey) missing.push("Q402_PRIVATE_KEY");
+  if (!CONFIG.privateKey) {
+    missing.push("Q402_PRIVATE_KEY");
+  } else if (!isValidPrivateKey(CONFIG.privateKey)) {
+    // PK is set but doesn't pass the live-mode regex — typically the
+    // literal `0x...` placeholder from the template. Surface the real
+    // reason instead of generic "PK missing", or the user thinks they
+    // already configured it.
+    missing.push(
+      "Q402_PRIVATE_KEY (currently the placeholder '0x...' — paste a real " +
+      "0x + 64-hex key into ~/.q402/mcp.env)",
+    );
+  }
   if (!CONFIG.realPaymentsRequested) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route the user to the right tier: trial scope → /event (free 2k TX,
@@ -214,6 +261,12 @@ export const PAY_TOOL = {
     "confirmed settlements — always branch on those fields before telling " +
     "the user the payment went through. " +
     "The recipient receives the full amount; the sender pays $0 in gas. " +
+    "\n\n" +
+    "SENDER ECHO — every response includes a `senderWallet` field with the " +
+    "address derived from the configured `Q402_PRIVATE_KEY`. Show this " +
+    "alongside the recipient/amount when you confirm the payment with the " +
+    "user (e.g. 'Signing from 0xabc…1234 on bnb → send 5 USDT to 0xdef…ABCD'). " +
+    "Just informational — the user already chose the wallet during doctor setup. " +
     "\n\n" +
     "EIP-7702 SIDE EFFECT — surface this to the user proactively after the " +
     "FIRST live payment on a chain: their wallet now shows up as a 'Smart " +

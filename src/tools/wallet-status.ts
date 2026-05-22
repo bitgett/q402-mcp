@@ -60,7 +60,10 @@ export async function runWalletStatus(): Promise<WalletStatusResult> {
   let body: unknown;
   let res:  Response;
   try {
-    res  = await fetch(url);
+    // 10s timeout — endpoint fans out 9 parallel eth_getCode calls on
+    // the server but completes in 200-500ms when healthy. A stall past
+    // 10s means the relay is unhealthy; bail rather than hang the tool.
+    res  = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     body = await res.json();
   } catch (e) {
     return {

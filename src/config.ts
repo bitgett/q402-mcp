@@ -84,6 +84,13 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     return {};
   }
 
+  // Strip a leading UTF-8 BOM (U+FEFF). Windows Notepad writes the BOM
+  // by default when saving "ANSI"/"UTF-8 with signature" files — without
+  // this strip, the first key `Q402_TRIAL_API_KEY` becomes
+  // `﻿Q402_TRIAL_API_KEY`, fails the `Q402_` prefix filter, and
+  // silently drops the user into sandbox with no warning.
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+
   for (const line of raw.split(/\r?\n/)) {
     const t = line.trim();
     if (!t || t.startsWith("#")) continue;
