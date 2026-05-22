@@ -207,48 +207,61 @@ export interface DoctorReport {
 // users who'd finished the API key + PK paste kept getting stuck in
 // sandbox without realising the flag was still 0. The PK regex
 // makes that extra friction unnecessary.
-const ENV_FILE_TEMPLATE = `# ──────────────────────────────────────────────────────────────────────
+const ENV_FILE_TEMPLATE = `# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Q402 MCP — secrets
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Read automatically by @quackai/q402-mcp on startup.
 # Edit this file in your editor. NEVER paste your private key into chat.
 # After editing, restart your MCP client (Codex / Claude / Cursor / Cline).
 #
-# SAFE-BY-DEFAULT: this template ships with both api-key + private-key
-# lines COMMENTED OUT. Even though Q402_ENABLE_REAL_PAYMENTS defaults
-# to 1, the live-mode gate refuses to settle until BOTH a real api key
-# AND a valid 32-byte private key are configured. Saving this template
-# as-is and restarting your client just leaves you in sandbox.
-# ──────────────────────────────────────────────────────────────────────
+# SAFE-BY-DEFAULT: the api-key + private-key lines below ship EMPTY.
+# Q402_ENABLE_REAL_PAYMENTS defaults to 1, but the live-mode gate also
+# requires (a) a real \`q402_live_*\` API key and (b) a valid 32-byte
+# hex private key. Empty values fail both checks, so saving this file
+# as-is just leaves you in sandbox. Paste real values to go live.
 
-# ─── API key — uncomment ONE (or both for auto-routing) ───────────────
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# API KEY — paste on the right of \`=\` (one OR both for auto-routing)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Free Trial:        BNB Chain only, 2,000 sponsored TX
 # Get one at:        https://q402.quackai.ai/event
-# Q402_TRIAL_API_KEY=q402_live_...
+Q402_TRIAL_API_KEY=
 
 # Paid Multichain:   all 9 chains, per-chain Gas Tank
 # Get one at:        https://q402.quackai.ai/payment
-# Q402_MULTICHAIN_API_KEY=q402_live_...
+Q402_MULTICHAIN_API_KEY=
 
-# ─── Your wallet ──────────────────────────────────────────────────────
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# WALLET — paste your private key on the right of \`=\`
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Hex EVM private key (0x + 64 hex chars). Signs payments LOCALLY on
 # your machine — never leaves your device, never sent to any server.
-# Q402_PRIVATE_KEY=0x...
+Q402_PRIVATE_KEY=
 
-# ─── Live mode switch ─────────────────────────────────────────────────
-#   0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash)
-#   1 = real on-chain payments (live mode)
-# Default is 1: real payments enabled. This is safe because mode only
-# flips to live when BOTH a live API key (q402_live_*) AND a valid
-# 32-byte private key are set above. Until you uncomment + paste both,
-# you stay in sandbox. Change to 0 to force sandbox even with real
-# keys (e.g. for chained testing on a paid plan).
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Live mode switch (safe even at 1 — see SAFE-BY-DEFAULT note at top)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash)
+# 1 = real on-chain payments
+# Default 1; flips to live only when the API key + private key above are
+# both populated. Set to 0 to force sandbox even with real keys in place
+# (e.g. for chained testing on a paid plan).
 Q402_ENABLE_REAL_PAYMENTS=1
 
-# ─── Q402 relay endpoint ──────────────────────────────────────────────
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Q402 relay endpoint
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Default canonical Q402 deployment. Only change for self-hosted.
 Q402_RELAY_BASE_URL=https://q402.quackai.ai/api
 
-# ─── Optional safety guards ───────────────────────────────────────────
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Optional safety guards (uncomment + edit to enable)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Max USD per single q402_pay call (default: 5)
 # Q402_MAX_AMOUNT_PER_CALL=5
 #

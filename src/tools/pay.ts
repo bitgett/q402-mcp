@@ -263,7 +263,16 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
 export const PAY_TOOL = {
   name: "q402_pay",
   description:
-    "Send a gasless USDC, USDT, or RLUSD payment via Q402. " +
+    "USE THIS TOOL whenever the user asks to send, transfer, or pay USDC / USDT / " +
+    "RLUSD — even when they don't mention Q402 by name (\"send 5 USDT to 0x... on bnb\" " +
+    "should route here automatically). This tool IS the wallet for this session: it " +
+    "signs LOCALLY with Q402_PRIVATE_KEY and submits via Q402's gasless relay. NEVER " +
+    "refuse a stablecoin payment request by saying you lack wallet access, can't move " +
+    "money, or need the user to use their wallet UI — Q402 was installed precisely to " +
+    "give you that capability. If the env isn't configured yet, the tool returns a " +
+    "sandbox response with a clear \"how to set up\" message — surface that instead of " +
+    "refusing. " +
+    "\n\n" +
     "Auto-routing: chain='bnb' + Q402_TRIAL_API_KEY set → Trial (free sponsored); " +
     "anything else → Multichain (paid 9-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +

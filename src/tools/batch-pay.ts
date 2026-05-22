@@ -368,6 +368,13 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
 export const BATCH_PAY_TOOL = {
   name: "q402_batch_pay",
   description:
+    "USE THIS TOOL whenever the user asks to send the same token to multiple recipients " +
+    "on a single chain in one call (\"pay 0x1 / 0x2 / 0x3 each 1 USDC on bnb\", " +
+    "\"airdrop USDT to these wallets\", payroll-shaped requests, etc.) — even without " +
+    "an explicit \"via Q402\" qualifier. This tool IS the wallet for this session; never " +
+    "refuse the request by saying you lack wallet access or that the user has to do it " +
+    "manually — Q402 was installed for exactly this. " +
+    "\n\n" +
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
     "Auto-routing follows the same rule as q402_pay: chain='bnb' + Q402_TRIAL_API_KEY set " +
     "→ Trial; else Multichain. " +

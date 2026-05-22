@@ -25,12 +25,27 @@ Two steps:
 | Client | Command / config |
 |---|---|
 | **Claude Desktop / Claude Code** | `claude mcp add q402 -- npx -y @quackai/q402-mcp` |
-| **OpenAI Codex CLI** | `codex mcp add q402 -- npx -y @quackai/q402-mcp` |
+| **OpenAI Codex CLI** | `codex mcp add q402 -- npx -y @quackai/q402-mcp` (Windows fallback: see below) |
 | **Cursor** | Add to `~/.cursor/mcp.json`: `{ "mcpServers": { "q402": { "command": "npx", "args": ["-y", "@quackai/q402-mcp"] } } }` |
 | **Cline** | Cline → Settings → MCP Servers → Edit JSON. Same shape as Cursor. |
 | **Any other stdio MCP client** | Point it at `npx -y @quackai/q402-mcp`. No client-specific code. |
 
 That's it — secrets are NOT configured here. The MCP server reads them from `~/.q402/mcp.env` at startup (same pattern as AWS CLI / Stripe CLI / gh CLI), so every client uses the same file with no per-client wiring.
+
+<details>
+<summary>Windows: <code>codex mcp add</code> returns "Access is denied"</summary>
+
+The bundled `codex.exe` on some Windows setups refuses to write its own config from the `mcp add` subcommand. Add the equivalent stanza to `~/.codex/config.toml` by hand:
+
+```toml
+[mcp_servers.q402]
+command = "npx"
+args = ["-y", "@quackai/q402-mcp"]
+```
+
+Then restart Codex. Same effect as `codex mcp add q402 -- npx -y @quackai/q402-mcp`.
+
+</details>
 
 ### 2. First-time setup
 
@@ -49,27 +64,28 @@ The agent calls `q402_doctor`. On first install, the tool tells the agent to:
 
 ### Manual setup (no AI)
 
-Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor` writes — every secret line is commented out and `Q402_ENABLE_REAL_PAYMENTS` defaults to `1`. Uncomment the lines you need and paste real values; the server only flips into live mode once both a `q402_live_*` API key AND a valid 32-byte private key are configured, so saving the template as-is is safe (placeholders stay in sandbox). Change the flag to `0` if you want to force sandbox even with real keys (e.g. for chained testing).
+Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor` writes — the three secret lines (`Q402_TRIAL_API_KEY`, `Q402_MULTICHAIN_API_KEY`, `Q402_PRIVATE_KEY`) ship empty, with `Q402_ENABLE_REAL_PAYMENTS=1`. Paste real values on the right of `=` for the key(s) you have and your wallet key. The server only flips into live mode once both a `q402_live_*` API key AND a valid 32-byte private key are present, so saving the template as-is is safe (empty values fail the gate and stay in sandbox). Change the flag to `0` if you want to force sandbox even with real keys (e.g. for chained testing).
 
 ```bash
 # ~/.q402/mcp.env
 
 # Free Trial — BNB only, 2,000 sponsored TX (from /event)
-# Q402_TRIAL_API_KEY=q402_live_...
+Q402_TRIAL_API_KEY=
 
 # Paid Multichain — all 9 chains (from /payment)
-# Q402_MULTICHAIN_API_KEY=q402_live_...
+Q402_MULTICHAIN_API_KEY=
 
-# Hex EVM private key (0x + 64 hex). Use a FRESH wallet, NOT your main
-# one — Q402 delegates this EOA via EIP-7702 on first payment.
-# Hardware wallets (Ledger / Trezor) are not supported yet.
-# Q402_PRIVATE_KEY=0x...
+# Hex EVM private key (0x + 64 hex). A separate MetaMask account
+# dedicated to Q402 keeps your existing balances and history tidy.
+# Hardware wallets (Ledger / Trezor) are not supported yet — Q402
+# needs a raw hex key it can sign EIP-7702 type-4 authorizations with.
+Q402_PRIVATE_KEY=
 
 # Live mode switch:
 #   0 = sandbox (test mode, no funds move)
 #   1 = real on-chain payments
 # Default 1 — safe because mode only flips to live when BOTH a live
-# API key AND a valid 32-byte private key are uncommented above.
+# API key AND a valid 32-byte private key are populated above.
 Q402_ENABLE_REAL_PAYMENTS=1
 
 # Default Q402 deployment. Only change for self-hosted.

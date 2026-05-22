@@ -149,6 +149,13 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
       const hashIdx = rawVal.search(/\s#/);
       if (hashIdx >= 0) rawVal = rawVal.slice(0, hashIdx).trimEnd();
     }
+    // Treat `KEY=` (empty value) as unset. The doctor template ships
+    // the api-key + private-key lines uncommented but empty so users
+    // only have to paste the value (no `#` to remove). An empty value
+    // should propagate as "unset" to `envSlot()` / `detectPhase()`
+    // rather than landing in FILE_ENV as a literal empty string —
+    // otherwise Q402_ENV_FILE_KEYS would lie about it being configured.
+    if (rawVal === "") continue;
     out[k] = rawVal;
   }
   return out;
