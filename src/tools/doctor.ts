@@ -43,6 +43,7 @@ import {
   Q402_ENV_FILE_KEYS,
   Q402_ENV_FILE_KEYS_ALL,
   isValidPrivateKey,
+  classifyApiKey,
   getQ402EnvFileReadError,
 } from "../config.js";
 import { CHAIN_KEYS }     from "../chains.js";
@@ -331,6 +332,15 @@ function mask(key: string | null | undefined): string {
 
 function detectPhase(): Phase {
   const anyKey = !!(CONFIG.trialApiKey || CONFIG.multichainApiKey || CONFIG.legacyApiKey);
+  // Per-slot live detection — CONFIG.apiKeyKind reads only the aliased
+  // single slot (multichain ?? trial ?? legacy), so a mixed state like
+  // multichain=q402_test_typo + trial=q402_live_real would classify as
+  // "test" and skip live-check, even though BNB pays would actually
+  // settle live via the trial slot. Look at each scope's key directly.
+  const anyLiveKey =
+    classifyApiKey(CONFIG.trialApiKey) === "live" ||
+    classifyApiKey(CONFIG.multichainApiKey) === "live" ||
+    classifyApiKey(CONFIG.legacyApiKey) === "live";
   const hasValidPrivateKey = isValidPrivateKey(CONFIG.privateKey);
 
   // Truly empty install: no env file, no keys, no PK. Force first-install
@@ -346,7 +356,7 @@ function detectPhase(): Phase {
   // template ships with `0x...` placeholder that's truthy but won't sign,
   // and that used to trip /keys/verify on every first-run health check.
   const allEssentials =
-    anyKey && hasValidPrivateKey && CONFIG.realPaymentsRequested && CONFIG.apiKeyKind === "live";
+    anyKey && hasValidPrivateKey && CONFIG.realPaymentsRequested && anyLiveKey;
   if (allEssentials) return "live-check";
 
   // Any concrete signal of in-progress setup — a key, a PK (even

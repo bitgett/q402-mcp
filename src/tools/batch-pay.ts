@@ -124,7 +124,7 @@ export interface BatchPaySummary {
    * agent should read `setupHint` for the choice list (trial-5, multichain-
    * all, or split via two calls) and re-invoke with an explicit `keyScope`.
    */
-  status: "success" | "partial_failure" | "aborted" | "sandbox" | "ambiguous";
+  status: "success" | "partial_failure" | "aborted" | "sandbox" | "ambiguous" | "trial_cap_exceeded";
   result?: BatchPayResult | { sandbox: PayResult[]; reason: string };
   guardsApplied: string[];
   setupHint?: string;
@@ -224,6 +224,34 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   // ambiguous response that prompts the agent to ask the human which path
   // they want — and re-call with explicit keyScope (or split via two calls).
   const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
+
+  // Explicit trial scope overflow — reject BEFORE the per-row signing
+  // loop in client.ts. Without this guard, `keyScope="trial"` with 6+
+  // recipients would sign N witness + authorization pairs locally and
+  // ship the batch, only for the server to reject with TRIAL_BATCH_CAP.
+  // From the user's seat that looks like "I confirmed, signed N times,
+  // and got nothing" — a much worse failure mode than the auto-ambiguous
+  // path below, which never signs. Surface the cap up front so the
+  // agent can prompt the human to split or escalate before signing.
+  if (
+    scopeRequest === "trial" &&
+    input.recipients.length > RECIPIENT_LIMIT_TRIAL
+  ) {
+    guardsApplied.push("trial_cap_exceeded");
+    return {
+      mode: "none",
+      status: "trial_cap_exceeded",
+      guardsApplied,
+      senderWallet,
+      setupHint:
+        `keyScope="trial" caps at ${RECIPIENT_LIMIT_TRIAL} recipients per call (BNB-only sponsored). ` +
+        `Your batch has ${input.recipients.length}. Either trim to the first ${RECIPIENT_LIMIT_TRIAL} ` +
+        `recipients and re-invoke with keyScope="trial", or send the full batch on the paid ` +
+        `Multichain key by re-invoking with keyScope="multichain" (charges the paid pool + Gas Tank, ` +
+        `up to ${RECIPIENT_LIMIT_PAID} per call).`,
+    };
+  }
+
   if (
     scopeRequest === "auto" &&
     input.chain === "bnb" &&

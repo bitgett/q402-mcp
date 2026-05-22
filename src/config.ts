@@ -239,7 +239,17 @@ export interface Config {
 const DEFAULT_RELAY_BASE = "https://q402.quackai.ai/api";
 const DEFAULT_MAX_AMOUNT = 5;
 
-function classifyApiKey(k: string | null): Config["apiKeyKind"] {
+/**
+ * Classify an API key string by its visible prefix. Exported so
+ * `q402_doctor` can detect "any scoped key is live" per-slot instead of
+ * relying on `CONFIG.apiKeyKind`, which is computed from the aliased
+ * single `apiKey` slot below and would mis-report when a user has e.g.
+ * Q402_MULTICHAIN_API_KEY=q402_test_typo + Q402_TRIAL_API_KEY=q402_live_real.
+ * In that mixed state `apiKeyKind` resolves against the multichain test
+ * key (alias winner) and reads "test", but the trial key is live for
+ * BNB-scope `q402_pay` — so detectPhase must look at each slot directly.
+ */
+export function classifyApiKey(k: string | null): Config["apiKeyKind"] {
   if (!k) return "missing";
   if (k.startsWith("q402_live_")) return "live";
   if (k.startsWith("q402_test_")) return "test";
@@ -272,9 +282,21 @@ export function loadConfig(): Config {
   const privateKey = ENV.Q402_PRIVATE_KEY ?? null;
   const realPaymentsRequested = ENV.Q402_ENABLE_REAL_PAYMENTS === "1";
 
+  // `mode` mirrors the per-scope live check used by `isLiveModeFor()` at
+  // payment time, NOT the aliased `apiKeyKind`. The alias picks one slot
+  // (`multichain ?? trial ?? legacy`) for backward-compat, but the actual
+  // live gate per call resolves the scope from the chain+recipient set
+  // and looks at that scope's key independently. If any one scope's key
+  // is live, q402_pay can settle on-chain — `mode=live` should reflect
+  // that, otherwise stderr says `mode=sandbox` while live BNB pays
+  // actually go through.
+  const anyLiveKey =
+    classifyApiKey(trialApiKey) === "live" ||
+    classifyApiKey(multichainApiKey) === "live" ||
+    classifyApiKey(legacyApiKey) === "live";
   const live =
     realPaymentsRequested &&
-    apiKeyKind === "live" &&
+    anyLiveKey &&
     typeof privateKey === "string" &&
     privateKey.length > 0;
 

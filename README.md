@@ -165,10 +165,10 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash with `success: false` and `sandbox: true`, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an accidental payment — if the agent misreads the conversation and fires `q402_pay` before you intended, nothing moves AND the response cannot be mistaken for a confirmed settlement.
 
-To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set to a valid 32-byte hex key, and `Q402_ENABLE_REAL_PAYMENTS=1`. The block below is the template `q402_doctor` writes to `~/.q402/mcp.env` — every secret line is commented out and the live flag defaults to `1`. Uncomment the lines you need and paste real values in your editor; the live-mode gate only flips once a real key + valid PK are present, so saving the template as-is stays in sandbox. Change the flag to `0` if you want to force sandbox even with real keys (e.g. for chained testing on a paid plan):
+To enable real on-chain transactions, the resolved API key must be live (`q402_live_*`), `Q402_PRIVATE_KEY` must be set to a valid 32-byte hex key, and `Q402_ENABLE_REAL_PAYMENTS=1`. The block below is the template `q402_doctor` writes to `~/.q402/mcp.env` — the three secret lines ship empty (no `#` to remove, just paste the value on the right of `=`) and the live flag defaults to `1`. The live-mode gate only flips once a real key + valid 32-byte PK are populated, so saving the template as-is stays in sandbox automatically. Change the flag to `0` if you want to force sandbox even with real keys (e.g. for chained testing on a paid plan):
 
 ```bash
-# Two-key model — uncomment ONE (or both for auto-routing).
+# Two-key model — fill ONE (or both for auto-routing).
 # Auto-routing (same for q402_pay AND q402_batch_pay):
 #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
 #   anything else                          → Multichain (paid 9-chain)
@@ -176,20 +176,19 @@ To enable real on-chain transactions, the resolved API key must be live (`q402_l
 #   status="ambiguous" instead of executing — agent asks user to pick.
 # Override per call with keyScope: "auto" | "trial" | "multichain".
 
-# Q402_TRIAL_API_KEY=q402_live_...         # BNB-only sponsored Trial key (from /event)
-# Q402_MULTICHAIN_API_KEY=q402_live_...    # paid 9-chain key (per-chain Gas Tank)
+Q402_TRIAL_API_KEY=                # BNB-only sponsored Trial key (from /event)
+Q402_MULTICHAIN_API_KEY=           # paid 9-chain key (per-chain Gas Tank)
 
-# Q402_PRIVATE_KEY=0x...                   # signer for the payer EOA (32-byte hex)
+Q402_PRIVATE_KEY=                  # signer for the payer EOA (0x + 64 hex chars)
 
 # Live mode switch:
 #   0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash)
 #   1 = real on-chain payments (live mode)
-# Default is 1: real payments enabled. Safe because mode only flips
-# to live when BOTH a live API key (q402_live_*) AND a valid 32-byte
-# private key are set above. Placeholders ("0x...") are rejected by
-# the live-mode gate, so partial setups stay in sandbox with a hint.
-# Change to 0 to force sandbox even with real keys (e.g. for chained
-# testing on a paid plan).
+# Default 1: real payments enabled. Safe because mode only flips to live
+# when BOTH a live API key (q402_live_*) AND a valid 32-byte private
+# key are populated above. Empty values fail the gate, so partial setups
+# stay in sandbox with a hint. Change to 0 to force sandbox even with
+# real keys (e.g. for chained testing on a paid plan).
 Q402_ENABLE_REAL_PAYMENTS=1
 ```
 
