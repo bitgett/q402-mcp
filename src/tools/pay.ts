@@ -278,11 +278,12 @@ export const PAY_TOOL = {
     "the user the payment went through. " +
     "The recipient receives the full amount; the sender pays $0 in gas. " +
     "\n\n" +
-    "SENDER ECHO — every response includes a `senderWallet` field with the " +
-    "address derived from the configured `Q402_PRIVATE_KEY`. Show this " +
-    "alongside the recipient/amount when you confirm the payment with the " +
-    "user (e.g. 'Signing from 0xabc…1234 on bnb → send 5 USDT to 0xdef…ABCD'). " +
+    "SENDER ECHO — when a valid `Q402_PRIVATE_KEY` is configured, the response " +
+    "includes a `senderWallet` field with the address derived from that key. " +
+    "Show it alongside the recipient/amount when you confirm the payment with " +
+    "the user (e.g. 'Signing from 0xabc…1234 on bnb → send 5 USDT to 0xdef…ABCD'). " +
     "Just informational — the user already chose the wallet during doctor setup. " +
+    "Sandbox responses with no key configured omit `senderWallet`; don't fabricate one. " +
     "\n\n" +
     "EIP-7702 SIDE EFFECT — surface this to the user proactively after the " +
     "FIRST live payment on a chain: their wallet now shows up as a 'Smart " +

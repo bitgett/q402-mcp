@@ -317,11 +317,32 @@ function mask(key: string | null | undefined): string {
 }
 
 function detectPhase(): Phase {
-  const anyKey   = !!(CONFIG.trialApiKey || CONFIG.multichainApiKey || CONFIG.legacyApiKey);
+  const anyKey = !!(CONFIG.trialApiKey || CONFIG.multichainApiKey || CONFIG.legacyApiKey);
+  const hasValidPrivateKey = isValidPrivateKey(CONFIG.privateKey);
+
+  // Truly empty install: no env file, no keys, no PK. Force first-install
+  // even if Q402_ENABLE_REAL_PAYMENTS=1 leaked in from the MCP registry
+  // default — otherwise that single flag alone would push a brand-new user
+  // into the needs-completion branch and the agent would skip the file-
+  // creation flow that lives behind first-install.
+  if (!Q402_ENV_FILE_PRESENT && !anyKey && !CONFIG.privateKey) {
+    return "first-install";
+  }
+
+  // Live-check requires a *valid* PK, not just any truthy string — the
+  // template ships with `0x...` placeholder that's truthy but won't sign,
+  // and that used to trip /keys/verify on every first-run health check.
   const allEssentials =
-    anyKey && !!CONFIG.privateKey && CONFIG.realPaymentsRequested && CONFIG.apiKeyKind === "live";
+    anyKey && hasValidPrivateKey && CONFIG.realPaymentsRequested && CONFIG.apiKeyKind === "live";
   if (allEssentials) return "live-check";
-  if (anyKey || CONFIG.privateKey || CONFIG.realPaymentsRequested) return "needs-completion";
+
+  // Any concrete signal of in-progress setup — a key, a PK (even
+  // placeholder), or an env file the user created — counts as partial.
+  // Note: realPaymentsRequested is deliberately NOT a phase signal here.
+  // It defaults to 1 via server.json, so leaning on it would put empty
+  // installs into needs-completion (see the first-install short-circuit
+  // above).
+  if (anyKey || CONFIG.privateKey || Q402_ENV_FILE_PRESENT) return "needs-completion";
   return "first-install";
 }
 
