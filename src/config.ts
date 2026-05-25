@@ -223,7 +223,17 @@ export interface Config {
    */
   apiKey: string | null;
   apiKeyKind: "live" | "test" | "missing";
+  /**
+   * Q402_PRIVATE_KEY — user's real EOA private key (Mode A). The signer
+   * is the user's MetaMask/OKX wallet, EIP-7702 delegated to Q402 impl.
+   */
   privateKey: string | null;
+  /**
+   * Q402_AGENTIC_PRIVATE_KEY — Agent Wallet's exported private key
+   * (Mode B). The signer is the Agent Wallet itself; the user's
+   * MetaMask is untouched.
+   */
+  agenticPrivateKey: string | null;
   realPaymentsRequested: boolean;
   /** Effective default mode after combining all gates (using the apiKey alias). */
   mode: Mode;
@@ -280,6 +290,7 @@ export function loadConfig(): Config {
   const apiKey = multichainApiKey ?? trialApiKey ?? legacyApiKey;
   const apiKeyKind = classifyApiKey(apiKey);
   const privateKey = ENV.Q402_PRIVATE_KEY ?? null;
+  const agenticPrivateKey = ENV.Q402_AGENTIC_PRIVATE_KEY ?? null;
   const realPaymentsRequested = ENV.Q402_ENABLE_REAL_PAYMENTS === "1";
 
   // `mode` mirrors the per-scope live check used by `isLiveModeFor()` at
@@ -307,12 +318,50 @@ export function loadConfig(): Config {
     apiKey,
     apiKeyKind,
     privateKey,
+    agenticPrivateKey,
     realPaymentsRequested,
     mode: live ? "live" : "sandbox",
     relayBaseUrl: (ENV.Q402_RELAY_BASE_URL ?? DEFAULT_RELAY_BASE).replace(/\/$/, ""),
     maxAmountPerCallUsd: parseMaxAmount(ENV.Q402_MAX_AMOUNT_PER_CALL),
     allowedRecipients: parseAllowedRecipients(ENV.Q402_ALLOWED_RECIPIENTS),
   };
+}
+
+/**
+ * Snapshot of which Agent Wallet modes the current env can drive.
+ *
+ *   Mode A — `Q402_PRIVATE_KEY` set: real user EOA signs locally, EIP-7702
+ *            delegation to Q402 impl. Existing flow.
+ *   Mode B — `Q402_AGENTIC_PRIVATE_KEY` set: Agent Wallet's exported pk
+ *            signs locally. User MetaMask never touched.
+ *   Mode C — only `Q402_*_API_KEY` set, no private key: server-mediated
+ *            send through /api/wallet/agentic/send. Q402 holds the key.
+ *
+ * When more than one mode is configured, callers (q402_pay, batch_pay)
+ * MUST ask the user which wallet to use. The MCP server cannot guess.
+ */
+export interface AgenticModes {
+  modeA: boolean;
+  modeB: boolean;
+  modeC: boolean;
+  /** Number of modes available (0..3). */
+  count: number;
+  /** First-available mode, or null when none. Used as the implicit pick
+   *  in cases where the caller hasn't explicitly disambiguated. */
+  primary: "A" | "B" | "C" | null;
+}
+
+export function detectAgenticModes(c: Config = CONFIG): AgenticModes {
+  const modeA = isValidPrivateKey(c.privateKey);
+  const modeB = isValidPrivateKey(c.agenticPrivateKey);
+  const modeC = !modeA && !modeB && c.apiKey !== null && c.apiKey.startsWith("q402_live_");
+  let count = 0;
+  if (modeA) count++;
+  if (modeB) count++;
+  if (modeC) count++;
+  const primary: AgenticModes["primary"] =
+    modeB ? "B" : modeA ? "A" : modeC ? "C" : null;
+  return { modeA, modeB, modeC, count, primary };
 }
 
 /** Single shared instance — env is parsed once at process start. */
