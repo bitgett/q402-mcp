@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes eight tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes nine tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -20,6 +20,7 @@
  *   q402_receipt            read-only, no key — fetch + locally verify a Trust
  *                           Receipt
  *   q402_wallet_status      read-only, requires key — per-chain EIP-7702
+ *   q402_agentic_info       read-only, requires key — Agent Wallet info + balance
  *                           delegation state across all 9 chains
  *   q402_clear_delegation   write, requires key — clears the EIP-7702
  *                           delegation on a chain (Q402-sponsored gas, local
@@ -56,6 +57,11 @@ import {
   runClearDelegation,
 } from "./tools/clear-delegation.js";
 import { DOCTOR_TOOL, DoctorInputSchema, runDoctor } from "./tools/doctor.js";
+import {
+  AGENTIC_INFO_TOOL,
+  AgenticInfoInputSchema,
+  runAgenticInfo,
+} from "./tools/agentic-info.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -78,6 +84,7 @@ async function main(): Promise<void> {
       BATCH_PAY_TOOL,
       RECEIPT_TOOL,
       WALLET_STATUS_TOOL,
+      AGENTIC_INFO_TOOL,
       CLEAR_DELEGATION_TOOL,
     ],
   }));
@@ -117,6 +124,10 @@ async function main(): Promise<void> {
         case "q402_clear_delegation": {
           const parsed = ClearDelegationInputSchema.parse(args ?? {});
           return { content: [jsonText(await runClearDelegation(parsed))] };
+        }
+        case "q402_agentic_info": {
+          AgenticInfoInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runAgenticInfo())] };
         }
         default:
           return {
