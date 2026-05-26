@@ -5,24 +5,32 @@
  * unlocks: the wallet address, the per-tx and daily spending caps, the
  * archive state, and an aggregate USD balance across the 9 EVM chains.
  *
+ * Multi-wallet aware (Phase 3): each owner can hold up to 10 Agent
+ * Wallets. Picks a wallet by:
+ *   1. `walletId` tool input (explicit override)
+ *   2. `Q402_WALLET_ID` env (operator default)
+ *   3. server-side default wallet (when nothing is specified)
+ *
  * Useful for the AI to answer "what's in my agent wallet?" without the
  * user ever leaving the chat. Pairs naturally with `q402_pay` Mode C
- * (server-mediated) where the agent has only the apiKey — no private
- * key — and needs to know which address it's spending from.
+ * where the agent has only the apiKey + (optionally) the walletId.
  *
- * Reads two Q402 endpoints under the hood:
- *   GET /api/wallet/agentic         — wallet record (address, caps, deletedAt)
- *   GET /api/wallet/agentic/balance — Multicall3'd USDC + USDT per chain
- *
- * Both endpoints currently require owner-signed auth via EIP-191. Until
- * the apiKey-auth GET variant ships, this tool falls back to a "needs
- * dashboard sign-in" hint when only an apiKey is configured.
+ * Reads /api/wallet/agentic/info-by-key under the hood (apiKey-auth).
  */
 
 import { z } from "zod";
 import { CONFIG } from "../config.js";
 
-export const AgenticInfoInputSchema = z.object({});
+export const AgenticInfoInputSchema = z.object({
+  walletId: z
+    .string()
+    .optional()
+    .describe(
+      "Optional lowercased Agent Wallet address to introspect when the user " +
+        "holds multiple (max 10 per owner). Omit to use Q402_WALLET_ID env, " +
+        "then the owner's default wallet.",
+    ),
+});
 export type AgenticInfoInput = z.infer<typeof AgenticInfoInputSchema>;
 
 export const AGENTIC_INFO_TOOL = {
@@ -31,11 +39,21 @@ export const AGENTIC_INFO_TOOL = {
     "Read-only Agent Wallet introspection. Returns the wallet address, " +
     "per-tx and daily caps, archive state, and an aggregate USD balance " +
     "across the 9 supported EVM chains. Authenticated by the configured " +
-    "Multichain API key — no private key required. Use this whenever the " +
-    "user asks 'what's in my agent wallet?' or 'what's the spending limit?'",
+    "Multichain API key — no private key required. Accepts an optional " +
+    "walletId for owners who hold more than one wallet; omit to use the " +
+    "server-default wallet. Use this whenever the user asks 'what's in my " +
+    "agent wallet?' or 'what's the spending limit?'",
   inputSchema: {
     type: "object" as const,
-    properties: {},
+    properties: {
+      walletId: {
+        type: "string" as const,
+        description:
+          "Optional. Lowercased Agent Wallet address when the user holds " +
+          "multiple wallets. Defaults to Q402_WALLET_ID env, then the " +
+          "owner's default wallet on the server.",
+      },
+    },
     additionalProperties: false,
   },
 };
@@ -45,6 +63,8 @@ export interface AgenticInfoSummary {
   configured: boolean;
   /** Wallet address, when known. */
   address: string | null;
+  /** Lowercased wallet address used as the walletId throughout the API. */
+  walletId: string | null;
   /** Daily and per-tx caps if the wallet has them set. */
   limits: {
     perTxMaxUsd: number | null;
@@ -56,9 +76,7 @@ export interface AgenticInfoSummary {
   totalUsd: number | null;
   /** When balance was last read. */
   asOf: string | null;
-  /** ERC-8004 public agent identity (if the owner graduated this wallet
-   *  via the dashboard). Stored as `{network}:{agentId}` — e.g. "bsc:42".
-   *  Null when not registered. */
+  /** ERC-8004 public agent identity if registered. `{network}:{agentId}`. */
   erc8004AgentId: string | null;
   /** Direct link to the agent's 8004scan page when registered. */
   scan8004Url: string | null;
@@ -69,40 +87,41 @@ export interface AgenticInfoSummary {
 }
 
 interface WalletJson {
-  /** Masked owner EOA from info-by-key (`0xAAAA…BBBB` shape). The
-   *  full owner address is intentionally not exposed on this surface
-   *  — apiKey readers don't need it and exposing it widens the join
-   *  surface on apiKey leaks. */
+  /** Masked owner EOA from info-by-key (`0xAAAA…BBBB`). */
   ownerAddrShort: string;
   address: string;
+  walletId?: string;
   createdAt: number;
   deletedAt: number | null;
   dailyLimitUsd: number | null;
   perTxMaxUsd: number | null;
   erc8004AgentId: string | null;
+  label?: string | null;
 }
 
-/** Build the 8004scan URL from a stored `{network}:{agentId}` tag. */
+/**
+ * Build the 8004scan URL from a stored `{network}:{agentId}` tag.
+ *
+ * 8004scan uses chain-slug paths (`/agents/{slug}/{id}`), NOT the
+ * EIP-155 CAIP-2 ID form. Verified against the live agents listing
+ * at https://8004scan.io/agents. Kept in sync with `scanUrl()` in
+ * the landing repo's `app/lib/erc8004.ts`.
+ */
 function scan8004UrlFor(tag: string | null): string | null {
   if (!tag) return null;
   const [network, agentId] = tag.split(":");
   if (!network || !agentId) return null;
-  const chainId =
-    network === "bsc"
-      ? 56
-      : network === "eth"
-        ? 1
-        : network === "base"
-          ? 8453
-          : network === "polygon"
-            ? 137
-            : network === "arbitrum"
-              ? 42161
-              : network === "celo"
-                ? 42220
-                : null;
-  if (chainId === null) return null;
-  return `https://8004scan.io/eip155:${chainId}/agent/${agentId}`;
+  const slug =
+    network === "bsc"          ? "bsc"
+    : network === "bsc-testnet" ? "bsc-testnet"
+    : network === "eth"        ? "ethereum"
+    : network === "base"       ? "base"
+    : network === "polygon"    ? "polygon"
+    : network === "arbitrum"   ? "arbitrum"
+    : network === "celo"       ? "celo"
+    : null;
+  if (slug === null) return null;
+  return `https://8004scan.io/agents/${slug}/${agentId}`;
 }
 
 interface BalanceJson {
@@ -111,22 +130,27 @@ interface BalanceJson {
 }
 
 /**
- * Stub for the eventual apiKey-auth read path. Today the GET /api/wallet/
- * agentic and /balance endpoints require an EIP-191 owner signature, so
- * an MCP run that only has an apiKey can't fetch the wallet without
- * round-tripping to the dashboard. This tool surfaces that limitation
- * cleanly so the AI knows to direct the user to /dashboard rather than
- * grinding through a 401.
+ * Fetch the configured Agent Wallet's snapshot via apiKey auth. The
+ * input.walletId overrides the env default; both are optional and a
+ * missing pair falls through to the server-side default wallet for
+ * the owner.
  */
-export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
+export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<AgenticInfoSummary> {
   const base = CONFIG.relayBaseUrl;
   const dashboardUrl = base.replace(/\/api$/, "") + "/dashboard?tab=agent";
+
+  // Resolution order: tool input → env → server default (= null body field).
+  const explicitWalletId =
+    typeof input.walletId === "string" && input.walletId.length > 0
+      ? input.walletId.toLowerCase()
+      : CONFIG.walletId;
 
   // No live key configured at all — full sandbox / first-install state.
   if (!CONFIG.apiKey || !CONFIG.apiKey.startsWith("q402_live_")) {
     return {
       configured: false,
       address: null,
+      walletId: null,
       limits: null,
       archivedAt: null,
       totalUsd: null,
@@ -140,10 +164,6 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
     };
   }
 
-  // The current Agent Wallet GET routes are owner-sig-only. Until the
-  // apiKey-auth variant ships server-side, instruct the user to fetch
-  // the address from the dashboard once and paste it into env via
-  // Q402_AGENTIC_OWNER (future enhancement) or just visit the link.
   let wallet: WalletJson | null = null;
   let balance: BalanceJson | null = null;
   let fetchError: string | null = null;
@@ -152,15 +172,19 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
     const res = await fetch(`${base}/wallet/agentic/info-by-key`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: CONFIG.apiKey }),
+      body: JSON.stringify({
+        apiKey: CONFIG.apiKey,
+        ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
+      }),
     });
     if (res.ok) {
       const data = (await res.json()) as { wallet?: WalletJson; balance?: BalanceJson };
       wallet = data.wallet ?? null;
       balance = data.balance ?? null;
     } else if (res.status === 404) {
-      // Endpoint not deployed yet — fall through to dashboard hint.
       fetchError = "endpoint_not_deployed";
+    } else if (res.status === 410) {
+      fetchError = "wallet_archived";
     } else {
       fetchError = `http_${res.status}`;
     }
@@ -172,6 +196,7 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
     return {
       configured: true,
       address: null,
+      walletId: explicitWalletId,
       limits: null,
       archivedAt: null,
       totalUsd: null,
@@ -183,14 +208,25 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
         fetchError === "endpoint_not_deployed"
           ? "Agent Wallet info-by-key endpoint is not live yet. " +
             "Open the dashboard to view your wallet directly."
-          : "Could not fetch Agent Wallet for this apiKey. " +
-            "Verify the key is bound to a wallet via the dashboard, then retry.",
+          : fetchError === "wallet_archived"
+            ? "The requested wallet is archived. Restore it from the dashboard before reading."
+            : explicitWalletId
+              ? `Could not fetch Agent Wallet ${explicitWalletId} for this apiKey. ` +
+                "Verify the walletId is one of this owner's wallets, or omit it to read the default wallet."
+              : "Could not fetch Agent Wallet for this apiKey. " +
+                "Verify the key is bound to a wallet via the dashboard, then retry.",
     };
   }
+
+  // Server returns wallet.walletId in Phase 3; fall back to lowercased
+  // address for forward-compat with older servers.
+  const resolvedWalletId =
+    typeof wallet.walletId === "string" ? wallet.walletId : wallet.address.toLowerCase();
 
   return {
     configured: true,
     address: wallet.address,
+    walletId: resolvedWalletId,
     limits: {
       perTxMaxUsd: wallet.perTxMaxUsd,
       dailyLimitUsd: wallet.dailyLimitUsd,

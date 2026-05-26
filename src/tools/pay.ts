@@ -335,6 +335,28 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   // still require a live apiKey and Q402_ENABLE_REAL_PAYMENTS=1 (sandbox
   // mode C is meaningless — there's no fake server-mediated path).
   if (effectiveMode === "agentic-server") {
+    // RLUSD pre-check. The server's /wallet/agentic/send currently
+    // only signs USDC/USDT — the encrypted-keystore signer hasn't
+    // been wired up for RLUSD yet. Without this guard the call lands
+    // an opaque INVALID_TOKEN with no setup hint; surface a clean
+    // explanation here instead so the AI doesn't dead-end the user.
+    if (input.token === "RLUSD") {
+      return {
+        result: failureResult("rlusd_not_supported_for_server_mode"),
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "token=RLUSD",
+          "rejected_pre_relay",
+        ],
+        senderWallet,
+        setupHint:
+          "RLUSD is not yet supported by the server-managed Agent Wallet " +
+          "(walletMode=\"agentic-server\"). Switch to walletMode=\"eoa\" or " +
+          "\"agentic-local\" (with a private key set), or pick USDC/USDT for " +
+          "this send.",
+      };
+    }
     if (!resolved.apiKey || !resolved.apiKey.startsWith("q402_live_")) {
       const result = sandboxPay(chain, {
         to: input.to,
