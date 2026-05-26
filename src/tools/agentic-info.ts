@@ -56,6 +56,12 @@ export interface AgenticInfoSummary {
   totalUsd: number | null;
   /** When balance was last read. */
   asOf: string | null;
+  /** ERC-8004 public agent identity (if the owner graduated this wallet
+   *  via the dashboard). Stored as `{network}:{agentId}` — e.g. "bsc:42".
+   *  Null when not registered. */
+  erc8004AgentId: string | null;
+  /** Direct link to the agent's 8004scan page when registered. */
+  scan8004Url: string | null;
   /** Human-friendly explanation of what's missing or what to do next. */
   setupHint?: string;
   /** Echoes the dashboard URL so the AI can offer a clickable next step. */
@@ -69,6 +75,30 @@ interface WalletJson {
   deletedAt: number | null;
   dailyLimitUsd: number | null;
   perTxMaxUsd: number | null;
+  erc8004AgentId: string | null;
+}
+
+/** Build the 8004scan URL from a stored `{network}:{agentId}` tag. */
+function scan8004UrlFor(tag: string | null): string | null {
+  if (!tag) return null;
+  const [network, agentId] = tag.split(":");
+  if (!network || !agentId) return null;
+  const chainId =
+    network === "bsc"
+      ? 56
+      : network === "eth"
+        ? 1
+        : network === "base"
+          ? 8453
+          : network === "polygon"
+            ? 137
+            : network === "arbitrum"
+              ? 42161
+              : network === "celo"
+                ? 42220
+                : null;
+  if (chainId === null) return null;
+  return `https://8004scan.io/eip155:${chainId}/agent/${agentId}`;
 }
 
 interface BalanceJson {
@@ -97,6 +127,8 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
       archivedAt: null,
       totalUsd: null,
       asOf: null,
+      erc8004AgentId: null,
+      scan8004Url: null,
       dashboardUrl,
       setupHint:
         "No live Q402 API key configured. Run q402_doctor to set one up, or " +
@@ -140,6 +172,8 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
       archivedAt: null,
       totalUsd: null,
       asOf: null,
+      erc8004AgentId: null,
+      scan8004Url: null,
       dashboardUrl,
       setupHint:
         fetchError === "endpoint_not_deployed"
@@ -160,6 +194,8 @@ export async function runAgenticInfo(): Promise<AgenticInfoSummary> {
     archivedAt: wallet.deletedAt,
     totalUsd: balance ? Math.round(balance.totalUsd * 100) / 100 : null,
     asOf: balance ? new Date(balance.asOf).toISOString() : null,
+    erc8004AgentId: wallet.erc8004AgentId,
+    scan8004Url: scan8004UrlFor(wallet.erc8004AgentId),
     dashboardUrl,
     setupHint: wallet.deletedAt
       ? "This Agent Wallet is archived and pending hard-delete. " +
