@@ -69,6 +69,16 @@ export const PayInputSchema = z.object({
         "When only one wallet is configured this argument is optional and the tool " +
         "routes there automatically.",
     ),
+  walletId: z
+    .string()
+    .optional()
+    .describe(
+      "Server-managed Agent Wallet only (walletMode=\"agentic-server\"). Lowercased " +
+        "Agent Wallet address selecting which of the user's wallets to spend from when " +
+        "they hold more than one (max 10 per owner). Omit to use the user's default wallet. " +
+        "Ignored for walletMode=\"eoa\" and \"agentic-local\" since those modes carry their " +
+        "own signing key.",
+    ),
   confirm: z
     .literal(true)
     .describe(
@@ -219,15 +229,39 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     });
   }
 
-  // Caller passed walletMode explicitly — validate that the requested mode
-  // actually has the env it needs. If not, fall through to ambiguous so
-  // the AI re-asks with the right phrasing.
+  // Caller passed walletMode explicitly — validate that the requested
+  // mode actually has the env it needs. NEVER silently substitute a
+  // different wallet: the user explicitly chose "agentic-server" (or
+  // "eoa", etc.) and any fallback to the wrong wallet is a misroute.
   const requestedMode = input.walletMode;
   const requestedAvailable = requestedMode
     ? available.some((w) => w.id === requestedMode)
     : false;
 
-  if (available.length > 1 && (!requestedMode || !requestedAvailable)) {
+  // Hard-stop: requested but missing the env it needs. Don't fall
+  // through to "pick the only other available wallet" — that would
+  // drain a wallet the user didn't ask for. Returns the available list
+  // so the AI can re-ask with the supported options.
+  if (requestedMode && !requestedAvailable) {
+    return {
+      result: failureResult("wallet_mode_unavailable"),
+      guardsApplied: [
+        `wallet_modes_available=${available.length}`,
+        `requested=${requestedMode}`,
+      ],
+      ambiguousWalletChoice: {
+        question:
+          available.length === 0
+            ? `The "${requestedMode}" wallet isn't configured. None of the supported wallets are set up — see the doctor for setup instructions.`
+            : `The "${requestedMode}" wallet isn't configured in this environment. Supported wallets here: ${available
+                .map((w) => `"${w.id}"`)
+                .join(", ")}. Which would you like to use instead?`,
+        available,
+      },
+    };
+  }
+
+  if (available.length > 1 && !requestedMode) {
     return {
       result: failureResult("needs_wallet_choice"),
       guardsApplied: [`wallet_modes_available=${available.length}`],
@@ -242,10 +276,10 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   }
 
   // Pick the effective wallet mode now that disambiguation passed.
-  // After the early-return above, we know either: (a) the caller asked
-  // explicitly and it's available, or (b) exactly one mode is configured.
-  // Falls back to "eoa" so the sandbox-setupHint branch still works when
-  // nothing's configured (available.length === 0 → effective = "eoa").
+  // After the early-returns above, we know either: (a) the caller
+  // asked explicitly and it's available, or (b) exactly one mode is
+  // configured. Falls back to "eoa" so the sandbox-setupHint branch
+  // still works when nothing's configured.
   const effectiveMode: WalletModeRequest =
     requestedMode && requestedAvailable
       ? requestedMode
@@ -333,6 +367,14 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       };
     }
 
+    // Multi-wallet (Phase 3): the user can have up to 10 Agent Wallets.
+    // Pick by explicit walletId in the tool input, then by the
+    // Q402_WALLET_ID env, then let the server pick the user's default.
+    const explicitWalletId =
+      typeof input.walletId === "string" && input.walletId.length > 0
+        ? input.walletId.toLowerCase()
+        : CONFIG.walletId;
+
     let resp: Response;
     try {
       resp = await fetch(`${CONFIG.relayBaseUrl}/wallet/agentic/send`, {
@@ -344,6 +386,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           token: input.token,
           to: input.to,
           amount: input.amount,
+          ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
         }),
       });
     } catch (e) {

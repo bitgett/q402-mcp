@@ -234,6 +234,14 @@ export interface Config {
    * MetaMask is untouched.
    */
   agenticPrivateKey: string | null;
+  /**
+   * Q402_WALLET_ID — Mode C only. Lowercased Agent Wallet address
+   * picking which of the user's wallets the server should sign with
+   * (multi-wallet Phase 3 supports up to 10 per owner). Null means
+   * "use the user's default wallet". Per-call `walletId` argument on
+   * `q402_pay` / `q402_batch_pay` overrides this env.
+   */
+  walletId: string | null;
   realPaymentsRequested: boolean;
   /** Effective default mode after combining all gates (using the apiKey alias). */
   mode: Mode;
@@ -291,6 +299,14 @@ export function loadConfig(): Config {
   const apiKeyKind = classifyApiKey(apiKey);
   const privateKey = ENV.Q402_PRIVATE_KEY ?? null;
   const agenticPrivateKey = ENV.Q402_AGENTIC_PRIVATE_KEY ?? null;
+  // walletId is just stored lowercased here; we don't validate its
+  // shape (the server returns 404 on a bad walletId, which is a
+  // friendlier error than this MCP guessing).
+  const walletIdRaw = ENV.Q402_WALLET_ID;
+  const walletId =
+    typeof walletIdRaw === "string" && walletIdRaw.length > 0
+      ? walletIdRaw.toLowerCase()
+      : null;
   const realPaymentsRequested = ENV.Q402_ENABLE_REAL_PAYMENTS === "1";
 
   // `mode` mirrors the per-scope live check used by `isLiveModeFor()` at
@@ -305,11 +321,15 @@ export function loadConfig(): Config {
     classifyApiKey(trialApiKey) === "live" ||
     classifyApiKey(multichainApiKey) === "live" ||
     classifyApiKey(legacyApiKey) === "live";
-  const live =
-    realPaymentsRequested &&
-    anyLiveKey &&
-    typeof privateKey === "string" &&
-    privateKey.length > 0;
+  // Live default reflects "is at least one signer key configured" the
+  // same way isLiveModeFor() does — either Mode A (Q402_PRIVATE_KEY)
+  // or Mode B (Q402_AGENTIC_PRIVATE_KEY) is enough. Mode C is a live
+  // path too but only resolves per-call (apiKey live + endpoint
+  // reachable), so we don't try to encode it in this default snapshot.
+  const hasAnySignerKey =
+    (typeof privateKey === "string" && privateKey.length > 0) ||
+    (typeof agenticPrivateKey === "string" && agenticPrivateKey.length > 0);
+  const live = realPaymentsRequested && anyLiveKey && hasAnySignerKey;
 
   return {
     trialApiKey,
@@ -319,6 +339,7 @@ export function loadConfig(): Config {
     apiKeyKind,
     privateKey,
     agenticPrivateKey,
+    walletId,
     realPaymentsRequested,
     mode: live ? "live" : "sandbox",
     relayBaseUrl: (ENV.Q402_RELAY_BASE_URL ?? DEFAULT_RELAY_BASE).replace(/\/$/, ""),
@@ -481,21 +502,35 @@ const PRIVATE_KEY_RE = /^0x[a-fA-F0-9]{64}$/;
  * Live-mode gate for a specific resolved key. Returns true ONLY when:
  *   - `resolved.apiKey` starts with `q402_live_`
  *   - `Q402_ENABLE_REAL_PAYMENTS=1`
- *   - `Q402_PRIVATE_KEY` parses as a valid 32-byte hex private key
+ *   - AT LEAST ONE valid signing key is configured. That's either
+ *     `Q402_PRIVATE_KEY` (Mode A — user EOA) OR
+ *     `Q402_AGENTIC_PRIVATE_KEY` (Mode B — exported Agent Wallet PK).
+ *     Mode C (server-mediated) doesn't sign locally so it short-circuits
+ *     ahead of this gate in `pay.ts` / `batch-pay.ts`.
  *
  * The PK format check matters: the 0.5.6 doctor template shipped with
- * `Q402_PRIVATE_KEY=0x...` as a placeholder, and the previous version of
- * this function (which only checked `!CONFIG.privateKey`) let the literal
+ * `Q402_PRIVATE_KEY=0x...` as a placeholder, and the previous version
+ * of this function (which only checked truthiness) let the literal
  * string `"0x..."` through — q402_pay then threw inside `new Wallet()`
  * instead of dropping into a friendly sandbox response. Validating the
  * shape here means a placeholder-tripped live mode now resolves to
- * sandbox + a clear setupHint, the same way a missing key would.
+ * sandbox + a clear setupHint.
+ *
+ * Earlier revisions hard-required `Q402_PRIVATE_KEY` regardless of
+ * effective mode. That blocked Mode B users (no MetaMask key, just the
+ * exported Agent Wallet PK) from ever going live — making Mode B
+ * useless as a prod option. The signer-selection step downstream picks
+ * the correct PK based on the chosen `walletMode`, so the gate here
+ * only needs to confirm that SOME valid signing key is available.
  */
 export function isLiveModeFor(resolved: ResolvedKey): boolean {
   if (!resolved.apiKey) return false;
   if (!CONFIG.realPaymentsRequested) return false;
-  if (!CONFIG.privateKey) return false;
-  if (!PRIVATE_KEY_RE.test(CONFIG.privateKey)) return false;
+  const hasMode_A_Key =
+    typeof CONFIG.privateKey === "string" && PRIVATE_KEY_RE.test(CONFIG.privateKey);
+  const hasMode_B_Key =
+    typeof CONFIG.agenticPrivateKey === "string" && PRIVATE_KEY_RE.test(CONFIG.agenticPrivateKey);
+  if (!hasMode_A_Key && !hasMode_B_Key) return false;
   return resolved.apiKey.startsWith("q402_live_");
 }
 
