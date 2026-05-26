@@ -354,7 +354,13 @@ export interface AgenticModes {
 export function detectAgenticModes(c: Config = CONFIG): AgenticModes {
   const modeA = isValidPrivateKey(c.privateKey);
   const modeB = isValidPrivateKey(c.agenticPrivateKey);
-  const modeC = !modeA && !modeB && c.apiKey !== null && c.apiKey.startsWith("q402_live_");
+  // Mode C is available whenever a live multichain apiKey is configured —
+  // independent of Modes A/B. Earlier revisions gated Mode C behind
+  // `!modeA && !modeB`, but that hid the server-managed wallet from any
+  // user who *also* had a private key set, which is the most common
+  // dev install. q402_pay's disambiguation step handles the "multiple
+  // modes available" UX correctly when more than one is available.
+  const modeC = c.apiKey !== null && c.apiKey.startsWith("q402_live_");
   let count = 0;
   if (modeA) count++;
   if (modeB) count++;

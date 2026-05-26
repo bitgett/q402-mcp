@@ -165,6 +165,22 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
   const guardsApplied: string[] = [];
 
+  /** Build a PayResult shell for failure / pre-execution paths so the
+   *  agent surfaces consistent fields (success, sandbox, tokenAmount,
+   *  token, method, chain) even when no on-chain tx ran. */
+  function failureResult(method: string): PayResult {
+    return {
+      success: false,
+      sandbox: false,
+      txHash: "",
+      tokenAmount: input.amount,
+      token: input.token,
+      chain: chain.key,
+      method,
+      explorerUrl: null,
+    };
+  }
+
   // ── Wallet mode disambiguation ─────────────────────────────────────────
   // Detect which payment paths the user's env permits, then either resolve
   // to a single mode automatically or surface an `ambiguousWalletChoice`
@@ -213,12 +229,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
   if (available.length > 1 && (!requestedMode || !requestedAvailable)) {
     return {
-      result: {
-        success: false,
-        txHash: null,
-        chain: chain.key,
-        message: "needs_wallet_choice",
-      } as PayResult,
+      result: failureResult("needs_wallet_choice"),
       guardsApplied: [`wallet_modes_available=${available.length}`],
       ambiguousWalletChoice: {
         question:
@@ -238,7 +249,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   const effectiveMode: WalletModeRequest =
     requestedMode && requestedAvailable
       ? requestedMode
-      : available.length === 1
+      : available.length === 1 && available[0]
         ? available[0].id
         : "eoa";
 
@@ -336,14 +347,16 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         }),
       });
     } catch (e) {
+      const transportErr = failureResult("eip7702");
       return {
-        result: {
-          success: false,
-          txHash: null,
-          chain: chain.key,
-          message: e instanceof Error ? e.message : String(e),
-        } as PayResult,
-        guardsApplied: [...guardsApplied, "wallet=agentic-server", "mode=live", "transport=fetch_failed"],
+        result: transportErr,
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "mode=live",
+          "transport=fetch_failed",
+          `error=${e instanceof Error ? e.message : String(e)}`,
+        ],
         senderWallet,
       };
     }
@@ -351,20 +364,31 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     const data = (await resp.json().catch(() => ({}))) as
       | { txHash?: string; error?: string; message?: string }
       | Record<string, never>;
-    const success = resp.ok && typeof (data as { txHash?: string }).txHash === "string";
+    const txHash = (data as { txHash?: string }).txHash ?? "";
+    const success = resp.ok && txHash.length > 0;
+    const message =
+      "message" in data
+        ? (data as { message?: string }).message
+        : "error" in data
+          ? (data as { error?: string }).error
+          : undefined;
     return {
       result: {
         success,
-        txHash: (data as { txHash?: string }).txHash ?? null,
+        sandbox: false,
+        txHash,
+        tokenAmount: input.amount,
+        token: input.token,
         chain: chain.key,
-        message:
-          "message" in data
-            ? (data as { message?: string }).message
-            : "error" in data
-              ? (data as { error?: string }).error
-              : undefined,
-      } as PayResult,
-      guardsApplied: [...guardsApplied, "wallet=agentic-server", "mode=live"],
+        method: "eip7702",
+        explorerUrl: txHash ? undefined : null,
+      } satisfies PayResult,
+      guardsApplied: [
+        ...guardsApplied,
+        "wallet=agentic-server",
+        "mode=live",
+        ...(message ? [`server_message=${message}`] : []),
+      ],
       senderWallet,
     };
   }
@@ -391,12 +415,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     // Defensive — isLiveModeFor() already gates on the EOA-mode PK; this
     // is the agentic-local branch's safety net if its env was malformed.
     return {
-      result: {
-        success: false,
-        txHash: null,
-        chain: chain.key,
-        message: "signing key unavailable for the selected wallet mode",
-      } as PayResult,
+      result: failureResult("missing_signing_key"),
       guardsApplied: [...guardsApplied, `wallet=${effectiveMode}`, "mode=sandbox"],
       senderWallet,
       setupHint:
