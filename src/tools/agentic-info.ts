@@ -69,7 +69,11 @@ export interface AgenticInfoSummary {
 }
 
 interface WalletJson {
-  ownerAddr: string;
+  /** Masked owner EOA from info-by-key (`0xAAAA…BBBB` shape). The
+   *  full owner address is intentionally not exposed on this surface
+   *  — apiKey readers don't need it and exposing it widens the join
+   *  surface on apiKey leaks. */
+  ownerAddrShort: string;
   address: string;
   createdAt: number;
   deletedAt: number | null;
