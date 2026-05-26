@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 — gasless USDC, USDT, and RLUSD payments across 9 EVM chains, callable from any MCP client. Nine tools (q402_doctor for first-install + 8 runtime tools). Recommended setup path: install with `claude mcp add q402 -- npx -y @quackai/q402-mcp` (or your client's equivalent), then ask your AI 'Set up Q402' — q402_doctor creates ~/.q402/mcp.env and walks you through pasting your API key + wallet private key in your editor (never in chat). The env-variable entries below are only needed if you'd rather inject secrets directly via your MCP client's env-var management.",
+  "description": "Q402 — gasless USDC/USDT/RLUSD payments across 9 EVM chains. Nine tools, sandbox by default.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
