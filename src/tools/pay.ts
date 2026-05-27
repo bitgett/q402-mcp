@@ -131,7 +131,7 @@ export interface PaySummary {
    * account' in MetaMask, here's why, and here's how to clear it if you
    * ever want to receive native gas tokens to that EOA"). The post-payment
    * tip is a tiny piece of context that heads off a predictable support
-   * ticket — without it users open MetaMask, see the new badge, and panic.
+   * ticket — without it users open MetaMask, see the new badge, and worry.
    */
   postPaymentTip?: string;
 }

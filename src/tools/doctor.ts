@@ -249,7 +249,8 @@ Q402_MULTICHAIN_API_KEY=
 #      Pros: simplest mental model — same wallet you already use
 #      Cons: after first payment, MetaMask will show this account as
 #            "Smart account" (EIP-7702 delegation, reversible via
-#            q402_clear_delegation but visually alarming on first sight)
+#            q402_clear_delegation — the visual change can be surprising
+#            the first time you see it)
 #
 #   B. Agent Wallet — local signing (recommended for AI agents)
 #      Set:  Q402_AGENTIC_PRIVATE_KEY  =  0x... (Agent Wallet pk from dashboard export)
@@ -354,9 +355,9 @@ const SECURITY_NOTICE =
  *      authorizations yet (as of 2026-Q2). The MCP server takes a raw hex
  *      private key — it can't talk to a Ledger.
  *   3. After the first payment on a chain, MetaMask / OKX show that EOA as
- *      a "Smart account". That's the EIP-7702 delegation marker. We've seen
- *      users panic at this exact moment; flagging it BEFORE the first
- *      payment heads off the support ticket.
+ *      a "Smart account". That's the EIP-7702 delegation marker. Surfacing
+ *      this BEFORE the first payment heads off the predictable "why does
+ *      my wallet look different now?" support ticket.
  */
 const FIRST_INSTALL_ADVISORY = [
   "Tip: a separate MetaMask account dedicated to Q402 keeps your existing balances and history " +

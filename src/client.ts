@@ -138,17 +138,15 @@ async function signAuthorization(
   //   r, s, yParity = secp256k1.sign(privateKey, message)
   //
   // ethers v6.16+ exposes `Wallet.authorize()` which produces exactly this
-  // signature. An earlier revision of this file signed an EIP-712 typed
-  // digest over a custom domain instead — wrong message, the EVM
-  // ecrecovered a different address and the authorizationList silently
-  // failed to delegate. Tx still succeeded as a no-op call into the
-  // un-delegated EOA, so settlement appeared to commit while no tokens
-  // moved.
-  //
-  // Wallets that had a delegation persisted from a prior (correctly-
-  // signed) authorization happened to work because the EOA already had
-  // the impl code installed; fresh EOAs broke. Hence this is the root
-  // fix for any first-time-binding wallet on the trial flow.
+  // signature. The shape is NOT an EIP-712 typed digest — anything that
+  // signs a typed digest over a custom domain produces a different
+  // recovered address and the authorizationList silently fails to
+  // delegate. The tx still succeeds as a no-op call into the
+  // un-delegated EOA, so settlement appears to commit while no tokens
+  // move. Wallets that already had a delegation persisted from a prior
+  // (correctly-signed) authorization happen to work because the EOA
+  // already has the impl code installed; fresh EOAs do not. Use
+  // `Wallet.authorize()` only.
   const auth = await wallet.authorize({
     chainId: args.chainId,
     address: args.address,
@@ -327,13 +325,12 @@ export class Q402NodeClient {
    * delegation), after which the remaining transfers are surfaced in
    * the result array even if individual ones fail.
    *
-   * Signature shape: `{ token, recipients }`. The previous revision took
-   * `PayInput[]` (with token on each row), which read as if rows could
-   * carry different tokens — but the request body only ships one token
-   * field, so the per-row token on rows 1..N was silently ignored. The
-   * new shape surfaces the constraint in the type so consumers can't
-   * accidentally build a "mixed-token batch" that quietly drops the
-   * second token. Same chain + same token across one batch, full stop.
+   * Signature shape: `{ token, recipients }`. The request body only ships
+   * one token field, so a per-row token would be silently ignored. The
+   * shape surfaces the constraint in the type so consumers can't
+   * accidentally build a "mixed-token batch" that would quietly drop
+   * the second token. Same chain + same token across one batch, full
+   * stop.
    */
   async batchPay(input: { token: PayInput["token"]; recipients: Array<{ to: string; amount: string }> }): Promise<BatchPayResult> {
     const { token, recipients: rows } = input;
@@ -475,12 +472,12 @@ export class Q402NodeClient {
     const data = (await resp.json()) as BatchPayResult & { error?: string };
 
     // Aborted batches (server returns 424) and partial failures (207) must
-    // throw, not return — earlier revision only threw on !resp.ok but the
-    // server then returned 200/ok:true even when recipient[0] failed and
-    // the batch was abandoned. Agents calling q402_batch_pay would have
-    // reported "batch sent" to the user even though zero transfers landed.
-    // The throw carries a BatchPayError with the per-row results so
-    // callers can still surface what landed and what didn't.
+    // throw, not return. The server returns 200/ok:true even when
+    // recipient[0] failed and the batch was abandoned — relying only on
+    // !resp.ok would let q402_batch_pay report "batch sent" to the user
+    // when zero transfers actually landed. The throw carries a
+    // BatchPayError with the per-row results so callers can still surface
+    // what landed and what didn't.
     if (!resp.ok || data.ok === false) {
       const err = new BatchPayError(
         data.aborted

@@ -10,8 +10,8 @@
  *
  * Emergency BNB-only narrowing: `BNB_FOCUS_MODE` (defined below) is currently
  * false — the full 9-chain matrix is live. The flag stays in the module as a
- * one-line revert path if a future incident requires temporarily collapsing
- * the supported set to BNB. Trial-key restrictions are enforced server-side
+ * one-line revert path in case we ever need to temporarily collapse the
+ * supported set to BNB. Trial-key restrictions are enforced server-side
  * via TRIAL_BNB_ONLY (separate code path) and don't depend on this flag.
  */
 
