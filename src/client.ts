@@ -49,6 +49,16 @@ export interface PayResult {
   /** Set on sandbox / simulated responses so the agent can disclose mode. */
   mode?: "sandbox" | "live";
   explorerUrl?: string | null;
+  /**
+   * Mode C only — `true` when an identical send is still in flight on
+   * the server (concurrent retry hit the SET NX idempotency claim).
+   * The caller should wait `retryAfterSec` and retry the same call;
+   * the server will return the cached settlement once the original
+   * completes. Distinct from `success: false + error` (which means
+   * the server actually said no).
+   */
+  pending?: boolean;
+  retryAfterSec?: number;
 }
 
 export interface PayInput {

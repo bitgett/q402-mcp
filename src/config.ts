@@ -235,11 +235,18 @@ export interface Config {
    */
   agenticPrivateKey: string | null;
   /**
-   * Q402_WALLET_ID — Mode C only. Lowercased Agent Wallet address
-   * picking which of the user's wallets the server should sign with
-   * (multi-wallet Phase 3 supports up to 10 per owner). Null means
-   * "use the user's default wallet". Per-call `walletId` argument on
-   * `q402_pay` / `q402_batch_pay` overrides this env.
+   * Q402_AGENT_WALLET_ADDRESS — Mode C only. Lowercased Agent Wallet
+   * address (the hex `0x…` that the dashboard shows on the Agent
+   * Wallet card) picking which of the user's wallets the server
+   * should sign with. Multi-wallet supports up to 10 per owner.
+   * Null means "use the user's default wallet". Per-call `walletId`
+   * argument on `q402_pay` / `q402_batch_pay` overrides this env.
+   *
+   * Was named `Q402_WALLET_ID` in v0.6.0 — too generic, easily
+   * confused with the user's MetaMask address or an apiKey
+   * identifier. Renamed in v0.6.1 to make the namespace + content
+   * shape explicit. The Config field name (`walletId`) stays so
+   * internal callers (pay.ts, agentic-info.ts) don't churn.
    */
   walletId: string | null;
   realPaymentsRequested: boolean;
@@ -302,7 +309,18 @@ export function loadConfig(): Config {
   // walletId is just stored lowercased here; we don't validate its
   // shape (the server returns 404 on a bad walletId, which is a
   // friendlier error than this MCP guessing).
-  const walletIdRaw = ENV.Q402_WALLET_ID;
+  // v0.6.1 rename: `Q402_AGENT_WALLET_ADDRESS` is the canonical name.
+  // `Q402_WALLET_ID` is accepted for one release as a soft-migration
+  // path. The canonical name wins on collision so a user explicitly
+  // moving to v0.6.1 isn't shadowed by a stale env.
+  const walletIdRaw =
+    ENV.Q402_AGENT_WALLET_ADDRESS ?? ENV.Q402_WALLET_ID;
+  if (!ENV.Q402_AGENT_WALLET_ADDRESS && ENV.Q402_WALLET_ID) {
+    process.stderr.write(
+      "[q402-mcp] Q402_WALLET_ID is deprecated — rename to Q402_AGENT_WALLET_ADDRESS. " +
+        "Old name will be removed in v0.7.0.\n",
+    );
+  }
   const walletId =
     typeof walletIdRaw === "string" && walletIdRaw.length > 0
       ? walletIdRaw.toLowerCase()

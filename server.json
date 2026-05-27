@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.6.0",
+  "version": "0.6.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "transport": {
         "type": "stdio"
       },
@@ -32,7 +32,14 @@
         },
         {
           "name": "Q402_PRIVATE_KEY",
-          "description": "Recommended path: skip this UI and run `q402_doctor` after install — it stores secrets in ~/.q402/mcp.env, which the server auto-loads (and never round-trips through chat). Fill this field directly ONLY if your MCP client manages secrets for you. Value is a hex-encoded EVM private key (0x + 64 hex chars) used to sign payment authorizations LOCALLY on your machine. Use a fresh wallet, not your main one.",
+          "description": "Mode A — real EOA signing. Hex-encoded EVM private key (0x + 64 hex chars) of YOUR MetaMask wallet, used to sign payment authorizations LOCALLY on your machine. After your first payment that wallet shows as 'Smart account' in MetaMask (EIP-7702 delegation, reversible via q402_clear_delegation). Use a fresh wallet, not your main one. Skip this and pick Mode B (Q402_AGENTIC_PRIVATE_KEY) or Mode C (server-managed Agent Wallet) if you'd rather keep your MetaMask untouched. Recommended path: run q402_doctor after install — it stores secrets in ~/.q402/mcp.env, which the server auto-loads.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "Q402_AGENTIC_PRIVATE_KEY",
+          "description": "Mode B — local Agent Wallet signing. Hex-encoded EVM private key (0x + 64 hex chars) exported from your Agent Wallet at https://q402.quackai.ai/dashboard → Agent tab → Export. Signs LOCALLY just like Mode A, but the signer is your dedicated Agent Wallet — your MetaMask EOA is never touched. Pick this for AI-agent automation when you want a dedicated purse with per-tx + daily caps you set on the dashboard.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
@@ -67,6 +74,13 @@
           "isSecret": false,
           "format": "string",
           "default": "https://q402.quackai.ai/api"
+        },
+        {
+          "name": "Q402_AGENT_WALLET_ADDRESS",
+          "description": "Server-managed Agent Wallet picker (walletMode='agentic-server' only). Lowercased agent wallet address (the hex 0x... shown on the Agent tab of your dashboard) selecting which of your Agent Wallets to spend from when you hold more than one (max 10 per owner). Omit to use the default wallet. Ignored for the local-signing modes that carry their own private key.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
         }
       ]
     }

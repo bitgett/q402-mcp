@@ -391,7 +391,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
     // Multi-wallet (Phase 3): the user can have up to 10 Agent Wallets.
     // Pick by explicit walletId in the tool input, then by the
-    // Q402_WALLET_ID env, then let the server pick the user's default.
+    // Q402_AGENT_WALLET_ADDRESS env, then let the server pick the user's default.
     const explicitWalletId =
       typeof input.walletId === "string" && input.walletId.length > 0
         ? input.walletId.toLowerCase()
@@ -427,9 +427,61 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     }
 
     const data = (await resp.json().catch(() => ({}))) as
-      | { txHash?: string; error?: string; message?: string }
+      | {
+          txHash?: string;
+          error?: string;
+          message?: string;
+          pending?: boolean;
+          status?: "processing" | "complete" | "failed";
+          retryAfterSec?: number;
+          idempotent?: boolean;
+          sendId?: string;
+        }
       | Record<string, never>;
     const txHash = (data as { txHash?: string }).txHash ?? "";
+
+    // Server returns HTTP 202 + `pending: true` when a concurrent
+    // identical request beats us to the SET NX claim — the relay
+    // hasn't settled yet, but it isn't a failure either. Without
+    // this branch, `resp.ok && txHash.length > 0` reports
+    // `success: false` for a perfectly normal "still in flight"
+    // state. Distinguish so the AI tells the user "wait + retry"
+    // instead of "your payment failed".
+    const isPending =
+      resp.status === 202 ||
+      (data as { pending?: boolean }).pending === true ||
+      (data as { status?: string }).status === "processing";
+    if (isPending) {
+      const retryAfter =
+        typeof (data as { retryAfterSec?: number }).retryAfterSec === "number"
+          ? (data as { retryAfterSec: number }).retryAfterSec
+          : 5;
+      return {
+        result: {
+          success: false,
+          sandbox: false,
+          txHash: "",
+          tokenAmount: input.amount,
+          token: input.token,
+          chain: chain.key,
+          method: "eip7702",
+          pending: true,
+          retryAfterSec: retryAfter,
+        } satisfies PayResult,
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "mode=live",
+          "status=pending",
+          `retry_after=${retryAfter}s`,
+        ],
+        senderWallet,
+        setupHint:
+          "An identical send for this wallet is still in flight on the server. " +
+          `Wait ${retryAfter}s and retry — the cached result will come back, no double-spend.`,
+      };
+    }
+
     const success = resp.ok && txHash.length > 0;
     const message =
       "message" in data

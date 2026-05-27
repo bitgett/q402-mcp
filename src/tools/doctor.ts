@@ -44,6 +44,7 @@ import {
   Q402_ENV_FILE_KEYS_ALL,
   isValidPrivateKey,
   classifyApiKey,
+  detectAgenticModes,
   getQ402EnvFileReadError,
 } from "../config.js";
 import { CHAIN_KEYS }     from "../chains.js";
@@ -235,11 +236,74 @@ Q402_MULTICHAIN_API_KEY=
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# WALLET — paste your private key on the right of \`=\`
+# SIGNING MODE — pick ONE of A / B / C below
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Q402 pays in three ways, depending on which keys you set. Pick the
+# row that matches your situation and fill ONLY that row's variable(s).
+# Setting multiple rows is allowed — q402_pay will ask you which one to
+# use per call (the AI surfaces the question; you don't pre-pick a
+# default here).
+#
+#   A. Real EOA (your MetaMask wallet)
+#      Set:  Q402_PRIVATE_KEY  =  0x... (your MetaMask account's private key)
+#      Pros: simplest mental model — same wallet you already use
+#      Cons: after first payment, MetaMask will show this account as
+#            "Smart account" (EIP-7702 delegation, reversible via
+#            q402_clear_delegation but visually alarming on first sight)
+#
+#   B. Agent Wallet — local signing (recommended for AI agents)
+#      Set:  Q402_AGENTIC_PRIVATE_KEY  =  0x... (Agent Wallet pk from dashboard export)
+#      Pros: your MetaMask stays untouched; agent has its own purse with
+#            per-tx + daily caps you set on the dashboard
+#      Cons: requires creating an Agent Wallet on the dashboard first
+#            (https://q402.quackai.ai/dashboard → Agent tab → Create)
+#            then exporting its private key
+#
+#   C. Agent Wallet — server-managed (no private key on your machine)
+#      Set:  (just the api key + optionally Q402_AGENT_WALLET_ADDRESS below)
+#      Pros: zero private-key handling locally; the server holds the
+#            encrypted Agent Wallet pk and signs on your behalf
+#      Cons: requires a paid Multichain API key (Mode C is not available
+#            on the free Trial). The server-side keystore is AES-256-GCM
+#            encrypted but is a custodial path — pick A or B if that
+#            posture doesn't fit your threat model.
+#
+# A user can have multiple wallets configured simultaneously (e.g. PK
+# for personal pays + apiKey-only for agent pays). When more than one
+# mode is set, q402_pay asks the user which to use rather than picking
+# silently.
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# WALLET — Mode A: real EOA private key
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Hex EVM private key (0x + 64 hex chars). Signs payments LOCALLY on
 # your machine — never leaves your device, never sent to any server.
+# Leave blank if you're using Mode B or Mode C.
 Q402_PRIVATE_KEY=
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# WALLET — Mode B: exported Agent Wallet private key
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Hex EVM private key (0x + 64 hex chars) exported from your Agent
+# Wallet on the dashboard. Signs payments LOCALLY just like Mode A,
+# but the wallet is your dedicated Agent Wallet — your MetaMask EOA
+# is never touched. Get the key at:
+#   https://q402.quackai.ai/dashboard → Agent tab → Export
+# Leave blank if you're using Mode A or Mode C.
+Q402_AGENTIC_PRIVATE_KEY=
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# WALLET — Mode C: server-managed Agent Wallet picker (optional)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Only set this when you're running Mode C (api key only, no private
+# keys above) AND you have more than one Agent Wallet on the account
+# (max 10). Pin which one Q402 should spend from. Format: lowercase
+# 0x... address of the Agent Wallet (visible on the dashboard's Agent
+# tab). Omit entirely to use your default Agent Wallet.
+# Q402_AGENT_WALLET_ADDRESS=0x...
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -342,22 +406,29 @@ function detectPhase(): Phase {
     classifyApiKey(CONFIG.trialApiKey) === "live" ||
     classifyApiKey(CONFIG.multichainApiKey) === "live" ||
     classifyApiKey(CONFIG.legacyApiKey) === "live";
-  const hasValidPrivateKey = isValidPrivateKey(CONFIG.privateKey);
+  const modes = detectAgenticModes();
+  const hasAnyValidSigningPath = modes.count > 0;
 
   // Truly empty install: no env file, no keys, no PK. Force first-install
   // even if Q402_ENABLE_REAL_PAYMENTS=1 leaked in from the MCP registry
   // default — otherwise that single flag alone would push a brand-new user
   // into the needs-completion branch and the agent would skip the file-
   // creation flow that lives behind first-install.
-  if (!Q402_ENV_FILE_PRESENT && !anyKey && !CONFIG.privateKey) {
+  if (
+    !Q402_ENV_FILE_PRESENT &&
+    !anyKey &&
+    !CONFIG.privateKey &&
+    !CONFIG.agenticPrivateKey
+  ) {
     return "first-install";
   }
 
-  // Live-check requires a *valid* PK, not just any truthy string — the
-  // template ships with `0x...` placeholder that's truthy but won't sign,
-  // and that used to trip /keys/verify on every first-run health check.
+  // Live-check requires AT LEAST ONE valid signing path (Mode A real-EOA PK,
+  // Mode B Agent Wallet PK, or Mode C server-managed via live apiKey). The
+  // template ships placeholders that are truthy but won't pass
+  // isValidPrivateKey, so this also screens out the unedited template.
   const allEssentials =
-    anyKey && hasValidPrivateKey && CONFIG.realPaymentsRequested && anyLiveKey;
+    anyKey && hasAnyValidSigningPath && CONFIG.realPaymentsRequested && anyLiveKey;
   if (allEssentials) return "live-check";
 
   // Any concrete signal of in-progress setup — a key, a PK (even
@@ -366,7 +437,14 @@ function detectPhase(): Phase {
   // It defaults to 1 via server.json, so leaning on it would put empty
   // installs into needs-completion (see the first-install short-circuit
   // above).
-  if (anyKey || CONFIG.privateKey || Q402_ENV_FILE_PRESENT) return "needs-completion";
+  if (
+    anyKey ||
+    CONFIG.privateKey ||
+    CONFIG.agenticPrivateKey ||
+    Q402_ENV_FILE_PRESENT
+  ) {
+    return "needs-completion";
+  }
   return "first-install";
 }
 
@@ -542,34 +620,56 @@ export async function runDoctor(): Promise<DoctorReport> {
   // teaching a third env var to first-time users only muddies the
   // Trial-vs-Multichain decision they actually have to make.
 
-  // Missing list — what's needed for live mode. Includes the placeholder
-  // case: a string like "0x..." is technically set but won't pass the
-  // private-key format check, so the user still has work to do.
+  // Missing list — what's needed for live mode. Mode-aware: the user only
+  // needs A PK if they're driving Mode A (real EOA) or Mode B (Agent Wallet
+  // local). Mode C (server-managed Agent Wallet) needs no PK at all — the
+  // server holds the encrypted Agent Wallet key.
+  const modes = detectAgenticModes();
   const missing: string[] = [];
   if (!CONFIG.trialApiKey && !CONFIG.multichainApiKey && !CONFIG.legacyApiKey) {
     missing.push(
       "An API key (Q402_TRIAL_API_KEY for free BNB OR Q402_MULTICHAIN_API_KEY for paid 9-chain)",
     );
   }
-  if (!CONFIG.privateKey) {
-    missing.push("Q402_PRIVATE_KEY");
-  } else if (!isValidPrivateKey(CONFIG.privateKey)) {
-    missing.push(
-      "Q402_PRIVATE_KEY is set but malformed (expected 0x + 64 hex chars). " +
-      "Looks like the placeholder '0x...' is still in ~/.q402/mcp.env — paste a real key in your editor.",
-    );
+
+  // Signing path: at least one of A/B/C must be available. If none, tell
+  // the user about all three options so they can pick. Placeholder PKs
+  // ("0x...") are truthy but fail isValidPrivateKey — flag that separately
+  // since the fix is different (paste a real key vs. choose a mode).
+  if (modes.count === 0) {
+    const pkAPlaceholder = !!CONFIG.privateKey && !isValidPrivateKey(CONFIG.privateKey);
+    const pkBPlaceholder = !!CONFIG.agenticPrivateKey && !isValidPrivateKey(CONFIG.agenticPrivateKey);
+    if (pkAPlaceholder) {
+      missing.push(
+        "Q402_PRIVATE_KEY is set but malformed (expected 0x + 64 hex chars). " +
+        "Looks like the placeholder '0x...' is still in ~/.q402/mcp.env — paste a real key in your editor.",
+      );
+    } else if (pkBPlaceholder) {
+      missing.push(
+        "Q402_AGENTIC_PRIVATE_KEY is set but malformed (expected 0x + 64 hex chars). " +
+        "Paste your exported Agent Wallet private key (https://q402.quackai.ai/dashboard → Agent tab → Export).",
+      );
+    } else {
+      missing.push(
+        "A signing path. Pick ONE: (A) Q402_PRIVATE_KEY = your MetaMask EOA's " +
+        "private key; (B) Q402_AGENTIC_PRIVATE_KEY = your exported Agent Wallet " +
+        "private key from the dashboard (Mode B keeps your MetaMask untouched); " +
+        "or (C) just use a live paid Q402_MULTICHAIN_API_KEY and let Q402 sign " +
+        "with your server-managed Agent Wallet (no PK on your machine).",
+      );
+    }
   }
+
   if (!CONFIG.realPaymentsRequested) {
     // server.json declares `default: "1"` for this var as of v0.5.11, but
     // not every MCP client passes registry defaults through — Codex without
     // an explicit env_vars allow-list, raw stdio bridges, etc. won't.
-    // When the user's API key + PK are otherwise fine but the flag is
-    // unset, the most likely cause is "client stripped the default" — so
-    // tell them to pin it explicitly in the file rather than chase the
-    // registry layer.
+    // When the user's API key + signing path are otherwise fine but the
+    // flag is unset, the most likely cause is "client stripped the default"
+    // — so tell them to pin it explicitly in the file rather than chase
+    // the registry layer.
     const haveAnyApi = !!(CONFIG.trialApiKey || CONFIG.multichainApiKey || CONFIG.legacyApiKey);
-    const havePk    = isValidPrivateKey(CONFIG.privateKey);
-    if (haveAnyApi && havePk) {
+    if (haveAnyApi && modes.count > 0) {
       missing.push(
         "Q402_ENABLE_REAL_PAYMENTS=1 — your other config looks fine, but your MCP " +
         "client isn't passing the registry default through. Add the line " +
@@ -668,15 +768,19 @@ export async function runDoctor(): Promise<DoctorReport> {
           : "Tell the user which env vars are still missing (from the 'missing' list) and how to add them to ~/.q402/mcp.env. Show userInstructions for the human-readable steps.",
       agentInstructions:
         phase === "first-install"
-          ? "[AI-ONLY — do not show this paragraph to the user verbatim] Multi-turn flow: (1) Briefly tell the user MCP is installed. (2) Ask one yes/no question — 'Want me to create your Q402 settings file?'. (3) On yes, execute recommendedActions IN ORDER: first `ensure-q402-dir` shell action (bash on macOS/Linux, PowerShell on Windows via shellWindows variant), then `create-env-file` write_file action. (4) Open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. (5) Walk through filling in the API key (from /event for free Trial or /payment for paid Multichain) and private key one at a time. (6) Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste a private key, surface the `advisories` array: fresh wallet, Smart-account-in-MetaMask heads-up, hardware wallets unsupported, MetaMask key-export path. (7) After they save, tell them to restart the MCP client — per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window. (8) Have them re-invoke 'Set up Q402' to confirm. Keep the conversation tight: one decision per turn, plain language, never echo this paragraph."
+          ? "[AI-ONLY — do not show this paragraph to the user verbatim] Multi-turn flow: (1) Briefly tell the user MCP is installed. (2) Ask one yes/no question — 'Want me to create your Q402 settings file?'. (3) On yes, execute recommendedActions IN ORDER: first `ensure-q402-dir` shell action (bash on macOS/Linux, PowerShell on Windows via shellWindows variant), then `create-env-file` write_file action. (4) Open the file in the user's editor — `code` works for VS Code / Cursor / Cline (e.g. `code ~/.q402/mcp.env`); `open` on macOS, `start` on Windows, `xdg-open` on Linux as fallback. (5) Help the user pick a wallet mode (A=Q402_PRIVATE_KEY real EOA, B=Q402_AGENTIC_PRIVATE_KEY exported Agent Wallet PK, C=API key only with server-managed Agent Wallet). If they're an AI agent / automation user, gently default to B or C; if they're a power user who wants their existing EOA to be the signer, A is fine. Walk through filling in the chosen mode's variable + the API key one at a time. (6) Do NOT accept key values via chat — direct the user to edit the file in their editor. BEFORE they paste any private key (Mode A OR Mode B), surface the `advisories` array: fresh wallet, Smart-account-in-MetaMask heads-up (Mode A only), hardware wallets unsupported, MetaMask key-export path (Mode A) or dashboard Export button (Mode B). (7) After they save, tell them to restart the MCP client — per-client restart verb: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window. (8) Have them re-invoke 'Set up Q402' to confirm. Keep the conversation tight: one decision per turn, plain language, never echo this paragraph."
           : "[AI-ONLY — do not show this paragraph to the user verbatim] User has SOME env set. List the missing items (from `missing`) in plain language. Tell them to edit ~/.q402/mcp.env and uncomment / fill the relevant line, then restart the MCP client. Restart verb per client: Claude Desktop → quit + relaunch; Codex → exit + relaunch; Cursor → Cmd/Ctrl+Shift+P → 'Developer: Reload Window'; Cline → reload VS Code window.",
       userInstructions:
         phase === "first-install"
           ? [
-              "Q402 is installed. To start sending payments you need an API key and a wallet.",
+              "Q402 is installed. To start sending payments you need (1) an API key and (2) a wallet to sign with.",
               "I'll create a settings file for you — say yes and I'll set it up + open it in your editor.",
               "Get a free API key at https://q402.quackai.ai/event (BNB Chain only, 2,000 sponsored transactions).",
-              "Use a FRESH wallet for Q402 — don't use your main wallet. The wallet will be marked 'Smart account' in MetaMask after your first payment (that's normal — Q402 reverses it on demand).",
+              "There are 3 wallet modes — pick one:" +
+                " (A) your MetaMask EOA's private key (simplest, but your account will be marked 'Smart account' after first payment);" +
+                " (B) export an Agent Wallet's private key from the dashboard (keeps your MetaMask untouched, recommended for AI agents);" +
+                " (C) on a paid plan, use the server-managed Agent Wallet — just set the API key, no private key needed.",
+              "Use a FRESH wallet for Mode A — don't use the one holding your main funds. The 'Smart account' marker is normal (EIP-7702 delegation, reversible via q402_clear_delegation).",
               "Paste your key + wallet private key INTO THE FILE (in your editor) — never paste a private key into this chat.",
               "Save the file, restart your MCP client, then ask me 'Verify Q402' to confirm.",
             ]

@@ -8,7 +8,7 @@
  * Multi-wallet aware (Phase 3): each owner can hold up to 10 Agent
  * Wallets. Picks a wallet by:
  *   1. `walletId` tool input (explicit override)
- *   2. `Q402_WALLET_ID` env (operator default)
+ *   2. `Q402_AGENT_WALLET_ADDRESS` env (operator default)
  *   3. server-side default wallet (when nothing is specified)
  *
  * Useful for the AI to answer "what's in my agent wallet?" without the
@@ -27,7 +27,7 @@ export const AgenticInfoInputSchema = z.object({
     .optional()
     .describe(
       "Optional lowercased Agent Wallet address to introspect when the user " +
-        "holds multiple (max 10 per owner). Omit to use Q402_WALLET_ID env, " +
+        "holds multiple (max 10 per owner). Omit to use Q402_AGENT_WALLET_ADDRESS env, " +
         "then the owner's default wallet.",
     ),
 });
@@ -50,7 +50,7 @@ export const AGENTIC_INFO_TOOL = {
         type: "string" as const,
         description:
           "Optional. Lowercased Agent Wallet address when the user holds " +
-          "multiple wallets. Defaults to Q402_WALLET_ID env, then the " +
+          "multiple wallets. Defaults to Q402_AGENT_WALLET_ADDRESS env, then the " +
           "owner's default wallet on the server.",
       },
     },
