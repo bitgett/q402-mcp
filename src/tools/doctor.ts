@@ -425,7 +425,7 @@ function envSlot(name: string, purpose: string): EnvSlot {
 
 function mask(key: string | null | undefined): string {
   if (!key || key.length < 12) return key ?? "";
-  return `${key.slice(0, 12)}…${key.slice(-4)}`;
+  return `${key.slice(0, 12)}...${key.slice(-4)}`;
 }
 
 function detectPhase(): Phase {
@@ -1083,10 +1083,14 @@ export async function runDoctor(): Promise<DoctorReport> {
       : "[AI-ONLY — do not show this paragraph to the user verbatim] Walk the user through each warning IN ORDER, plain language. For slot-mismatch warnings, the fix is editing ~/.q402/mcp.env and restarting the client (Cursor / Cline: reload window; Claude / Codex: quit + relaunch). Surface body.error strings from any verify failure as the user-visible reason (e.g. 'your Trial expired 3 days ago', 'API key has been rotated') — don't generic-out to 'check the key value'.",
     userInstructions: ready
       ? [
-          `Your wallet: ${walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : "(derive failed — check Q402_PRIVATE_KEY)"}`,
+          walletAddress
+            ? `Your wallet: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+            : modes.modeC && !modes.modeA && !modes.modeB
+              ? "Wallet: server-managed (Mode C) — Q402 holds your Agent Wallet key. No local wallet to show."
+              : "(wallet derive failed — check Q402_PRIVATE_KEY or Q402_AGENTIC_PRIVATE_KEY in ~/.q402/mcp.env)",
           "Q402 is live. You can now ask me to quote, pay, batch-pay, or check Trust Receipts.",
           "Want me to run a quick gas comparison across all 9 chains as a smoke test?",
-          "Need to chain-test against sandbox without changing keys? Set Q402_ENABLE_REAL_PAYMENTS=0 in ~/.q402/mcp.env and restart — every q402_pay returns a fake hash until you flip it back to 1.",
+          "Need to chain-test against sandbox without changing keys? Set Q402_ENABLE_REAL_PAYMENTS=0 in ~/.q402/mcp.env and restart - every q402_pay returns a fake hash until you flip it back to 1.",
         ]
       : [
           `Q402 has ${warnings.length} issue${warnings.length === 1 ? "" : "s"} to fix:`,

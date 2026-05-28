@@ -28,6 +28,17 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const AMOUNT_RE = /^\d+(\.\d{1,18})?$/;
 
 export const RecurringCreateInputSchema = z.object({
+  confirm: z
+    .literal(true)
+    .describe(
+      "REQUIRED. Must be literally `true`. Authoring a recurring rule schedules " +
+        "future on-chain payments that the user does not click through one-by-one — " +
+        "the user has to explicitly say yes BEFORE this is called. Echo back the " +
+        "frequency + recipient + amount + chain + token + cancelWindow you intend " +
+        "to create, get a plain-language confirmation from the user (e.g. \"yes, " +
+        "create the schedule\"), and ONLY then call this with confirm: true. " +
+        "Mirrors the same guard q402_pay / q402_batch_pay use on one-shot sends.",
+    ),
   frequency: z
     .string()
     .min(1)
@@ -102,6 +113,15 @@ export const RECURRING_CREATE_TOOL = {
   inputSchema: {
     type: "object" as const,
     properties: {
+      confirm: {
+        type: "boolean" as const,
+        const: true,
+        description:
+          "REQUIRED. Must be literally `true`. Recurring rules schedule future " +
+          "on-chain payments without per-fire user prompts, so the agent must " +
+          "get an explicit user yes BEFORE setting `confirm: true` and calling " +
+          "this. Same guard q402_pay / q402_batch_pay use on one-shot sends.",
+      },
       frequency: {
         type: "string" as const,
         description:
@@ -144,7 +164,7 @@ export const RECURRING_CREATE_TOOL = {
         description: "Optional. Defaults to default wallet on server.",
       },
     },
-    required: ["frequency", "recipient", "amount"],
+    required: ["confirm", "frequency", "recipient", "amount"],
     additionalProperties: false,
   },
 };
