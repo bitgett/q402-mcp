@@ -157,6 +157,20 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ---
 
+## Wallet modes — which signing path?
+
+Three signing paths. Pick one when `q402_doctor` asks on first install. You can change later by editing `~/.q402/mcp.env` and restarting your client.
+
+| Mode | Best for | Env to set | Private key in env? |
+|---|---|---|---|
+| **C — Server-managed** (recommended) | Most users. AI agents, automations, anyone who wants payments to "just work". Q402 holds an encrypted Agent Wallet for you; no MetaMask popup, no Smart-account marker. | `Q402_MULTICHAIN_API_KEY` (paid) **or** `Q402_TRIAL_API_KEY` (free BNB) | **No** |
+| **B — Local Agent Wallet PK** | You want Agent Wallet automation but prefer to hold the PK yourself. Export from the dashboard once. MCP signs locally — key never leaves your machine. Your MetaMask is never touched. | `Q402_AGENTIC_PRIVATE_KEY` + an API key | Yes (Agent Wallet's exported PK) |
+| **A — Your own EOA** | Power users who want their existing MetaMask address to be the on-chain payer. Your EOA signs directly via EIP-7702; the "Smart account" marker after first use is normal + reversible with `q402_clear_delegation`. **Use a fresh wallet.** | `Q402_PRIVATE_KEY` + an API key | Yes (your EOA's PK) |
+
+`q402_doctor` on first install reads your env and recommends one of these based on what's already configured. The default for an empty install is Mode C — simplest path. If multiple modes are configured at once (e.g. both `Q402_PRIVATE_KEY` and `Q402_AGENTIC_PRIVATE_KEY` set), `q402_pay` will ask which one to use before sending so the agent never silently picks the wrong wallet.
+
+---
+
 ## Tools exposed
 
 | Tool | Auth | Purpose |
