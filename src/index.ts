@@ -62,6 +62,21 @@ import {
   AgenticInfoInputSchema,
   runAgenticInfo,
 } from "./tools/agentic-info.js";
+import {
+  RECURRING_LIST_TOOL,
+  RecurringListInputSchema,
+  runRecurringList,
+} from "./tools/recurring-list.js";
+import {
+  RECURRING_CREATE_TOOL,
+  RecurringCreateInputSchema,
+  runRecurringCreate,
+} from "./tools/recurring-create.js";
+import {
+  RECURRING_CANCEL_TOOL,
+  RecurringCancelInputSchema,
+  runRecurringCancel,
+} from "./tools/recurring-cancel.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -85,6 +100,9 @@ async function main(): Promise<void> {
       RECEIPT_TOOL,
       WALLET_STATUS_TOOL,
       AGENTIC_INFO_TOOL,
+      RECURRING_LIST_TOOL,
+      RECURRING_CREATE_TOOL,
+      RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
     ],
   }));
@@ -128,6 +146,18 @@ async function main(): Promise<void> {
         case "q402_agentic_info": {
           AgenticInfoInputSchema.parse(args ?? {});
           return { content: [jsonText(await runAgenticInfo())] };
+        }
+        case "q402_recurring_list": {
+          const parsed = RecurringListInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringList(parsed))] };
+        }
+        case "q402_recurring_create": {
+          const parsed = RecurringCreateInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringCreate(parsed))] };
+        }
+        case "q402_recurring_cancel": {
+          const parsed = RecurringCancelInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringCancel(parsed))] };
         }
         default:
           return {
