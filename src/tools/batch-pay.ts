@@ -200,12 +200,21 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   }
 
   // Derive sender wallet so we can echo it back on every response shape
-  // (ambiguous / sandbox / live). Same regex gate as q402_pay — skip if
-  // PK missing or placeholder.
+  // (ambiguous / sandbox / live). Use the SAME signing-key precedence
+  // batch's Q402NodeClient construction picks below
+  // (agenticPrivateKey ?? privateKey) — otherwise a Mode B install
+  // echoes the MetaMask EOA address while actually signing with the
+  // exported Agent Wallet, and the user sees "from <eoa>" in their UI
+  // even though the on-chain TX comes from the Agent Wallet.
   let senderWallet: BatchPaySummary["senderWallet"];
-  if (CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey)) {
+  const echoPk = (CONFIG.agenticPrivateKey && isValidPrivateKey(CONFIG.agenticPrivateKey))
+    ? CONFIG.agenticPrivateKey
+    : (CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey))
+      ? CONFIG.privateKey
+      : null;
+  if (echoPk) {
     try {
-      const addr = new Wallet(CONFIG.privateKey).address;
+      const addr = new Wallet(echoPk).address;
       senderWallet = {
         address:      addr,
         addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,

@@ -905,15 +905,21 @@ export async function runDoctor(): Promise<DoctorReport> {
   // smart-quote from a chat client).
   let walletAddress: string | undefined;
   let walletError:   string | undefined;
-  try {
-    walletAddress = new Wallet(CONFIG.privateKey!).address;
-  } catch (e) {
-    walletError = e instanceof Error ? e.message : String(e);
-    warnings.push(
-      `Q402_PRIVATE_KEY is set but does not parse as a 32-byte hex key: ${walletError}. ` +
-      "Open ~/.q402/mcp.env in your editor and paste a real key (0x + 64 hex chars). " +
-      "Live calls will fail until this is fixed.",
-    );
+  // Mode C only (no PK in env, server signs): there's nothing to
+  // derive locally. Skipping the parse avoids a misleading
+  // "Q402_PRIVATE_KEY malformed" warning on an install that
+  // deliberately holds no private key.
+  if (CONFIG.privateKey) {
+    try {
+      walletAddress = new Wallet(CONFIG.privateKey).address;
+    } catch (e) {
+      walletError = e instanceof Error ? e.message : String(e);
+      warnings.push(
+        `Q402_PRIVATE_KEY is set but does not parse as a 32-byte hex key: ${walletError}. ` +
+        "Open ~/.q402/mcp.env in your editor and paste a real key (0x + 64 hex chars). " +
+        "Live calls will fail until this is fixed.",
+      );
+    }
   }
 
   // Verify each present key in parallel.
