@@ -301,9 +301,33 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     };
   }
 
+  // Pick the local signing key with the same precedence q402_pay uses:
+  // Mode B (Q402_AGENTIC_PRIVATE_KEY) wins when set so a Mode B-only
+  // install — common for users who never want their MetaMask EOA in
+  // the MCP env — actually has a key to sign with. Earlier this
+  // unconditionally read CONFIG.privateKey and crashed with a non-null
+  // assertion on Mode B-only setups.
+  const signingPk = CONFIG.agenticPrivateKey ?? CONFIG.privateKey;
+  if (!signingPk) {
+    guardsApplied.push("mode=sandbox");
+    const sandboxResults = input.recipients.map((r) =>
+      sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
+    );
+    const reason =
+      "No local signing key configured. Set Q402_AGENTIC_PRIVATE_KEY (Mode B) " +
+      "or Q402_PRIVATE_KEY (Mode A) to sign batch payments locally.";
+    return {
+      mode: "sandbox",
+      status: "sandbox",
+      result: { sandbox: sandboxResults, reason },
+      senderWallet,
+      guardsApplied,
+      setupHint: reason,
+    };
+  }
   const client = new Q402NodeClient({
     apiKey: resolved.apiKey!,
-    privateKey: CONFIG.privateKey!,
+    privateKey: signingPk,
     chain,
     relayBaseUrl: CONFIG.relayBaseUrl,
   });

@@ -94,8 +94,11 @@ export const RECURRING_CREATE_TOOL = {
     "and a recipient + amount + chain + token. Authenticated by the " +
     "configured Multichain API key; no private key required. Non-bnb chains " +
     "need the paid Multichain subscription. Each fire is bounded by the " +
-    "wallet's perTxMax + dailyLimit caps configured on the dashboard. The " +
-    "user can stop a rule any time via q402_recurring_cancel.",
+    "wallet's perTxMax (configured on the dashboard) — the dashboard's " +
+    "dailyLimit cap currently applies to manual sends only, NOT recurring " +
+    "fires, so an attacker with the apiKey could schedule N rules at " +
+    "perTxMax and drain the wallet's USDC balance over time. The user can " +
+    "stop a rule any time via q402_recurring_cancel.",
   inputSchema: {
     type: "object" as const,
     properties: {
