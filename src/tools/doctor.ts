@@ -186,6 +186,38 @@ export interface DoctorReport {
    *  heads-up, hardware-wallet caveat, MetaMask private-key export breadcrumb.
    *  Populated only on the `first-install` phase. */
   advisories?: string[];
+
+  /** Wallet-mode picker — shown on first-install / needs-completion so the
+   *  AI can ask the user "which mode?" without forcing them to read docs. */
+  walletModePicker?: {
+    question:        string;
+    helpText:        string;
+    recommendedPick: "A" | "B" | "C";
+    options: Array<{
+      pick:               "A" | "B" | "C";
+      title:              string;
+      description:        string;
+      env:                string[];
+      privateKeyRequired: boolean;
+    }>;
+  };
+
+  /** Mode summary — surfaced on live-check so the AI can answer "what
+   *  mode am I in / do I need a private key?" without re-deriving the
+   *  state from envState. */
+  walletModes?: {
+    available: Array<{ mode: "A" | "B" | "C"; label: string; rationale: string }>;
+    count:     number;
+    primary:   "A" | "B" | "C" | null;
+    recommendation: string;
+    catalog: Array<{
+      mode:     "A" | "B" | "C";
+      label:    string;
+      envVar:   string;
+      needsPk:  boolean;
+      bestFor:  string;
+    }>;
+  };
 }
 
 // ── Env file template ──────────────────────────────────────────────────────
@@ -607,7 +639,18 @@ export async function runDoctor(): Promise<DoctorReport> {
     ),
     Q402_PRIVATE_KEY: envSlot(
       "Q402_PRIVATE_KEY",
-      "Hex EVM private key. Signs LOCALLY on your machine — never leaves your device.",
+      "Mode A signing key — your real EOA's private key (e.g. MetaMask). EIP-7702 " +
+      "delegates your wallet to Q402 impl. Signs LOCALLY, never leaves your device.",
+    ),
+    Q402_AGENTIC_PRIVATE_KEY: envSlot(
+      "Q402_AGENTIC_PRIVATE_KEY",
+      "Mode B signing key — your Agent Wallet's exported private key from the " +
+      "dashboard. Signs LOCALLY, never leaves your device. Your MetaMask stays untouched.",
+    ),
+    Q402_AGENT_WALLET_ADDRESS: envSlot(
+      "Q402_AGENT_WALLET_ADDRESS",
+      "Mode C target — lowercased Agent Wallet address when you hold multiple. " +
+      "Omit to use the server-default wallet. No PK needed; the server signs.",
     ),
     Q402_ENABLE_REAL_PAYMENTS: envSlot(
       "Q402_ENABLE_REAL_PAYMENTS",
@@ -747,6 +790,56 @@ export async function runDoctor(): Promise<DoctorReport> {
     );
   }
 
+  // Picker the AI surfaces to the user the moment doctor runs for the
+  // first time. Three signing modes, in plain English, with a clear
+  // default — designed so a user who just installed `@quackai/q402-mcp`
+  // and ran `q402_doctor` can answer "which mode?" without reading any
+  // docs. The AI is instructed to echo the question + options verbatim
+  // and accept the user's "A", "B", or "C" pick.
+  const walletModePicker = {
+    question: "How would you like Q402 to sign your payments?",
+    helpText:
+      "Pick once — you can change later by editing ~/.q402/mcp.env. " +
+      "Most users want C (simplest).",
+    recommendedPick:
+      modes.modeC && !modes.modeA && !modes.modeB
+        ? "C"
+        : modes.primary ?? "C",
+    options: [
+      {
+        pick: "C" as const,
+        title: "Q402 server signs for me (recommended, simplest)",
+        description:
+          "Q402 holds an encrypted Agent Wallet for you. You only set an API key — " +
+          "no private key in your env, no MetaMask popup, no Smart-account marker on your wallet. " +
+          "Best for AI agents, automations, and anyone who just wants payments to work.",
+        env: ["Q402_MULTICHAIN_API_KEY (paid)", "or Q402_TRIAL_API_KEY (free BNB)"],
+        privateKeyRequired: false,
+      },
+      {
+        pick: "B" as const,
+        title: "I'll export the Agent Wallet's private key and sign locally",
+        description:
+          "Same Agent Wallet as Mode C, but YOU hold the private key. Export it from the " +
+          "dashboard once. MCP signs locally so the key never leaves your machine. Your MetaMask " +
+          "is never touched.",
+        env: ["Q402_AGENTIC_PRIVATE_KEY (export from dashboard)", "+ Q402_MULTICHAIN_API_KEY or Q402_TRIAL_API_KEY"],
+        privateKeyRequired: true,
+      },
+      {
+        pick: "A" as const,
+        title: "Use my own EOA (MetaMask) as the signer",
+        description:
+          "Your existing wallet signs directly. EIP-7702 delegates it to Q402 for the call — " +
+          "your wallet shows a 'Smart account' marker after first use (normal, reversible). Best for " +
+          "power users who want their MetaMask address to be the on-chain payer. Use a FRESH wallet — " +
+          "not the one with your main funds.",
+        env: ["Q402_PRIVATE_KEY (your EOA's private key)", "+ Q402_MULTICHAIN_API_KEY or Q402_TRIAL_API_KEY"],
+        privateKeyRequired: true,
+      },
+    ],
+  };
+
   // Short-circuit phases that don't need live RPC calls.
   if (phase !== "live-check") {
     return {
@@ -756,6 +849,7 @@ export async function runDoctor(): Promise<DoctorReport> {
       ready:   false,
       envFile,
       envState,
+      walletModePicker,
       missing,
       warnings,
       recommendedActions,
@@ -906,6 +1000,57 @@ export async function runDoctor(): Promise<DoctorReport> {
 
   const ready = warnings.length === 0 && keys.some(k => k.valid);
 
+  // Mode summary — surface the three signing paths and which one the
+  // current env actually drives. Pre-this-version doctor only echoed
+  // Q402_PRIVATE_KEY in envState; Mode B (Q402_AGENTIC_PRIVATE_KEY) +
+  // Mode C (apiKey-only) users got no signal at all and asked "do I
+  // need a private key?". This block tells them, in plain words, which
+  // mode the install is wired for and what the alternatives look like.
+  const activeModes: Array<{ mode: "A" | "B" | "C"; label: string; rationale: string }> = [];
+  if (modes.modeA) activeModes.push({
+    mode: "A" as const,
+    label: "Real EOA (Q402_PRIVATE_KEY)",
+    rationale: "Your MetaMask wallet signs directly. EIP-7702 delegates it to Q402 for the call.",
+  });
+  if (modes.modeB) activeModes.push({
+    mode: "B" as const,
+    label: "Agent Wallet local (Q402_AGENTIC_PRIVATE_KEY)",
+    rationale: "Your exported Agent Wallet PK signs locally. Your MetaMask stays untouched.",
+  });
+  if (modes.modeC) activeModes.push({
+    mode: "C" as const,
+    label: "Server-mediated Agent Wallet (apiKey only)",
+    rationale: "No PK in your env. Q402's server holds the encrypted Agent Wallet key and signs for you.",
+  });
+  // Recommended primary: order matches detectAgenticModes.primary —
+  // Mode B if PK present, else Mode A if EOA PK present, else Mode C
+  // when a live apiKey is configured. We surface a short user-facing
+  // recommendation so a first-time install knows which path to pick.
+  const recommendedMode: "A" | "B" | "C" | "none" =
+    modes.primary ?? (CONFIG.apiKey?.startsWith("q402_live_") ? "C" : "none");
+  const walletModes = {
+    available: activeModes,
+    count:     modes.count,
+    primary:   modes.primary,
+    /** Plain-English picker that the AI should echo when the user asks
+     *  "which mode do I use?" or "do I need a private key?". */
+    recommendation:
+      recommendedMode === "C"
+        ? "You're configured for Mode C — Q402's server signs with your Agent Wallet. No private key needed. Simplest path; recommended for most users."
+        : recommendedMode === "B"
+          ? "You're configured for Mode B — your exported Agent Wallet PK signs locally. Your MetaMask is never touched."
+          : recommendedMode === "A"
+            ? "You're configured for Mode A — your MetaMask EOA signs directly. EIP-7702 delegates it to Q402 for the call. (If the Smart-account banner in MetaMask is a concern, switch to Mode B or C.)"
+            : "No signing path configured yet. Easiest: set Q402_MULTICHAIN_API_KEY (or Q402_TRIAL_API_KEY for free BNB) and let the server sign — that's Mode C, no PK needed.",
+    /** All three modes documented so the AI can answer "what are my
+     *  options?" without re-deriving from envState. */
+    catalog: [
+      { mode: "A" as const, label: "Real EOA",            envVar: "Q402_PRIVATE_KEY",          needsPk: true,  bestFor: "Power users who want their MetaMask to be the on-chain signer." },
+      { mode: "B" as const, label: "Agent Wallet local",  envVar: "Q402_AGENTIC_PRIVATE_KEY",  needsPk: true,  bestFor: "Users who want Agent Wallet automation but keep custody of the PK." },
+      { mode: "C" as const, label: "Server-mediated",     envVar: "(none)",                    needsPk: false, bestFor: "Most users. No PK in env; Q402 holds the Agent Wallet key encrypted server-side." },
+    ],
+  };
+
   return {
     package: PACKAGE_NAME,
     version: PACKAGE_VERSION,
@@ -913,6 +1058,7 @@ export async function runDoctor(): Promise<DoctorReport> {
     ready,
     envFile,
     envState,
+    walletModes,
     missing,
     wallet:            walletAddress ? { address: walletAddress } : undefined,
     keys,
