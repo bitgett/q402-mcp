@@ -150,7 +150,7 @@ export const RECURRING_CREATE_TOOL = {
       chain: {
         type: "string" as const,
         enum: ["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable"],
-        description: "Default 'bnb'. Non-bnb requires paid Multichain.",
+        description: "Default 'bnb'. Recurring requires the paid Multichain subscription on EVERY chain (BNB included) — trial keys are rejected with MULTICHAIN_REQUIRED.",
       },
       token: {
         type: "string" as const,
