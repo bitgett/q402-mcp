@@ -42,6 +42,7 @@ import {
   resolveApiKey,
   isLiveModeFor,
   isValidPrivateKey,
+  detectAgenticModes,
   type KeyScopeRequest,
   type KeyScope,
 } from "../config.js";
@@ -52,6 +53,7 @@ import {
   type BatchPayResult,
   type PayResult,
 } from "../client.js";
+import type { AvailableWallet, WalletModeRequest } from "./pay.js";
 
 const RECIPIENT_LIMIT_TRIAL = 5;
 const RECIPIENT_LIMIT_PAID  = 20;
@@ -104,6 +106,30 @@ export const BatchPayInputSchema = z.object({
         'the BNB-only sponsored key (≤5 recipients). keyScope="multichain" ' +
         'forces the paid 9-chain key (≤20 recipients).',
     ),
+  walletMode: z
+    .enum(["eoa", "agentic-local", "agentic-server"])
+    .optional()
+    .describe(
+      "Which wallet to spend from — same three modes as q402_pay:\n" +
+        '  "eoa"              — user MetaMask/OKX EOA, signed locally with Q402_PRIVATE_KEY\n' +
+        '  "agentic-local"    — Agent Wallet exported key (Q402_AGENTIC_PRIVATE_KEY)\n' +
+        '  "agentic-server"   — server-managed Agent Wallet (Q402 holds the key; needs Q402_MULTICHAIN_API_KEY)\n' +
+        "When MORE THAN ONE wallet is configured, you MUST ask the user which " +
+        "to use before calling — do NOT guess. Phrase: \"You have multiple " +
+        "wallets set up — batch from your EOA, or your Agent Wallet?\" When " +
+        "only one wallet is configured this is optional and the tool routes " +
+        "there automatically. Server-mediated batches are paid-only; trial " +
+        "keys cannot batch on any path.",
+    ),
+  walletId: z
+    .string()
+    .optional()
+    .describe(
+      "Server-managed Agent Wallet only (walletMode=\"agentic-server\"). " +
+        "Lowercased Agent Wallet address selecting which of the user's wallets " +
+        "to spend from when they hold more than one. Omit to use the default. " +
+        "Ignored for local-signing modes.",
+    ),
   confirm: z
     .literal(true)
     .describe(
@@ -123,8 +149,20 @@ export interface BatchPaySummary {
    * arrives with Q402_TRIAL_API_KEY set and no explicit `keyScope`. The
    * agent should read `setupHint` for the choice list (trial-5, multichain-
    * all, or split via two calls) and re-invoke with an explicit `keyScope`.
+   * `needs_wallet_choice` / `wallet_mode_unavailable` are returned when the
+   * user has multiple wallets configured AND no `walletMode` was passed
+   * (or the passed mode lacks its env). The agent must relay
+   * `ambiguousWalletChoice` to the user and retry with `walletMode` set.
    */
-  status: "success" | "partial_failure" | "aborted" | "sandbox" | "ambiguous" | "trial_cap_exceeded";
+  status:
+    | "success"
+    | "partial_failure"
+    | "aborted"
+    | "sandbox"
+    | "ambiguous"
+    | "trial_cap_exceeded"
+    | "needs_wallet_choice"
+    | "wallet_mode_unavailable";
   result?: BatchPayResult | { sandbox: PayResult[]; reason: string };
   guardsApplied: string[];
   setupHint?: string;
@@ -137,6 +175,15 @@ export interface BatchPaySummary {
   senderWallet?: {
     address:      string;
     addressShort: string;
+  };
+  /**
+   * Set when more than one wallet mode is configured AND the caller did
+   * NOT pass `walletMode`. The AI must relay `question` to the user, collect
+   * the answer, and retry with the chosen `walletMode`. Mirrors q402_pay.
+   */
+  ambiguousWalletChoice?: {
+    question: string;
+    available: AvailableWallet[];
   };
 }
 
@@ -199,20 +246,105 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  // Derive sender wallet so we can echo it back on every response shape
-  // (ambiguous / sandbox / live). Use the SAME signing-key precedence
-  // batch's Q402NodeClient construction picks below
-  // (agenticPrivateKey ?? privateKey) — otherwise a Mode B install
-  // echoes the MetaMask EOA address while actually signing with the
-  // exported Agent Wallet, and the user sees "from <eoa>" in their UI
-  // even though the on-chain TX comes from the Agent Wallet.
+  // ── Wallet mode disambiguation ─────────────────────────────────────────
+  // Mirror q402_pay's three-mode picker: when more than one wallet is
+  // configured (Mode A: real EOA, Mode B: Agent Wallet exported key,
+  // Mode C: server-managed Agent Wallet) AND the caller did NOT specify
+  // walletMode, return without firing so the AI can ask the user. Same
+  // safety contract as single-pay — never pick silently when ambiguous.
+  const modes = detectAgenticModes(CONFIG);
+  const available: AvailableWallet[] = [];
+  if (modes.modeA && CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey)) {
+    try {
+      const addr = new Wallet(CONFIG.privateKey).address;
+      available.push({
+        id: "eoa",
+        label: "Your real MetaMask / OKX EOA",
+        addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+        note: "Signs locally with Q402_PRIVATE_KEY. Your wallet becomes EIP-7702-delegated after the first payment on each chain.",
+      });
+    } catch { /* defensive */ }
+  }
+  if (modes.modeB && CONFIG.agenticPrivateKey && isValidPrivateKey(CONFIG.agenticPrivateKey)) {
+    try {
+      const addr = new Wallet(CONFIG.agenticPrivateKey).address;
+      available.push({
+        id: "agentic-local",
+        label: "Agent Wallet (local signing with exported key)",
+        addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+        note: "Signs locally with Q402_AGENTIC_PRIVATE_KEY. Your MetaMask is never touched.",
+      });
+    } catch { /* defensive */ }
+  }
+  if (modes.modeC) {
+    available.push({
+      id: "agentic-server",
+      label: "Agent Wallet (server-managed)",
+      note: "Q402 holds the encrypted key; batch fires through /api/wallet/agentic/batch. Caps you set in the dashboard bound the spend.",
+    });
+  }
+
+  const requestedMode = input.walletMode;
+  const requestedAvailable = requestedMode
+    ? available.some((w) => w.id === requestedMode)
+    : false;
+
+  if (requestedMode && !requestedAvailable) {
+    return {
+      mode: "none",
+      status: "wallet_mode_unavailable",
+      guardsApplied: [
+        ...guardsApplied,
+        `wallet_modes_available=${available.length}`,
+        `requested=${requestedMode}`,
+      ],
+      ambiguousWalletChoice: {
+        question:
+          available.length === 0
+            ? `The "${requestedMode}" wallet isn't configured. None of the supported wallets are set up — see the doctor for setup instructions.`
+            : `The "${requestedMode}" wallet isn't configured in this environment. Supported wallets here: ${available
+                .map((w) => `"${w.id}"`)
+                .join(", ")}. Which would you like to use instead?`,
+        available,
+      },
+    };
+  }
+
+  if (available.length > 1 && !requestedMode) {
+    return {
+      mode: "none",
+      status: "needs_wallet_choice",
+      guardsApplied: [...guardsApplied, `wallet_modes_available=${available.length}`],
+      ambiguousWalletChoice: {
+        question:
+          available.length === 2
+            ? `You have ${available.length} wallets set up — which one should I batch-pay from?`
+            : `You have ${available.length} wallets set up. Which one should I batch-pay from?`,
+        available,
+      },
+    };
+  }
+
+  const effectiveMode: WalletModeRequest =
+    requestedMode && requestedAvailable
+      ? requestedMode
+      : available.length === 1 && available[0]
+        ? available[0].id
+        : "eoa";
+
+  // Derive sender wallet based on the effective mode. Mode C has no
+  // local key — senderWallet stays undefined; the server response carries
+  // the from-address in each row's relay record. For Mode A/B we echo
+  // the address derived from the signing PK so the AI surfaces "batch
+  // signing from 0xabc…1234 on bnb" alongside the recipient list.
   let senderWallet: BatchPaySummary["senderWallet"];
-  const echoPk = (CONFIG.agenticPrivateKey && isValidPrivateKey(CONFIG.agenticPrivateKey))
-    ? CONFIG.agenticPrivateKey
-    : (CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey))
+  const echoPk: string | null =
+    effectiveMode === "eoa"
       ? CONFIG.privateKey
-      : null;
-  if (echoPk) {
+      : effectiveMode === "agentic-local"
+        ? CONFIG.agenticPrivateKey
+        : null;
+  if (echoPk && isValidPrivateKey(echoPk)) {
     try {
       const addr = new Wallet(echoPk).address;
       senderWallet = {
@@ -292,12 +424,194 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   const resolved = resolveApiKey(input.chain, scopeRequest);
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
+  // ── Mode C — server-mediated, no local signing ──────────────────────────
+  // Fires before the Mode A/B live gate because Mode C doesn't need a
+  // local PK at all; the server holds the Agent Wallet's key. We still
+  // require a live multichain apiKey and Q402_ENABLE_REAL_PAYMENTS=1
+  // (sandbox Mode C is meaningless — there's no fake server-mediated
+  // path). RLUSD isn't supported on the server signer yet — surface a
+  // clean explanation instead of letting the relay return INVALID_TOKEN.
+  if (effectiveMode === "agentic-server") {
+    if (input.token === "RLUSD") {
+      return {
+        mode: "none",
+        status: "sandbox",
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "token=RLUSD",
+          "rejected_pre_relay",
+        ],
+        senderWallet,
+        setupHint:
+          "RLUSD is not yet supported by the server-managed Agent Wallet " +
+          "(walletMode=\"agentic-server\"). Switch to walletMode=\"eoa\" or " +
+          "\"agentic-local\" (with a private key set), or pick USDC/USDT for " +
+          "this batch.",
+      };
+    }
+    if (!resolved.apiKey || !resolved.apiKey.startsWith("q402_live_")) {
+      const sandboxResults = input.recipients.map((r) =>
+        sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
+      );
+      guardsApplied.push("mode=sandbox", "wallet=agentic-server");
+      const reason =
+        resolved.sandboxReason ??
+        "Server-mediated Agent Wallet needs a live Q402_MULTICHAIN_API_KEY. " +
+          "Visit https://q402.quackai.ai/payment to activate a paid plan.";
+      return {
+        mode: "sandbox",
+        status: "sandbox",
+        result: { sandbox: sandboxResults, reason },
+        senderWallet,
+        guardsApplied,
+        setupHint: reason,
+      };
+    }
+    if (!CONFIG.realPaymentsRequested) {
+      const sandboxResults = input.recipients.map((r) =>
+        sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
+      );
+      guardsApplied.push("mode=sandbox", "wallet=agentic-server");
+      const reason = "Set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real server-mediated batch.";
+      return {
+        mode: "sandbox",
+        status: "sandbox",
+        result: { sandbox: sandboxResults, reason },
+        senderWallet,
+        guardsApplied,
+        setupHint: reason,
+      };
+    }
+
+    // Multi-wallet (Phase 3): pick by explicit walletId in the input,
+    // then by Q402_AGENT_WALLET_ADDRESS env, then let the server pick
+    // the user's default.
+    const explicitWalletId =
+      typeof input.walletId === "string" && input.walletId.length > 0
+        ? input.walletId.toLowerCase()
+        : CONFIG.walletId;
+
+    let resp: Response;
+    try {
+      resp = await fetch(`${CONFIG.relayBaseUrl}/wallet/agentic/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: resolved.apiKey,
+          chain: input.chain,
+          token: input.token,
+          recipients: input.recipients,
+          ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
+        }),
+      });
+    } catch (e) {
+      return {
+        mode: "live",
+        status: "aborted",
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "mode=live",
+          "transport=fetch_failed",
+        ],
+        senderWallet,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+
+    const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
+
+    if (!resp.ok) {
+      const errMsg =
+        data && typeof data === "object" && "error" in data
+          ? String((data as { error: unknown }).error)
+          : `relay_http_${resp.status}`;
+      return {
+        mode: "live",
+        status: "aborted",
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "mode=live",
+          `http=${resp.status}`,
+        ],
+        senderWallet,
+        error: errMsg,
+        setupHint:
+          resp.status === 402
+            ? "Server-mediated batch requires a paid Multichain subscription. " +
+              "Activate one at https://q402.quackai.ai/payment."
+            : resp.status === 401
+              ? "apiKey was rejected by the server (stale or not bound to your owner). " +
+                "Rotate to the current key in your dashboard."
+              : resp.status === 404
+                ? "No active Agent Wallet found. Create one in your dashboard before retrying."
+                : undefined,
+      };
+    }
+
+    const serverResults = Array.isArray(data.results)
+      ? (data.results as Array<{
+          to?: string;
+          amount?: string;
+          ok?: boolean;
+          txHash?: string;
+          error?: string;
+        }>)
+      : [];
+    const settled = serverResults.filter((r) => r.ok === true).length;
+    const failed = serverResults.length - settled;
+    // Server now sets `aborted: true` when row 0 failed (the EIP-7702
+    // delegation never landed, so rows 1..N were marked
+    // ABORTED_AFTER_ROW_0_FAILURE without firing). Treat that as
+    // authoritative; fall back to the settled===0 inference for older
+    // server versions that don't send the field yet.
+    const serverAborted =
+      typeof (data as { aborted?: unknown }).aborted === "boolean"
+        ? ((data as { aborted: boolean }).aborted)
+        : null;
+    const isAborted = serverAborted ?? (settled === 0 && failed > 0);
+    const status: BatchPaySummary["status"] =
+      failed === 0
+        ? "success"
+        : isAborted
+          ? "aborted"
+          : "partial_failure";
+
+    guardsApplied.push(
+      "mode=live",
+      "wallet=agentic-server",
+      "scope=multichain (server enforced)",
+      `batch_size=${serverResults.length}/${RECIPIENT_LIMIT_PAID}`,
+    );
+    return {
+      mode: "live",
+      status,
+      result: {
+        ok: failed === 0,
+        scope: "paid",
+        limit: RECIPIENT_LIMIT_PAID,
+        totalSuccess: settled,
+        totalFailed: failed,
+        aborted: isAborted,
+        results: serverResults.map((r) => ({
+          success: r.ok === true,
+          txHash: r.txHash,
+          error: r.error,
+        })),
+      },
+      guardsApplied,
+      senderWallet,
+    };
+  }
+
   const live = isLiveModeFor(resolved);
   if (!live) {
     const sandboxResults = input.recipients.map((r) =>
       sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
     );
-    guardsApplied.push("mode=sandbox");
+    guardsApplied.push("mode=sandbox", `wallet=${effectiveMode}`);
     const reason =
       resolved.sandboxReason ?? describeSandboxReason(resolved.apiKey ?? "", resolved.scope);
     return {
@@ -310,21 +624,26 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     };
   }
 
-  // Pick the local signing key with the same precedence q402_pay uses:
-  // Mode B (Q402_AGENTIC_PRIVATE_KEY) wins when set so a Mode B-only
-  // install — common for users who never want their MetaMask EOA in
-  // the MCP env — actually has a key to sign with. Earlier this
-  // unconditionally read CONFIG.privateKey and crashed with a non-null
-  // assertion on Mode B-only setups.
-  const signingPk = CONFIG.agenticPrivateKey ?? CONFIG.privateKey;
+  // Pick the local signing key based on the effective wallet mode.
+  // Mode C was already handled above (server-mediated). Modes A and B
+  // both sign locally; pick the key matching the user's effective mode
+  // rather than always preferring B, so an explicit Mode A choice isn't
+  // silently routed to the Agent Wallet key.
+  const signingPk: string | null =
+    effectiveMode === "eoa"
+      ? CONFIG.privateKey
+      : effectiveMode === "agentic-local"
+        ? CONFIG.agenticPrivateKey
+        : null;
   if (!signingPk) {
-    guardsApplied.push("mode=sandbox");
+    guardsApplied.push("mode=sandbox", `wallet=${effectiveMode}`);
     const sandboxResults = input.recipients.map((r) =>
       sandboxPay(chain, { to: r.to, amount: r.amount, token: input.token }),
     );
     const reason =
-      "No local signing key configured. Set Q402_AGENTIC_PRIVATE_KEY (Mode B) " +
-      "or Q402_PRIVATE_KEY (Mode A) to sign batch payments locally.";
+      effectiveMode === "agentic-local"
+        ? "Set Q402_AGENTIC_PRIVATE_KEY to your Agent Wallet's exported private key."
+        : "Set Q402_PRIVATE_KEY to your EOA private key.";
     return {
       mode: "sandbox",
       status: "sandbox",
@@ -351,13 +670,13 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       token: input.token,
       recipients: input.recipients.map((r) => ({ to: r.to, amount: r.amount })),
     });
-    guardsApplied.push("mode=live");
+    guardsApplied.push("mode=live", `wallet=${effectiveMode}`);
     guardsApplied.push(`scope=${result.scope} (server enforced)`);
     guardsApplied.push(`batch_size=${input.recipients.length}/${result.limit}`);
     return { mode: "live", status: "success", result, guardsApplied, senderWallet };
   } catch (err) {
     if (err instanceof BatchPayError) {
-      guardsApplied.push("mode=live");
+      guardsApplied.push("mode=live", `wallet=${effectiveMode}`);
       guardsApplied.push(`scope=${err.scope} (server enforced)`);
       guardsApplied.push(`batch_${err.aborted ? "aborted" : "partial_failure"}`);
       const status: BatchPaySummary["status"] = err.aborted ? "aborted" : "partial_failure";
@@ -452,6 +771,18 @@ export const BATCH_PAY_TOOL = {
     "After the first batch on a chain, follow-up batches on the same chain are " +
     "faster and cheaper (Q402 reuses the wallet's setup); q402_clear_delegation " +
     "resets it if the user ever asks. " +
+    "\n\n" +
+    "MULTI-WALLET DISAMBIGUATION — when more than one wallet is configured " +
+    "in the user's env (Q402_PRIVATE_KEY for the real EOA, " +
+    "Q402_AGENTIC_PRIVATE_KEY for the Agent Wallet's exported key, or only " +
+    "Q402_MULTICHAIN_API_KEY for the server-managed Agent Wallet), the tool " +
+    "RETURNS WITHOUT firing with `status='needs_wallet_choice'` and an " +
+    "`ambiguousWalletChoice` payload — relay the question to the user verbatim, " +
+    "then call again with the chosen `walletMode` ('eoa' | 'agentic-local' | " +
+    "'agentic-server'). Do NOT pick a wallet on the user's behalf when multiple " +
+    "are available. Server-mediated batches go through " +
+    "/api/wallet/agentic/batch and are paid-only (the trial key cannot batch). " +
+    "\n\n" +
     "ALWAYS get explicit user confirmation " +
     "of the complete recipient + amount list, chain, and token in conversation immediately " +
     "before calling this tool — the user must approve the full batch, not the individual rows.",
@@ -504,6 +835,26 @@ export const BATCH_PAY_TOOL = {
           'Trial; else Multichain. When auto would land on Trial AND ' +
           'recipients.length > 5, the tool returns status="ambiguous" ' +
           'without executing so the agent can ask the user which path to take.',
+      },
+      walletMode: {
+        type: "string",
+        enum: ["eoa", "agentic-local", "agentic-server"],
+        description:
+          'Which wallet to spend from. "eoa" = user MetaMask EOA ' +
+          '(Q402_PRIVATE_KEY). "agentic-local" = Agent Wallet exported key ' +
+          '(Q402_AGENTIC_PRIVATE_KEY). "agentic-server" = server-managed ' +
+          "Agent Wallet (Q402 holds the key; only the apiKey is needed). " +
+          "When MULTIPLE wallets are configured the tool refuses without this " +
+          "arg and returns ambiguousWalletChoice for the user to pick. Server-" +
+          "mediated batches are paid-only.",
+      },
+      walletId: {
+        type: "string",
+        description:
+          'Server-managed Agent Wallet only (walletMode="agentic-server"). ' +
+          "Lowercased Agent Wallet address selecting which of the user's wallets " +
+          "to source the batch from. Omit to use the default. Ignored for local-" +
+          "signing modes.",
       },
       confirm: {
         type: "boolean",
