@@ -70,7 +70,7 @@ Q402 supports three signing modes — pick ONE:
 |---|---|---|---|
 | **A** | `Q402_PRIVATE_KEY` | your MetaMask EOA, local | Simplest. After the first payment that EOA shows "Smart account" in MetaMask (EIP-7702 delegation, reversible via `q402_clear_delegation`). |
 | **B** | `Q402_AGENTIC_PRIVATE_KEY` | dedicated Agent Wallet, local | Export the PK from the [dashboard](https://q402.quackai.ai/dashboard) Agent tab → Export. Signs locally just like Mode A, but the signer is your Agent Wallet — MetaMask is never touched. Recommended for AI-agent automation. |
-| **C** | (just the paid API key) | dedicated Agent Wallet, server-managed | The encrypted Agent Wallet key lives on the Q402 server and signs on your behalf. No private key on the client. Optionally set `Q402_AGENT_WALLET_ADDRESS` to pick among multiple wallets (max 10 per owner). Mode C requires a paid Multichain API key — not available on the free Trial. |
+| **C** | (just an API key) | dedicated Agent Wallet, server-managed | The encrypted Agent Wallet key lives on the Q402 server and signs on your behalf. No private key on the client. Optionally set `Q402_AGENT_WALLET_ADDRESS` to pick among multiple wallets (max 10 per owner). **One-shot pays** work with either `Q402_TRIAL_API_KEY` (BNB-only sponsored) or `Q402_MULTICHAIN_API_KEY` (paid, all 9 chains). **Recurring** (`q402_recurring_create`) requires the paid Multichain key on every chain, including BNB. |
 
 When more than one signing mode is set at once, `q402_pay` asks the user which to use rather than picking silently. The picker lives in the `walletMode` argument: `"agentic-server"` (Mode C), `"agentic-local"` (Mode B), `"eoa"` (Mode A).
 
@@ -163,7 +163,7 @@ Three signing paths. Pick one when `q402_doctor` asks on first install. You can 
 
 | Mode | Best for | Env to set | Private key in env? |
 |---|---|---|---|
-| **C — Server-managed** (recommended) | Most users. AI agents, automations, anyone who wants payments to "just work". Q402 holds an encrypted Agent Wallet for you; no MetaMask popup, no Smart-account marker. | `Q402_MULTICHAIN_API_KEY` (paid) **or** `Q402_TRIAL_API_KEY` (free BNB) | **No** |
+| **C — Server-managed** (recommended) | Most users. AI agents, automations, anyone who wants payments to "just work". Q402 holds an encrypted Agent Wallet for you; no MetaMask popup, no Smart-account marker. One-shot pays accept either key; **recurring schedules require the paid Multichain key on every chain (BNB included)**. | `Q402_MULTICHAIN_API_KEY` (paid, full surface) **or** `Q402_TRIAL_API_KEY` (free BNB, one-shot only) | **No** |
 | **B — Local Agent Wallet PK** | You want Agent Wallet automation but prefer to hold the PK yourself. Export from the dashboard once. MCP signs locally — key never leaves your machine. Your MetaMask is never touched. | `Q402_AGENTIC_PRIVATE_KEY` + an API key | Yes (Agent Wallet's exported PK) |
 | **A — Your own EOA** | Power users who want their existing MetaMask address to be the on-chain payer. Your EOA signs directly via EIP-7702; the "Smart account" marker after first use is normal + reversible with `q402_clear_delegation`. **Use a fresh wallet.** | `Q402_PRIVATE_KEY` + an API key | Yes (your EOA's PK) |
 

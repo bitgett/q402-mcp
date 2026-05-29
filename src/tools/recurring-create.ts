@@ -69,8 +69,10 @@ export const RecurringCreateInputSchema = z.object({
     .enum(["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable"])
     .default("bnb")
     .describe(
-      "Chain to fire the recurring TX on. Defaults to bnb (the only chain " +
-        "supported on Trial). Non-bnb requires the paid Multichain subscription.",
+      "Chain to fire the recurring TX on. Defaults to bnb. " +
+        "Recurring requires the paid Multichain subscription on EVERY chain, " +
+        "including bnb — Trial keys are rejected at create time with " +
+        "MULTICHAIN_REQUIRED. Trial keys can still pay one-shot via q402_pay on BNB.",
     ),
   token: z
     .enum(["USDC", "USDT"])

@@ -812,8 +812,10 @@ export async function runDoctor(): Promise<DoctorReport> {
         description:
           "Q402 holds an encrypted Agent Wallet for you. You only set an API key — " +
           "no private key in your env, no MetaMask popup, no Smart-account marker on your wallet. " +
-          "Best for AI agents, automations, and anyone who just wants payments to work.",
-        env: ["Q402_MULTICHAIN_API_KEY (paid)", "or Q402_TRIAL_API_KEY (free BNB)"],
+          "Best for AI agents, automations, and anyone who just wants payments to work. " +
+          "One-shot pays accept either key below; recurring schedules require the paid Multichain " +
+          "key on every chain (BNB included).",
+        env: ["Q402_MULTICHAIN_API_KEY (paid — required for recurring)", "or Q402_TRIAL_API_KEY (free BNB, one-shot pays only)"],
         privateKeyRequired: false,
       },
       {
@@ -1042,12 +1044,12 @@ export async function runDoctor(): Promise<DoctorReport> {
      *  "which mode do I use?" or "do I need a private key?". */
     recommendation:
       recommendedMode === "C"
-        ? "You're configured for Mode C — Q402's server signs with your Agent Wallet. No private key needed. Simplest path; recommended for most users."
+        ? "You're configured for Mode C — Q402's server signs with your Agent Wallet. No private key needed. Simplest path; recommended for most users. (One-shot pays accept either Trial or Multichain keys; recurring schedules require the paid Multichain key on every chain.)"
         : recommendedMode === "B"
           ? "You're configured for Mode B — your exported Agent Wallet PK signs locally. Your MetaMask is never touched."
           : recommendedMode === "A"
             ? "You're configured for Mode A — your MetaMask EOA signs directly. EIP-7702 delegates it to Q402 for the call. (If the Smart-account banner in MetaMask is a concern, switch to Mode B or C.)"
-            : "No signing path configured yet. Easiest: set Q402_MULTICHAIN_API_KEY (or Q402_TRIAL_API_KEY for free BNB) and let the server sign — that's Mode C, no PK needed.",
+            : "No signing path configured yet. Easiest: set Q402_MULTICHAIN_API_KEY (paid, recommended) — covers one-shot pays and recurring schedules across all 9 chains. Q402_TRIAL_API_KEY alone unlocks one-shot pays on BNB only; recurring requires the paid key.",
     /** All three modes documented so the AI can answer "what are my
      *  options?" without re-deriving from envState. */
     catalog: [
