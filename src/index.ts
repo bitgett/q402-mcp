@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes nine tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes thirteen tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -22,6 +22,13 @@
  *   q402_wallet_status      read-only, requires key — per-chain EIP-7702
  *   q402_agentic_info       read-only, requires key — Agent Wallet info + balance
  *                           delegation state across all 9 chains
+ *   q402_recurring_list     read-only, requires key — list Agent Wallet's
+ *                           recurring rules + status + next-run time
+ *   q402_recurring_create   write, requires key — author a new recurring
+ *                           rule (single-recipient via MCP path)
+ *   q402_recurring_fires    read-only, requires key — past-fire history of
+ *                           one rule (last 50 with tx hashes + amounts)
+ *   q402_recurring_cancel   write, requires key — stop a recurring rule
  *   q402_clear_delegation   write, requires key — clears the EIP-7702
  *                           delegation on a chain (Q402-sponsored gas, local
  *                           signing)
@@ -77,6 +84,11 @@ import {
   RecurringCancelInputSchema,
   runRecurringCancel,
 } from "./tools/recurring-cancel.js";
+import {
+  RECURRING_FIRES_TOOL,
+  RecurringFiresInputSchema,
+  runRecurringFires,
+} from "./tools/recurring-fires.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -102,6 +114,7 @@ async function main(): Promise<void> {
       AGENTIC_INFO_TOOL,
       RECURRING_LIST_TOOL,
       RECURRING_CREATE_TOOL,
+      RECURRING_FIRES_TOOL,
       RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
     ],
@@ -158,6 +171,10 @@ async function main(): Promise<void> {
         case "q402_recurring_cancel": {
           const parsed = RecurringCancelInputSchema.parse(args ?? {});
           return { content: [jsonText(await runRecurringCancel(parsed))] };
+        }
+        case "q402_recurring_fires": {
+          const parsed = RecurringFiresInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringFires(parsed))] };
         }
         default:
           return {
