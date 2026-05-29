@@ -9,16 +9,14 @@
 >
 > **Trial-scope policy:** API keys minted under the free-trial program (`plan: "trial"`) are restricted to BNB Chain with USDC/USDT — server-side enforcement, returns `403 TRIAL_BNB_ONLY` otherwise. **Paid API keys see the full 9-chain matrix at all times.**
 
-AI agents — Claude (Desktop / Code), OpenAI Codex CLI, Cursor, Cline, and any other MCP-compatible client — can now reason about stablecoin payments end to end: quote a transfer across 9 chains, pick the cheapest route, and (optionally) settle the transaction over [Q402](https://q402.quackai.ai)'s EIP-7702 relayer infrastructure. The recipient receives the full amount; the sender pays $0 in gas.
+Quote → route → (optional) settle stablecoin payments across 9 EVM chains, from any MCP client. Recipient gets the full amount; sender pays $0 gas via [Q402](https://q402.quackai.ai)'s EIP-7702 relayer.
 
 ---
 
 ## Quick start
 
-Two steps:
-
-1. Register the MCP server with your client (one-line install per client).
-2. Open your client and say: **"Set up Q402"**. The agent calls `q402_doctor` which walks you through creating a single secrets file at `~/.q402/mcp.env` and pasting in your API key + private key. Nothing else.
+1. Register the server with your client (one-line per client).
+2. Say **"Set up Q402"** to your agent. It runs `q402_doctor` → creates `~/.q402/mcp.env` → walks you through pasting keys.
 
 ### 1. Register the server
 
@@ -30,12 +28,12 @@ Two steps:
 | **Cline** | Cline → Settings → MCP Servers → Edit JSON. Same shape as Cursor. |
 | **Any other stdio MCP client** | Point it at `npx -y @quackai/q402-mcp`. No client-specific code. |
 
-That's it — secrets are NOT configured here. The MCP server reads them from `~/.q402/mcp.env` at startup (same pattern as AWS CLI / Stripe CLI / gh CLI), so every client uses the same file with no per-client wiring.
+Secrets are NOT in this config. The server reads them from `~/.q402/mcp.env` (same pattern as AWS / Stripe / gh CLIs).
 
 <details>
 <summary>Windows: <code>codex mcp add</code> returns "Access is denied"</summary>
 
-The bundled `codex.exe` on some Windows setups refuses to write its own config from the `mcp add` subcommand. Add the equivalent stanza to `~/.codex/config.toml` by hand:
+Some Windows setups block `codex.exe` from writing its own config. Add the stanza to `~/.codex/config.toml` by hand:
 
 ```toml
 [mcp_servers.q402]
@@ -49,34 +47,30 @@ Then restart Codex. Same effect as `codex mcp add q402 -- npx -y @quackai/q402-m
 
 ### 2. First-time setup
 
-Restart your client, then ask your agent:
+Restart your client, ask: > *"Set up Q402"*
 
-> *"Set up Q402"*
+The agent runs `q402_doctor`. On first install:
 
-The agent calls `q402_doctor`. On first install, the tool tells the agent to:
+1. Creates `~/.q402/mcp.env` (placeholders)
+2. Opens it in your editor
+3. Walks you through pasting an API key + a signing path **into the file, not into chat**
+4. Restart + re-run `q402_doctor` to verify
 
-1. Offer to create `~/.q402/mcp.env` (placeholder values only)
-2. Open the file in your editor (`code` / `open` / `start` / `xdg-open`)
-3. Walk you through pasting in (a) your API key from <https://q402.quackai.ai/event> (free Trial) or <https://q402.quackai.ai/payment> (paid Multichain), and (b) a signing path — **into the file, not into chat**
-4. Restart the client and run `q402_doctor` again to verify
-
-🔒 **Q402 never asks you to paste your private key into chat.** When you use a local signing mode the MCP server signs payments LOCALLY on your machine — your key never leaves your device. Mode C (server-managed Agent Wallet) requires no private key on the client at all.
+🔒 **Keys never paste into chat.** Local modes sign on your machine; the key never leaves the device. Mode C (server-managed) needs no PK on the client.
 
 ### Pick a signing mode
 
-Q402 supports three signing modes — pick ONE:
-
-| Mode | Env you set | Signer | Notes |
+| Mode | Env | Signer | Notes |
 |---|---|---|---|
-| **A** | `Q402_PRIVATE_KEY` | your MetaMask EOA, local | Simplest. After the first payment that EOA shows "Smart account" in MetaMask (EIP-7702 delegation, reversible via `q402_clear_delegation`). |
-| **B** | `Q402_AGENTIC_PRIVATE_KEY` | dedicated Agent Wallet, local | Export the PK from the [dashboard](https://q402.quackai.ai/dashboard) Agent tab → Export. Signs locally just like Mode A, but the signer is your Agent Wallet — MetaMask is never touched. Recommended for AI-agent automation. |
-| **C** | (just an API key) | dedicated Agent Wallet, server-managed | The encrypted Agent Wallet key lives on the Q402 server and signs on your behalf. No private key on the client. Optionally set `Q402_AGENT_WALLET_ADDRESS` to pick among multiple wallets (max 10 per owner). **One-shot pays** work with either `Q402_TRIAL_API_KEY` (BNB-only sponsored) or `Q402_MULTICHAIN_API_KEY` (paid, all 9 chains). **Recurring** (`q402_recurring_create`) requires the paid Multichain key on every chain, including BNB. |
+| **A** | `Q402_PRIVATE_KEY` | MetaMask EOA, local | Simplest. Shows "Smart account" after first use (reversible via `q402_clear_delegation`). |
+| **B** | `Q402_AGENTIC_PRIVATE_KEY` | Agent Wallet, local | Export PK from the [dashboard](https://q402.quackai.ai/dashboard) Agent tab. MetaMask untouched. |
+| **C** | (just an API key) | Agent Wallet, server-managed | No PK on the client. One-shot pays accept Trial or Multichain keys; recurring needs Multichain on every chain (BNB included). |
 
-When more than one signing mode is set at once, `q402_pay` asks the user which to use rather than picking silently. The picker lives in the `walletMode` argument: `"agentic-server"` (Mode C), `"agentic-local"` (Mode B), `"eoa"` (Mode A).
+When more than one mode is set, `q402_pay` asks the user which to use. Picker: `walletMode = "agentic-server" \| "agentic-local" \| "eoa"`.
 
 ### Manual setup (no AI)
 
-Create `~/.q402/mcp.env` yourself. The template below matches what `q402_doctor` writes — every secret line ships empty, with `Q402_ENABLE_REAL_PAYMENTS=1`. Fill in (a) at least one API key and (b) the row(s) for the signing mode you picked. The server only flips into live mode once both a `q402_live_*` API key AND a valid signing path are present, so saving the template as-is is safe (empty values fail the gate and stay in sandbox). Change the flag to `0` to force sandbox even with real keys (e.g. for chained testing).
+Create `~/.q402/mcp.env` yourself with the template below. Live mode only flips when an API key + a signing path are populated, so saving the template as-is stays in sandbox. `Q402_ENABLE_REAL_PAYMENTS=0` forces sandbox even with real keys.
 
 ```bash
 # ~/.q402/mcp.env
@@ -157,52 +151,43 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ---
 
-## Wallet modes — which signing path?
-
-Three signing paths. Pick one when `q402_doctor` asks on first install. You can change later by editing `~/.q402/mcp.env` and restarting your client.
-
-| Mode | Best for | Env to set | Private key in env? |
-|---|---|---|---|
-| **C — Server-managed** (recommended) | Most users. AI agents, automations, anyone who wants payments to "just work". Q402 holds an encrypted Agent Wallet for you; no MetaMask popup, no Smart-account marker. One-shot pays accept either key; **recurring schedules require the paid Multichain key on every chain (BNB included)**. | `Q402_MULTICHAIN_API_KEY` (paid, full surface) **or** `Q402_TRIAL_API_KEY` (free BNB, one-shot only) | **No** |
-| **B — Local Agent Wallet PK** | You want Agent Wallet automation but prefer to hold the PK yourself. Export from the dashboard once. MCP signs locally — key never leaves your machine. Your MetaMask is never touched. | `Q402_AGENTIC_PRIVATE_KEY` + an API key | Yes (Agent Wallet's exported PK) |
-| **A — Your own EOA** | Power users who want their existing MetaMask address to be the on-chain payer. Your EOA signs directly via EIP-7702; the "Smart account" marker after first use is normal + reversible with `q402_clear_delegation`. **Use a fresh wallet.** | `Q402_PRIVATE_KEY` + an API key | Yes (your EOA's PK) |
-
-`q402_doctor` on first install reads your env and recommends one of these based on what's already configured. The default for an empty install is Mode C — simplest path. If multiple modes are configured at once (e.g. both `Q402_PRIVATE_KEY` and `Q402_AGENTIC_PRIVATE_KEY` set), `q402_pay` will ask which one to use before sending so the agent never silently picks the wrong wallet.
-
----
-
 ## Tools exposed
+
+**16 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
-| `q402_doctor` | none | Health check covering BOTH first-install onboarding AND ongoing operational diagnostics. AI calls this when the user says "set up Q402" / "verify Q402" / "why isn't Q402 working". On first install, returns a `recommendedActions[]` payload telling the client to create `~/.q402/mcp.env` and open it in the user's editor. Later phases verify per-scope quota, EIP-7702 delegation state per chain, relay reachability, and surface slot-mismatch warnings (e.g. Trial-tier key sitting in `Q402_MULTICHAIN_API_KEY` would silently burn paid quota). Read-only — no signing, no on-chain action. |
-| `q402_quote` | none | Compare gas cost and supported tokens across chains. Read-only. |
-| `q402_balance` | API key | Verify the API key and report its plan tier + remaining quota credits (live vs sandbox). |
-| `q402_pay` | API key + private key + flag | Send a gasless payment to a single recipient. **Sandbox by default** — see [Sandbox vs live mode](#sandbox-vs-live-mode). |
-| `q402_batch_pay` | API key + private key + flag | Send a gasless payment to **multiple** recipients in one call on a single chain × token. Trial keys: 5 rows max. Paid keys: 20 rows max. **Auto-routing:** same rule as `q402_pay` (BNB + Trial key set ⇒ Trial, else Multichain). **Ambiguity gate:** 6+ recipient BNB batches with Trial set return `status="ambiguous"` instead of executing — the agent asks the user to pick `keyScope="trial"` (first 5), `"multichain"` (all paid), or two calls (5 free + remainder paid). **Supported chains: avax, bnb, eth, mantle, injective, monad, scroll** (default EIP-7702 mode). xlayer + stable are NOT batchable — use `q402_pay` in a loop for those. Same sandbox gating as `q402_pay`. **Rate-limit note:** the inner `/api/relay` budget (30/min per key) is consumed per row, so a paid 20-row batch leaves ~10 inner slots for the next minute. |
-| `q402_receipt` | none | Look up a Trust Receipt by `rct_…` id and locally verify its ECDSA signature against the relayer EOA. Returns the public settlement record + a `verified` boolean. *receiptId-only today; tx-hash lookup reserved for a future release.* |
-| `q402_wallet_status` | private key | Per-chain EIP-7702 delegation status for the EOA derived from `Q402_PRIVATE_KEY`, across all 9 Q402 chains. Read-only — no on-chain action, no quota consumption. Useful as the diagnostic step before `q402_clear_delegation`. |
-| `q402_agentic_info` | API key | Introspect your server-managed Agent Wallets — addresses, per-wallet caps, daily-spend used, ERC-8004 agent id, per-chain sub-balances. Drives Mode C (server-managed) so the agent can see what wallet it's about to pay from without ever holding the private key. Auth is API-key only; no PK needed. Read-only. |
-| `q402_clear_delegation` | private key | Clear the EIP-7702 delegation on a single chain for the configured wallet. Local signing with `Q402_PRIVATE_KEY`; Q402 sponsors the on-chain TX so the user pays $0 gas. After clearing, the next `q402_pay` on that chain recreates a fresh delegation automatically. |
+| `q402_doctor` | none | First-install onboarding + ongoing health check (per-scope quota, EIP-7702 state, relay reachability, slot-mismatch warnings). |
+| `q402_quote` | none | Compare gas + supported tokens across chains. |
+| `q402_balance` | api key | Verify key + remaining quota. |
+| `q402_pay` | live mode | Single-recipient gasless transfer. Sandbox by default. |
+| `q402_batch_pay` | live mode | Up to 20 recipients per call (trial: 5). Same auto-routing as `q402_pay`. 6+ BNB batches with Trial set return `status="ambiguous"` so the agent asks how to split. xlayer + stable not batchable — use `q402_pay` in a loop. |
+| `q402_receipt` | none | Fetch + locally verify a Trust Receipt (`rct_…` id, ECDSA against the relayer EOA). |
+| `q402_wallet_status` | private key | Per-chain EIP-7702 state for the EOA derived from `Q402_PRIVATE_KEY`. |
+| `q402_clear_delegation` | private key | Clear EIP-7702 delegation; Q402 sponsors the on-chain TX. |
+| `q402_agentic_info` | api key | Agent Wallet info (addresses, per-wallet caps, daily-spend used, ERC-8004 id). Drives Mode C. |
+| `q402_recurring_list` | api key | List scheduled rules. |
+| `q402_recurring_create` | api key | Author a recurring rule. Paid Multichain on EVERY chain (BNB included). |
+| `q402_recurring_fires` | api key | Last 50 fires per rule (timestamp + txHashes + amount). |
+| `q402_recurring_pause` | api key | Pause a rule (reversible). |
+| `q402_recurring_resume` | api key | Resume a paused / stopped rule. |
+| `q402_recurring_skip_next` | api key | Skip only the next scheduled fire. |
+| `q402_recurring_cancel` | api key | Permanently stop a rule. |
 
-`q402_pay` and `q402_batch_pay` follow a "confirm in chat first" contract: the tool description instructs the model to never call it without explicit user approval of the recipient address(es), amount(s), chain, and token. For batch calls the user must approve the **full batch**, not the individual rows.
+`q402_pay` + `q402_batch_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
-`q402_receipt` is the natural follow-up: after `q402_pay` returns a `receiptUrl`, hand the agent the `rct_…` id and ask *"verify this receipt"* — the tool re-runs the same canonical-JSON + EIP-191 recovery the receipt page does in the browser, so the verification doesn't depend on trusting any UI. Example prompts that work today:
-
-> *"Pay 0.10 USDT on BNB to 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045, then verify the receipt."*  
-> *"Is `rct_afa5f50bc49a65ebba3b28ab` a real Q402 receipt? Verify the signature."*
-
-> ℹ️ `q402_pay` takes a 0x-prefixed EVM address — ENS names are not resolved by the tool. If your prompt mentions a name like `vitalik.eth`, your AI client needs to resolve it client-side before invoking the tool.
-
-> Per-chain gas tank balances and full transaction history live in the [dashboard](https://q402.quackai.ai/dashboard) — those endpoints require a wallet signature, not a bare API key, so the MCP server points the agent there instead of exposing them.
+> ℹ️ `q402_pay` expects a 0x address — ENS isn't resolved server-side. Resolve client-side first.
+> Per-chain Gas Tank balances + full TX history live in the [dashboard](https://q402.quackai.ai/dashboard) (wallet-signature only).
 
 ---
 
 ## Sandbox vs live mode
 
-By default the MCP server operates in **sandbox mode**: `q402_pay` returns a random fake transaction hash with `success: false` and `sandbox: true`, no funds move, no gas-tank credit is consumed. That makes it safe to plug into any MCP client without worrying about an accidental payment — if the agent misreads the conversation and fires `q402_pay` before you intended, nothing moves AND the response cannot be mistaken for a confirmed settlement.
+**Sandbox default**: `q402_pay` returns a fake `txHash` with `success: false` and `sandbox: true`. No funds, no quota.
 
-To enable real on-chain transactions you need (a) a live API key (`q402_live_*`), (b) at least one valid signing path — Mode A `Q402_PRIVATE_KEY`, Mode B `Q402_AGENTIC_PRIVATE_KEY`, or Mode C (paid Multichain key alone, server-managed Agent Wallet, no PK on the client) — and (c) `Q402_ENABLE_REAL_PAYMENTS=1`. The block below is the template `q402_doctor` writes to `~/.q402/mcp.env`; every secret line ships empty, the live flag defaults to `1`, and the gate only flips when an API key + a valid signing path are populated. Change the flag to `0` to force sandbox even with real keys (e.g. for chained testing on a paid plan):
+**Live** = (a) live API key (`q402_live_*`), (b) a signing path (A / B / C), (c) `Q402_ENABLE_REAL_PAYMENTS=1`. The live flag defaults to `1` — gate only flips when both other conditions are met. Set to `0` to force sandbox even with real keys.
+
+Template `q402_doctor` writes to `~/.q402/mcp.env`:
 
 ```bash
 # ── API key — fill ONE (or both for auto-routing) ──
@@ -233,18 +218,16 @@ Q402_ENABLE_REAL_PAYMENTS=1
 
 Anything missing for the resolved scope → automatic sandbox fallback with a hint pointing at what to set.
 
-> ⚠️ **Sandbox returns a deterministic-looking fake `txHash` but explicitly NOT a success.** Since v0.5.8 every sandbox response carries `success: false` and `sandbox: true` at the top level of the `PayResult` — so a downstream chatbot summary that lifts the `success` field cannot mistakenly tell the user "payment succeeded" when nothing happened. The `txHash` itself is a 32-byte random hex string (visually indistinguishable from a real hash but emitted only when no on-chain TX is broadcast). Combined with the `mode: "sandbox"` and `method: "sandbox"` markers + the `setupHint` field on the wrapping `PaySummary` describing **exactly why** sandbox was selected, you have four independent signals to branch on before showing the user a confirmation message.
+> ⚠️ Sandbox responses carry `success: false`, `sandbox: true`, `mode: "sandbox"`, `method: "sandbox"`, plus a `setupHint` explaining why — four signals so a downstream summary can't claim success.
 
 ### Hard caps
 
-Two additional guards run before every payment regardless of mode:
-
 | Env var | Default | Effect |
 |---|---|---|
-| `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject any single call where `amount > N` USD-equivalent. |
-| `Q402_ALLOWED_RECIPIENTS` | (empty = off) | Comma-separated address allowlist. When set, all other recipients are rejected. |
+| `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject calls with `amount > N` USD. |
+| `Q402_ALLOWED_RECIPIENTS` | off | Comma-separated address allowlist. |
 
-Combined with the `confirm: true` argument the tool requires, this means the model needs (a) explicit user OK in chat, (b) amount ≤ cap, (c) recipient on allowlist if one exists, (d) all three live-mode env vars set, before a single wei moves.
+Combined with `confirm: true` + live-mode env, a payment needs: chat OK + amount ≤ cap + recipient allowed + all 3 live envs.
 
 ---
 
