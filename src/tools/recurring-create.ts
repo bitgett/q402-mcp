@@ -4,19 +4,25 @@
  *
  * Mode-C-only (apiKey auth). Single-recipient — for multi-recipient
  * payroll rules the user opens the dashboard. The recurring scheduler
- * itself handles cancel-window alerts, daily/per-tx cap enforcement,
- * and the hourly heartbeat that drives every cadence (see
- * recurring-trigger in the viz-backend).
+ * itself handles cancel-window alerts, per-tx cap enforcement, and the
+ * hourly heartbeat that drives every cadence. The wallet-level
+ * `dailyLimitUsd` cap does NOT apply to recurring fires (the rule is
+ * the spend ceiling, authorised at create time); it gates manual
+ * `q402_pay` calls only. `perTxMaxUsd` IS re-checked at fire time.
  *
  * Frequency strings (validated server-side):
- *   "hourly:N"      where N is 1..23. Fires every N hours.
+ *   "hourly:N"      N=1..23. Fires every N hours, snapped to the next
+ *                    :00 UTC after the cancel window.
  *   "daily"         once per day at the creation-minute UTC.
  *   "weekly:{day}"  day in {mon,tue,wed,thu,fri,sat,sun}.
  *   "monthly:N"     day-of-month 1..31 (fires last day if shorter).
  *   "monthly:last"  last day of every month.
  *
- * Non-BNB chains require the paid Multichain subscription. Trial
- * Mode-C calls on bnb still work.
+ * Recurring is a paid feature on EVERY chain, including BNB. Trial keys
+ * are rejected at create time with `MULTICHAIN_REQUIRED` even when the
+ * user picks `chain: "bnb"` — trial keys can still pay manually via
+ * `q402_pay`, but scheduled fires consume paid-tier quota and require
+ * the live Multichain subscription.
  *
  * Hits POST /api/wallet/agentic/recurring-by-key { action: "create", ... }.
  */
