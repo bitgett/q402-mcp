@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes thirteen tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes sixteen tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -28,7 +28,13 @@
  *                           rule (single-recipient via MCP path)
  *   q402_recurring_fires    read-only, requires key — past-fire history of
  *                           one rule (last 50 with tx hashes + amounts)
- *   q402_recurring_cancel   write, requires key — stop a recurring rule
+ *   q402_recurring_pause    write, requires key — pause an active rule
+ *                           (reversible via _resume)
+ *   q402_recurring_resume   write, requires key — bring a paused / stopped
+ *                           rule back to active
+ *   q402_recurring_skip_next write, requires key — skip ONLY the next
+ *                           scheduled fire, preserve cadence
+ *   q402_recurring_cancel   write, requires key — permanently stop a rule
  *   q402_clear_delegation   write, requires key — clears the EIP-7702
  *                           delegation on a chain (Q402-sponsored gas, local
  *                           signing)
@@ -89,6 +95,21 @@ import {
   RecurringFiresInputSchema,
   runRecurringFires,
 } from "./tools/recurring-fires.js";
+import {
+  RECURRING_PAUSE_TOOL,
+  RecurringPauseInputSchema,
+  runRecurringPause,
+} from "./tools/recurring-pause.js";
+import {
+  RECURRING_RESUME_TOOL,
+  RecurringResumeInputSchema,
+  runRecurringResume,
+} from "./tools/recurring-resume.js";
+import {
+  RECURRING_SKIP_NEXT_TOOL,
+  RecurringSkipNextInputSchema,
+  runRecurringSkipNext,
+} from "./tools/recurring-skip-next.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -115,6 +136,9 @@ async function main(): Promise<void> {
       RECURRING_LIST_TOOL,
       RECURRING_CREATE_TOOL,
       RECURRING_FIRES_TOOL,
+      RECURRING_PAUSE_TOOL,
+      RECURRING_RESUME_TOOL,
+      RECURRING_SKIP_NEXT_TOOL,
       RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
     ],
@@ -175,6 +199,18 @@ async function main(): Promise<void> {
         case "q402_recurring_fires": {
           const parsed = RecurringFiresInputSchema.parse(args ?? {});
           return { content: [jsonText(await runRecurringFires(parsed))] };
+        }
+        case "q402_recurring_pause": {
+          const parsed = RecurringPauseInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringPause(parsed))] };
+        }
+        case "q402_recurring_resume": {
+          const parsed = RecurringResumeInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringResume(parsed))] };
+        }
+        case "q402_recurring_skip_next": {
+          const parsed = RecurringSkipNextInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRecurringSkipNext(parsed))] };
         }
         default:
           return {
