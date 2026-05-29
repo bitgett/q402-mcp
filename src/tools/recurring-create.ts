@@ -111,13 +111,15 @@ export const RECURRING_CREATE_TOOL = {
     "recipient (use the dashboard for multi-recipient payroll). Pick a " +
     "cadence — hourly:N, daily, weekly:{day}, monthly:N, or monthly:last — " +
     "and a recipient + amount + chain + token. Authenticated by the " +
-    "configured Multichain API key; no private key required. Non-bnb chains " +
-    "need the paid Multichain subscription. Each fire is bounded by the " +
-    "wallet's perTxMax (configured on the dashboard) — the dashboard's " +
-    "dailyLimit cap currently applies to manual sends only, NOT recurring " +
-    "fires, so an attacker with the apiKey could schedule N rules at " +
-    "perTxMax and drain the wallet's USDC balance over time. The user can " +
-    "stop a rule any time via q402_recurring_cancel.",
+    "configured Multichain API key; no private key required. Recurring " +
+    "requires the paid Multichain subscription on EVERY chain including " +
+    "bnb — trial keys are rejected at create time with MULTICHAIN_REQUIRED " +
+    "and should keep using q402_pay for one-shot Trial sends. Each fire is " +
+    "bounded by the wallet's perTxMax (configured on the dashboard) — the " +
+    "dashboard's dailyLimit cap currently applies to manual sends only, NOT " +
+    "recurring fires, so an attacker with the apiKey could schedule N rules " +
+    "at perTxMax and drain the wallet's USDC balance over time. The user " +
+    "can stop a rule any time via q402_recurring_cancel.",
   inputSchema: {
     type: "object" as const,
     properties: {
