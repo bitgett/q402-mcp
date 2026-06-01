@@ -729,6 +729,15 @@ export const PAY_TOOL = {
           "When MULTIPLE wallets are configured the tool refuses without this " +
           "arg and returns ambiguousWalletChoice for the user to pick.",
       },
+      walletId: {
+        type: "string",
+        description:
+          'Server-managed Agent Wallet only (walletMode="agentic-server"). ' +
+          "Lowercased Agent Wallet address selecting which of the user's wallets " +
+          "to spend from when they hold more than one (max 10 per owner). Omit " +
+          "to use the user's default wallet. Ignored for the other walletMode " +
+          "values since those modes carry their own signing key.",
+      },
       confirm: {
         type: "boolean",
         const: true,
