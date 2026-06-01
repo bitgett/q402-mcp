@@ -58,6 +58,22 @@ export const AGENTIC_INFO_TOOL = {
   },
 };
 
+/**
+ * Reputation summary mirrored from the backend's
+ * `app/lib/erc8004-reputation.ts`. Populated only for ERC-8004
+ * graduated wallets — surfaces both the total cross-source aggregate
+ * AND Q402's own weekly heartbeat count, so AI agents can introspect
+ * "how does the world see me" vs "how active has my home rail been
+ * vouching for me".
+ */
+export interface ReputationView {
+  agentId: string;
+  total: { feedbackCount: number; summaryValue: string; valueDecimals: number };
+  fromQ402: { feedbackCount: number; summaryValue: string; valueDecimals: number };
+  scan8004Url: string;
+  lastChecked: number;
+}
+
 export interface AgenticInfoSummary {
   /** True when at least one auth source was usable to read the wallet. */
   configured: boolean;
@@ -80,6 +96,10 @@ export interface AgenticInfoSummary {
   erc8004AgentId: string | null;
   /** Direct link to the agent's 8004scan page when registered. */
   scan8004Url: string | null;
+  /** Two-view on-chain reputation snapshot for graduated wallets. Null
+   *  when the wallet isn't graduated OR the RPC read failed (UI omits
+   *  the surface rather than surface "0 feedback" misleadingly). */
+  reputation: ReputationView | null;
   /** Human-friendly explanation of what's missing or what to do next. */
   setupHint?: string;
   /** Echoes the dashboard URL so the AI can offer a clickable next step. */
@@ -157,6 +177,7 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
       asOf: null,
       erc8004AgentId: null,
       scan8004Url: null,
+      reputation: null,
       dashboardUrl,
       setupHint:
         "No live Q402 API key configured. Run q402_doctor to set one up, or " +
@@ -166,6 +187,7 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
 
   let wallet: WalletJson | null = null;
   let balance: BalanceJson | null = null;
+  let reputation: ReputationView | null = null;
   let fetchError: string | null = null;
 
   try {
@@ -178,9 +200,14 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
       }),
     });
     if (res.ok) {
-      const data = (await res.json()) as { wallet?: WalletJson; balance?: BalanceJson };
+      const data = (await res.json()) as {
+        wallet?: WalletJson;
+        balance?: BalanceJson;
+        reputation?: ReputationView | null;
+      };
       wallet = data.wallet ?? null;
       balance = data.balance ?? null;
+      reputation = data.reputation ?? null;
     } else if (res.status === 404) {
       fetchError = "endpoint_not_deployed";
     } else if (res.status === 410) {
@@ -203,6 +230,7 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
       asOf: null,
       erc8004AgentId: null,
       scan8004Url: null,
+      reputation: null,
       dashboardUrl,
       setupHint:
         fetchError === "endpoint_not_deployed"
@@ -236,6 +264,7 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
     asOf: balance ? new Date(balance.asOf).toISOString() : null,
     erc8004AgentId: wallet.erc8004AgentId,
     scan8004Url: scan8004UrlFor(wallet.erc8004AgentId),
+    reputation,
     dashboardUrl,
     setupHint: wallet.deletedAt
       ? "This Agent Wallet is archived and pending hard-delete. " +
