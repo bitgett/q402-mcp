@@ -181,8 +181,12 @@ async function main(): Promise<void> {
           return { content: [jsonText(await runClearDelegation(parsed))] };
         }
         case "q402_agentic_info": {
-          AgenticInfoInputSchema.parse(args ?? {});
-          return { content: [jsonText(await runAgenticInfo())] };
+          // Forward the parsed input so the optional `walletId` override
+          // reaches `runAgenticInfo` — without this multi-wallet owners
+          // always saw the env-default wallet regardless of what they
+          // typed into the tool call.
+          const parsed = AgenticInfoInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runAgenticInfo(parsed))] };
         }
         case "q402_recurring_list": {
           const parsed = RecurringListInputSchema.parse(args ?? {});
