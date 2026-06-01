@@ -364,7 +364,19 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   // server error. Neither default is honest. Instead, return a structured
   // ambiguous response that prompts the agent to ask the human which path
   // they want — and re-call with explicit keyScope (or split via two calls).
-  const scopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
+  //
+  // EXCEPTION for walletMode="agentic-server": the server-mediated batch
+  // endpoint (/api/wallet/agentic/batch) is paid-only — it rejects Trial
+  // keys outright. If `auto` resolved to Trial here (BNB + ≤
+  // RECIPIENT_LIMIT_TRIAL), Mode C would later 402 server-side and the
+  // user would see "I have a paid key but my batch failed". Force
+  // multichain when the user committed to Mode C — the explicit
+  // user-supplied scope (`trial` / `multichain`) is still respected.
+  const rawScopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
+  const scopeRequest: KeyScopeRequest =
+    effectiveMode === "agentic-server" && rawScopeRequest === "auto"
+      ? "multichain"
+      : rawScopeRequest;
 
   // Explicit trial scope overflow — reject BEFORE the per-row signing
   // loop in client.ts. Without this guard, `keyScope="trial"` with 6+

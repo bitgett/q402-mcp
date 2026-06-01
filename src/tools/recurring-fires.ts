@@ -148,6 +148,21 @@ export async function runRecurringFires(
         "or open the dashboard to view fire history from the UI.",
     };
   }
+  if (!CONFIG.multichainApiKey || !CONFIG.multichainApiKey.startsWith("q402_live_")) {
+    return {
+      configured: false,
+      walletId:   null,
+      ruleId:     input.ruleId,
+      rule:       null,
+      fires:      [],
+      count:      0,
+      dashboardUrl,
+      setupHint:
+        "Recurring payments require a paid Multichain API key " +
+        "(Q402_MULTICHAIN_API_KEY). Trial keys can't see fire history. " +
+        "Activate a paid plan at https://q402.quackai.ai/payment.",
+    };
+  }
 
   const explicitWalletId =
     typeof input.walletId === "string" && input.walletId.length > 0

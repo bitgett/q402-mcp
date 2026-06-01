@@ -97,6 +97,22 @@ export async function runRecurringList(
         "or open the dashboard to create rules from the UI.",
     };
   }
+  // Recurring lookups also gate behind the Multichain key — same scope
+  // as create/cancel. Pre-check locally so Trial-only users hear "you
+  // need a paid key" from the tool instead of the server.
+  if (!CONFIG.multichainApiKey || !CONFIG.multichainApiKey.startsWith("q402_live_")) {
+    return {
+      configured: false,
+      walletId:   null,
+      rules:      [],
+      count:      0,
+      dashboardUrl,
+      setupHint:
+        "Recurring payments require a paid Multichain API key " +
+        "(Q402_MULTICHAIN_API_KEY). Trial keys can't see recurring " +
+        "rules. Activate a paid plan at https://q402.quackai.ai/payment.",
+    };
+  }
 
   const explicitWalletId =
     typeof input.walletId === "string" && input.walletId.length > 0

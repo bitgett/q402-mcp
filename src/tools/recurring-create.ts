@@ -218,6 +218,23 @@ export async function runRecurringCreate(
       dashboardUrl,
     };
   }
+  // Recurring schedules are Multichain-only on the server. The Trial
+  // key never satisfies the recurring scope check, so failing locally
+  // here saves a roundtrip + gives the user an actionable hint instead
+  // of an opaque server-side scope error.
+  if (!CONFIG.multichainApiKey || !CONFIG.multichainApiKey.startsWith("q402_live_")) {
+    return {
+      ok:       false,
+      walletId: null,
+      rule:     null,
+      error:    "MULTICHAIN_KEY_REQUIRED",
+      message:
+        "Recurring payments require a paid Multichain API key " +
+        "(Q402_MULTICHAIN_API_KEY). Trial keys can't schedule recurring " +
+        "rules. Activate a paid plan at https://q402.quackai.ai/payment.",
+      dashboardUrl,
+    };
+  }
 
   const explicitWalletId =
     typeof input.walletId === "string" && input.walletId.length > 0

@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.7.5",
+  "version": "0.7.6",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.7.5",
+      "version": "0.7.6",
       "transport": {
         "type": "stdio"
       },
@@ -46,7 +46,7 @@
         },
         {
           "name": "Q402_ENABLE_REAL_PAYMENTS",
-          "description": "Live-mode switch. 0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash). 1 = real on-chain payments. Default 1 since v0.5.11: safe because mode only flips to live when BOTH a live API key (q402_live_*) AND a valid 32-byte private key are configured. Without those, the server stays in sandbox regardless of this flag.",
+          "description": "Live-mode switch. 0 = sandbox (test mode, no funds move — every q402_pay returns a fake hash). 1 = real on-chain payments. Default 1 since v0.5.11: safe because mode only flips to live when a live API key (q402_live_*) is set AND one of (a) a valid 32-byte private key for local signing modes, OR (b) walletMode=\"agentic-server\" with Q402_MULTICHAIN_API_KEY for the server-managed Agent Wallet path. Without either combination, the server stays in sandbox regardless of this flag.",
           "isRequired": false,
           "isSecret": false,
           "format": "string",

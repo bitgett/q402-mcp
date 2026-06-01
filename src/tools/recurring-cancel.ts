@@ -100,6 +100,19 @@ export async function runRecurringCancel(
       dashboardUrl,
     };
   }
+  if (!CONFIG.multichainApiKey || !CONFIG.multichainApiKey.startsWith("q402_live_")) {
+    return {
+      ok:       false,
+      walletId: null,
+      rule:     null,
+      error:    "MULTICHAIN_KEY_REQUIRED",
+      message:
+        "Recurring payments require a paid Multichain API key " +
+        "(Q402_MULTICHAIN_API_KEY). Activate a paid plan at " +
+        "https://q402.quackai.ai/payment.",
+      dashboardUrl,
+    };
+  }
 
   const explicitWalletId =
     typeof input.walletId === "string" && input.walletId.length > 0
