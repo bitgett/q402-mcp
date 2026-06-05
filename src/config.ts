@@ -318,7 +318,7 @@ export function loadConfig(): Config {
   if (!ENV.Q402_AGENT_WALLET_ADDRESS && ENV.Q402_WALLET_ID) {
     process.stderr.write(
       "[q402-mcp] Q402_WALLET_ID is deprecated — rename to Q402_AGENT_WALLET_ADDRESS. " +
-        "Old name will be removed in v0.8.0.\n",
+        "Old name will be removed in a future release.\n",
     );
   }
   const walletId =
