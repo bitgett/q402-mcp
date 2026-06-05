@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 — gasless USDC/USDT/RLUSD payments across 10 EVM chains. Sixteen tools, sandbox-default.",
+  "description": "Q402 — gasless payments + CCIP bridge on 10 EVM chains. Twenty tools, sandbox-default.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.8.1",
+  "version": "0.8.2",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.8.1",
+      "version": "0.8.2",
       "transport": {
         "type": "stdio"
       },

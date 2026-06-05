@@ -75,6 +75,10 @@ import {
   AgenticInfoInputSchema,
   runAgenticInfo,
 } from "./tools/agentic-info.js";
+import { BRIDGE_QUOTE_TOOL,    BridgeQuoteInputSchema,    runBridgeQuote }    from "./tools/bridge-quote.js";
+import { BRIDGE_SEND_TOOL,     BridgeSendInputSchema,     runBridgeSend }     from "./tools/bridge-send.js";
+import { BRIDGE_HISTORY_TOOL,  BridgeHistoryInputSchema,  runBridgeHistory }  from "./tools/bridge-history.js";
+import { BRIDGE_GAS_TANK_TOOL, BridgeGasTankInputSchema, runBridgeGasTank } from "./tools/bridge-gas-tank.js";
 import {
   RECURRING_LIST_TOOL,
   RecurringListInputSchema,
@@ -141,6 +145,13 @@ async function main(): Promise<void> {
       RECURRING_SKIP_NEXT_TOOL,
       RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
+      // CCIP bridge surface (v0.8.2) — USDC routing on the eth/avax/arbitrum
+      // triangle. Bridge_send is sandbox-only in v0.8.2; live execution
+      // happens through the dashboard until session-binding ships.
+      BRIDGE_QUOTE_TOOL,
+      BRIDGE_SEND_TOOL,
+      BRIDGE_HISTORY_TOOL,
+      BRIDGE_GAS_TANK_TOOL,
     ],
   }));
 
@@ -215,6 +226,22 @@ async function main(): Promise<void> {
         case "q402_recurring_skip_next": {
           const parsed = RecurringSkipNextInputSchema.parse(args ?? {});
           return { content: [jsonText(await runRecurringSkipNext(parsed))] };
+        }
+        case "q402_bridge_quote": {
+          const parsed = BridgeQuoteInputSchema.parse(args ?? {});
+          return await runBridgeQuote(parsed);
+        }
+        case "q402_bridge_send": {
+          const parsed = BridgeSendInputSchema.parse(args ?? {});
+          return await runBridgeSend(parsed);
+        }
+        case "q402_bridge_history": {
+          const parsed = BridgeHistoryInputSchema.parse(args ?? {});
+          return await runBridgeHistory(parsed);
+        }
+        case "q402_bridge_gas_tank": {
+          const parsed = BridgeGasTankInputSchema.parse(args ?? {});
+          return await runBridgeGasTank(parsed);
         }
         default:
           return {
