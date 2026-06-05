@@ -1,7 +1,7 @@
 /**
  * q402_quote — read-only, no API key required.
  *
- * Compares gas costs across the nine chains Q402 relays for, given a payment
+ * Compares gas costs across the ten chains Q402 relays for, given a payment
  * amount and (optional) target chain/token. Lets a Claude agent reason about
  * "where should I send this?" before any signing happens.
  */
@@ -23,10 +23,10 @@ export const QuoteInputSchema = z.object({
         "RLUSD here narrows the quote to chain=\"eth\".",
     ),
   chain: z
-    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll"])
+    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"])
     .optional()
     .describe(
-      "Optional chain filter. When omitted, all 9 chains are compared and ranked by gas cost.",
+      "Optional chain filter. When omitted, all 10 chains are compared and ranked by gas cost.",
     ),
 });
 
@@ -103,7 +103,7 @@ export function runQuote(input: QuoteInput): {
 export const QUOTE_TOOL = {
   name: "q402_quote",
   description:
-    "Compare gas costs and supported tokens across the 9 chains Q402 relays " +
+    "Compare gas costs and supported tokens across the 10 chains Q402 relays " +
     "for (avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll). " +
     "Returns the full chain × token matrix unconditionally — this tool does " +
     "not read any API key, so it can't filter by trial vs multichain scope. " +
@@ -129,7 +129,7 @@ export const QUOTE_TOOL = {
       chain: {
         type: "string",
         enum: CHAIN_KEYS as readonly string[],
-        description: "Optional chain filter; omit to compare all 9.",
+        description: "Optional chain filter; omit to compare all 10.",
       },
     },
     required: ["amount"],

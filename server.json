@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 — gasless USDC/USDT/RLUSD payments across 9 EVM chains. Sixteen tools (incl. recurring schedule + per-rule fire history + pause/resume/skip-next), sandbox by default.",
+  "description": "Q402 — gasless USDC/USDT/RLUSD payments across 10 EVM chains. Sixteen tools (incl. recurring schedule + per-rule fire history + pause/resume/skip-next), sandbox by default.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.7.6",
+  "version": "0.8.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.7.6",
+      "version": "0.8.0",
       "transport": {
         "type": "stdio"
       },
@@ -25,7 +25,7 @@
         },
         {
           "name": "Q402_MULTICHAIN_API_KEY",
-          "description": "Recommended path: skip this UI and run `q402_doctor` after install — it stores secrets in ~/.q402/mcp.env, which the server auto-loads. Fill this field directly ONLY if your MCP client manages secrets for you. Value is a Paid Multichain API key from https://q402.quackai.ai/payment — full 9-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments and whenever keyScope='multichain' is chosen.",
+          "description": "Recommended path: skip this UI and run `q402_doctor` after install — it stores secrets in ~/.q402/mcp.env, which the server auto-loads. Fill this field directly ONLY if your MCP client manages secrets for you. Value is a Paid Multichain API key from https://q402.quackai.ai/payment — full 10-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments and whenever keyScope='multichain' is chosen.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"

@@ -144,7 +144,7 @@ export interface DoctorReport {
 
   /** Live-check phase only — per-chain EIP-7702 delegation snapshot.
    *  `undefined` when wallet derivation failed (Q402_PRIVATE_KEY malformed);
-   *  empty array would falsely read as "all 9 chains undelegated". */
+   *  empty array would falsely read as "all 10 chains undelegated". */
   delegation?: DelegationState[] | undefined;
 
   /** Live-check phase only — relay reachability + latency. */
@@ -262,7 +262,7 @@ const ENV_FILE_TEMPLATE = `# ━━━━━━━━━━━━━━━━━
 # Get one at:        https://q402.quackai.ai/event
 Q402_TRIAL_API_KEY=
 
-# Paid Multichain:   all 9 chains, per-chain Gas Tank
+# Paid Multichain:   all 10 chains, per-chain Gas Tank
 # Get one at:        https://q402.quackai.ai/payment
 Q402_MULTICHAIN_API_KEY=
 
@@ -635,7 +635,7 @@ export async function runDoctor(): Promise<DoctorReport> {
     ),
     Q402_MULTICHAIN_API_KEY: envSlot(
       "Q402_MULTICHAIN_API_KEY",
-      "Paid Multichain — all 9 chains, per-chain Gas Tank. Get at https://q402.quackai.ai/payment",
+      "Paid Multichain — all 10 chains, per-chain Gas Tank. Get at https://q402.quackai.ai/payment",
     ),
     Q402_PRIVATE_KEY: envSlot(
       "Q402_PRIVATE_KEY",
@@ -672,7 +672,7 @@ export async function runDoctor(): Promise<DoctorReport> {
   const missing: string[] = [];
   if (!CONFIG.trialApiKey && !CONFIG.multichainApiKey && !CONFIG.legacyApiKey) {
     missing.push(
-      "An API key (Q402_TRIAL_API_KEY for free BNB OR Q402_MULTICHAIN_API_KEY for paid 9-chain)",
+      "An API key (Q402_TRIAL_API_KEY for free BNB OR Q402_MULTICHAIN_API_KEY for paid 10-chain)",
     );
   }
 
@@ -933,7 +933,7 @@ export async function runDoctor(): Promise<DoctorReport> {
   }
 
   // delegation stays `undefined` (not `[]`) when wallet derivation failed,
-  // so the AI can distinguish "9 chains all undelegated" from "we couldn't
+  // so the AI can distinguish "10 chains all undelegated" from "we couldn't
   // even ask because the private key is bad".
   //
   // F9 mitigation: don't issue a redundant pingRelay() call here when we're
@@ -1049,7 +1049,7 @@ export async function runDoctor(): Promise<DoctorReport> {
           ? "You're configured for Mode B — your exported Agent Wallet PK signs locally. Your MetaMask is never touched."
           : recommendedMode === "A"
             ? "You're configured for Mode A — your MetaMask EOA signs directly. EIP-7702 delegates it to Q402 for the call. (If the Smart-account banner in MetaMask is a concern, switch to Mode B or C.)"
-            : "No signing path configured yet. Easiest: set Q402_MULTICHAIN_API_KEY (paid, recommended) — covers one-shot pays and recurring schedules across all 9 chains. Q402_TRIAL_API_KEY alone unlocks one-shot pays on BNB only; recurring requires the paid key.",
+            : "No signing path configured yet. Easiest: set Q402_MULTICHAIN_API_KEY (paid, recommended) — covers one-shot pays and recurring schedules across all 10 chains. Q402_TRIAL_API_KEY alone unlocks one-shot pays on BNB only; recurring requires the paid key.",
     /** All three modes documented so the AI can answer "what are my
      *  options?" without re-deriving from envState. */
     catalog: [
@@ -1091,7 +1091,7 @@ export async function runDoctor(): Promise<DoctorReport> {
               ? "Wallet: server-managed (Mode C) — Q402 holds your Agent Wallet key. No local wallet to show."
               : "(wallet derive failed — check Q402_PRIVATE_KEY or Q402_AGENTIC_PRIVATE_KEY in ~/.q402/mcp.env)",
           "Q402 is live. You can now ask me to quote, pay, batch-pay, or check Trust Receipts.",
-          "Want me to run a quick gas comparison across all 9 chains as a smoke test?",
+          "Want me to run a quick gas comparison across all 10 chains as a smoke test?",
           "Need to chain-test against sandbox without changing keys? Set Q402_ENABLE_REAL_PAYMENTS=0 in ~/.q402/mcp.env and restart - every q402_pay returns a fake hash until you flip it back to 1.",
         ]
       : [

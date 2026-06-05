@@ -1,15 +1,15 @@
 # @quackai/q402-mcp
 
-> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 9 EVM chains, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
+> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 10 EVM chains, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
 
 [![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
 [![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
 
 > **🎟️ Free trial available (2026-05-19 → 2026-06-30)** — 2,000 gasless transactions on BNB Chain (USDC + USDT), 30-day window, no card. One wallet signature: <https://q402.quackai.ai>.
 >
-> **Trial-scope policy:** API keys minted under the free-trial program (`plan: "trial"`) are restricted to BNB Chain with USDC/USDT — server-side enforcement, returns `403 TRIAL_BNB_ONLY` otherwise. **Paid API keys see the full 9-chain matrix at all times.**
+> **Trial-scope policy:** API keys minted under the free-trial program (`plan: "trial"`) are restricted to BNB Chain with USDC/USDT — server-side enforcement, returns `403 TRIAL_BNB_ONLY` otherwise. **Paid API keys see the full 10-chain matrix at all times.**
 
-Quote → route → (optional) settle stablecoin payments across 9 EVM chains, from any MCP client. Recipient gets the full amount; sender pays $0 gas via [Q402](https://q402.quackai.ai)'s EIP-7702 relayer.
+Quote → route → (optional) settle stablecoin payments across 10 EVM chains, from any MCP client. Recipient gets the full amount; sender pays $0 gas via [Q402](https://q402.quackai.ai)'s EIP-7702 relayer.
 
 ---
 
@@ -77,7 +77,7 @@ Create `~/.q402/mcp.env` yourself with the template below. Live mode only flips 
 
 # ── API key (pick one or both for auto-routing) ──
 Q402_TRIAL_API_KEY=          # Free Trial, BNB only (from /event)
-Q402_MULTICHAIN_API_KEY=     # Paid Multichain, all 9 chains (from /payment)
+Q402_MULTICHAIN_API_KEY=     # Paid Multichain, all 10 chains (from /payment)
 
 # ── Signing path — pick ONE of Mode A / B / C ──
 # Mode A: your MetaMask EOA's hex private key.
@@ -143,7 +143,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 `q402_quote` works with zero configuration — no API key, no private key, no env file. Ask:
 
-> *"Compare gas costs to send 50 USDC to vitalik.eth across all 9 Q402 chains."*
+> *"Compare gas costs to send 50 USDC to vitalik.eth across all 10 Q402 chains."*
 
 ---
 
@@ -193,12 +193,12 @@ Template `q402_doctor` writes to `~/.q402/mcp.env`:
 # ── API key — fill ONE (or both for auto-routing) ──
 # Auto-routing (same for q402_pay AND q402_batch_pay):
 #   chain="bnb" + Q402_TRIAL_API_KEY set  → Trial (free sponsored)
-#   anything else                          → Multichain (paid 9-chain)
+#   anything else                          → Multichain (paid 10-chain)
 # Batch ambiguity: 6+ recipient BNB batch with Trial set returns
 #   status="ambiguous" instead of executing — agent asks user to pick.
 # Override per call with keyScope: "auto" | "trial" | "multichain".
 Q402_TRIAL_API_KEY=                # BNB-only sponsored Trial key (from /event)
-Q402_MULTICHAIN_API_KEY=           # paid 9-chain key (per-chain Gas Tank)
+Q402_MULTICHAIN_API_KEY=           # paid 10-chain key (per-chain Gas Tank)
 
 # ── Signing path — pick ONE of Mode A / B / C ──
 Q402_PRIVATE_KEY=                  # Mode A: real EOA pk (0x + 64 hex)
@@ -236,7 +236,7 @@ Combined with `confirm: true` + live-mode env, a payment needs: chat OK + amount
 | Env var | Required for | Notes |
 |---|---|---|
 | `Q402_TRIAL_API_KEY` | live-pay (BNB) | BNB-only sponsored Trial key. Free at https://q402.quackai.ai/event. Auto-routed for `chain="bnb"` in both `q402_pay` and `q402_batch_pay` (≤5 recipients) when set. 6+ recipient BNB batches return `status="ambiguous"` so the agent can ask the user how to split. |
-| `Q402_MULTICHAIN_API_KEY` | live-pay (9-chain) | Paid 9-chain key. Get one at https://q402.quackai.ai/payment. Auto-routed for non-BNB chains AND for BNB when no Trial key is set. Cap: 20 recipients per batch. Required for Mode C (server-managed Agent Wallet). |
+| `Q402_MULTICHAIN_API_KEY` | live-pay (10-chain) | Paid 10-chain key. Get one at https://q402.quackai.ai/payment. Auto-routed for non-BNB chains AND for BNB when no Trial key is set. Cap: 20 recipients per batch. Required for Mode C (server-managed Agent Wallet). |
 | `Q402_PRIVATE_KEY` | Mode A | Hex private key of your MetaMask EOA. Signer for local Mode A. **Never share. Never paste in chat.** |
 | `Q402_AGENTIC_PRIVATE_KEY` | Mode B | Exported Agent Wallet hex private key from the dashboard (Agent tab → Export). Signs locally, but the signer is your dedicated Agent Wallet — MetaMask is never touched. **Never share. Never paste in chat.** |
 | `Q402_AGENT_WALLET_ADDRESS` | Mode C (optional) | When you have multiple server-managed Agent Wallets (max 10 per owner), set this to the lowercased 0x… address of the one Q402 should spend from. Omit to use the default wallet. Ignored in Modes A/B. |
@@ -274,7 +274,7 @@ If you set up Q402 before v0.5.0 you may have a single `Q402_API_KEY` env var. T
 
 AI agents are becoming the default interface for software, but the moment they need to move money the stack breaks: holding gas tokens, signing every transaction, managing wallets across many chains. None of that scales when the agent is supposed to act on its own.
 
-Q402 is the payment layer for that gap. A single signing primitive (EIP-712 + EIP-7702) settles gasless stablecoin payments across 9 EVM chains, with an ECDSA-signed Trust Receipt for every transaction. The MCP package exposes that surface inside Claude, Codex, Cursor, and Cline — your agent can quote, send, batch, and audit payments from a natural-language prompt.
+Q402 is the payment layer for that gap. A single signing primitive (EIP-712 + EIP-7702) settles gasless stablecoin payments across 10 EVM chains, with an ECDSA-signed Trust Receipt for every transaction. The MCP package exposes that surface inside Claude, Codex, Cursor, and Cline — your agent can quote, send, batch, and audit payments from a natural-language prompt.
 
 Single transfers and multi-recipient batches ship today. The next layer — recurring payouts, conditional execution, and policy-gated treasury automation — is the same primitive composed differently. We're building toward agents that operate real budgets, settle among themselves, and move value through workflows no human triggers manually.
 

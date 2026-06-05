@@ -9,7 +9,7 @@
  * this file *and* the @quackai/q402-mcp version in lock-step.
  *
  * Emergency BNB-only narrowing: `BNB_FOCUS_MODE` (defined below) is currently
- * false — the full 9-chain matrix is live. The flag stays in the module as a
+ * false — the full 10-chain matrix is live. The flag stays in the module as a
  * one-line revert path in case we ever need to temporarily collapse the
  * supported set to BNB. Trial-key restrictions are enforced server-side
  * via TRIAL_BNB_ONLY (separate code path) and don't depend on this flag.
@@ -24,7 +24,8 @@ export type ChainKey =
   | "mantle"
   | "injective"
   | "monad"
-  | "scroll";
+  | "scroll"
+  | "arbitrum";
 
 export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "avax",
@@ -36,6 +37,7 @@ export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "injective",
   "monad",
   "scroll",
+  "arbitrum",
 ];
 
 export interface TokenInfo {
@@ -197,10 +199,26 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     approxGasCostUsd: 0.001,
     note: "zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). Data-availability cost dominates per-tx gas.",
   },
+  arbitrum: {
+    key: "arbitrum",
+    name: "Arbitrum One",
+    chainId: 42161,
+    domainName: "Q402 Arbitrum",
+    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    gasToken: "ETH",
+    explorer: "https://arbiscan.io",
+    // Native Circle USDC (CCTP) + canonical Tether on Arbitrum One.
+    // The legacy bridged USDC.e (0xFF970A61...) is intentionally NOT supported.
+    usdc: { address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", decimals: 6 },
+    usdt: { address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", decimals: 6 },
+    supportedTokens: ["USDC", "USDT"],
+    approxGasCostUsd: 0.001,
+    note: "Optimistic Rollup L2 — EIP-7702 live on Arbitrum One since ArbOS 40 'Callisto'; ArbOS 51 'Dia' (activated 2026-01-08) refined precompile delegation. Data-availability cost dominates per-tx gas.",
+  },
 };
 
 // ─── BNB-only emergency flag (mirrors q402-landing app/lib/feature-flags.ts) ──
-// Currently false: the full 9-chain matrix is live. The flag exists as a
+// Currently false: the full 10-chain matrix is live. The flag exists as a
 // one-line revert path — flipping to true rewrites `supportedTokens` for
 // every non-BNB chain to [] at module load, which makes every non-BNB
 // quote/pay call produce a single deterministic rejection message. The

@@ -36,7 +36,7 @@ const DEFAULT_RPC: Record<number, string> = {
 
 export const ClearDelegationInputSchema = z.object({
   chain: z
-    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll"])
+    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"])
     .describe("Which Q402 chain to clear the delegation on."),
 });
 

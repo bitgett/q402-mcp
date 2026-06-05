@@ -69,7 +69,7 @@ const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 // /api/relay/batch rejects those chains regardless, but failing here gets
 // the error in front of the agent instead of after a round-trip.
 export const BatchPayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll"]),
+  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum"]),
   token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
     "Stablecoin symbol. USDC / USDT supported on most chains (Injective is " +
       "USDT-only). RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
@@ -104,7 +104,7 @@ export const BatchPayInputSchema = z.object({
         'the tool returns status="ambiguous" WITHOUT executing so the agent ' +
         'can ask the user which path to take. Use keyScope="trial" to force ' +
         'the BNB-only sponsored key (≤5 recipients). keyScope="multichain" ' +
-        'forces the paid 9-chain key (≤20 recipients).',
+        'forces the paid 10-chain key (≤20 recipients).',
     ),
   walletMode: z
     .enum(["eoa", "agentic-local", "agentic-server"])
@@ -743,7 +743,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   if (noEnable) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route to the right tier: trial scope → /event (free 2k TX, BNB only),
-  // multichain scope → /payment (paid plan, all 9 chains).
+  // multichain scope → /payment (paid plan, all 10 chains).
   const tier = scope === "trial" ? "Free Trial" : "Multichain";
   const url  =
     scope === "trial"
@@ -806,7 +806,7 @@ export const BATCH_PAY_TOOL = {
         // Narrower than the full chain set — xlayer and stable are NOT batchable
         // (chain-specific nonce field shapes). Use q402_pay in a loop for
         // those chains.
-        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll"],
+        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum"],
         description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here — use q402_pay in a loop.",
       },
       token: {

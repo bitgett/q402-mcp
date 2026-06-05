@@ -2,7 +2,7 @@
  * q402_wallet_status — read-only, no API key required.
  *
  * Reports the EIP-7702 delegation state of the EOA derived from
- * Q402_PRIVATE_KEY across all 9 Q402-supported chains. Read-only:
+ * Q402_PRIVATE_KEY across all 10 Q402-supported chains. Read-only:
  * no signing, no funds movement, no quota consumption.
  *
  * Useful as the diagnostic companion to `q402_clear_delegation` —
@@ -97,7 +97,7 @@ export const WALLET_STATUS_TOOL = {
   name: "q402_wallet_status",
   description:
     "Report the EIP-7702 delegation status of your Q402 wallet (the EOA " +
-    "derived from Q402_PRIVATE_KEY) across all 9 Q402-supported chains. " +
+    "derived from Q402_PRIVATE_KEY) across all 10 Q402-supported chains. " +
     "Returns per-chain { delegated, impl } and a one-line summary. Read-" +
     "only — no signing, no on-chain TX, no quota consumption. Pair with " +
     "q402_clear_delegation when the user wants to reset a specific chain. " +

@@ -66,7 +66,7 @@ export const RecurringCreateInputSchema = z.object({
         "Counted in the same unit as `token` (USDC or USDT, both 1:1 USD).",
     ),
   chain: z
-    .enum(["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable"])
+    .enum(["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum"])
     .default("bnb")
     .describe(
       "Chain to fire the recurring TX on. Defaults to bnb. " +
@@ -149,7 +149,7 @@ export const RECURRING_CREATE_TOOL = {
       },
       chain: {
         type: "string" as const,
-        enum: ["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable"],
+        enum: ["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum"],
         description: "Default 'bnb'. Recurring requires the paid Multichain subscription on EVERY chain (BNB included) — trial keys are rejected with MULTICHAIN_REQUIRED.",
       },
       token: {
