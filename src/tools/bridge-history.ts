@@ -21,17 +21,24 @@ export const BRIDGE_HISTORY_TOOL = {
   inputSchema: {
     type: "object" as const,
     properties: {
-      ownerAddress: { type: "string" as const, description: "Owner address (optional)" },
+      ownerAddress: {
+        type: "string" as const,
+        pattern: "^0x[0-9a-fA-F]{40}$",
+        description: "Owner EOA (0x address, optional — defaults to configured wallet).",
+      },
     },
   },
 };
 
 export async function runBridgeHistory(_input: z.infer<typeof BridgeHistoryInputSchema>) {
+  // isError: true so an LLM doesn't parse the prose as a successful empty
+  // array. We're explicitly saying "this surface isn't wired here yet".
   return {
     content: [{
       type: "text" as const,
-      text: "Bridge history via MCP requires owner-sig auth, which is dashboard-managed in v0.8.2. " +
+      text: "Bridge history via MCP requires owner-sig auth, which is dashboard-managed in v0.8.3. " +
             "View at https://q402.quackai.ai/dashboard → Agent tab → Bridge History.",
     }],
+    isError: true,
   };
 }

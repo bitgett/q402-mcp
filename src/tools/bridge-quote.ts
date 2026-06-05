@@ -25,10 +25,26 @@ export const BRIDGE_QUOTE_TOOL = {
   inputSchema: {
     type: "object" as const,
     properties: {
-      src:          { type: "string" as const, enum: ["eth", "avax", "arbitrum"], description: "Source chain" },
-      dst:          { type: "string" as const, enum: ["eth", "avax", "arbitrum"], description: "Destination chain (must differ from src)" },
-      amount:       { type: "string" as const, description: "USDC amount in raw 6-decimal units" },
-      destReceiver: { type: "string" as const, description: "Destination receiver (0x address)" },
+      src: {
+        type: "string" as const,
+        enum: ["eth", "avax", "arbitrum"],
+        description: "Source chain.",
+      },
+      dst: {
+        type: "string" as const,
+        enum: ["eth", "avax", "arbitrum"],
+        description: "Destination chain (MUST differ from src; pool only routes inside the 3-chain triangle).",
+      },
+      amount: {
+        type: "string" as const,
+        pattern: "^[0-9]+$",
+        description: "USDC amount in raw 6-decimal units (e.g. '1000000' = 1 USDC). Integer string only.",
+      },
+      destReceiver: {
+        type: "string" as const,
+        pattern: "^0x[0-9a-fA-F]{40}$",
+        description: "Destination receiver (0x 20-byte address). Same EOA on the destination chain.",
+      },
     },
     required: ["src", "dst", "amount", "destReceiver"],
   },
@@ -41,13 +57,31 @@ export async function runBridgeQuote(input: z.infer<typeof BridgeQuoteInputSchem
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  const data = await res.json();
+  type FeeSlice = { raw: string; whole: number; usd: number };
+  type QuoteData = {
+    recommended?: "link" | "native";
+    fee?: { link?: FeeSlice; native?: FeeSlice };
+  };
+  const data = (await res.json()) as QuoteData;
   if (!res.ok) {
     return { content: [{ type: "text" as const, text: `Quote failed (HTTP ${res.status}): ${JSON.stringify(data)}` }], isError: true };
   }
+  // Surface the cheaper option as a one-liner so the agent doesn't have
+  // to parse the blob to compare fees. Full quote follows in the second
+  // block for traceability.
+  const recommended = data.recommended;
+  const link = data.fee?.link;
+  const native = data.fee?.native;
+  const otherKey = recommended === "link" ? "native" : "link";
+  const recUsd = recommended ? data.fee?.[recommended]?.usd : undefined;
+  const otherUsd = recommended ? data.fee?.[otherKey]?.usd : undefined;
+  const cheaper = recommended && typeof recUsd === "number"
+    ? `Cheaper: ${recommended.toUpperCase()} (~$${recUsd.toFixed(4)} vs $${(otherUsd ?? 0).toFixed(4)})`
+    : "Quote returned.";
   return {
     content: [
-      { type: "text" as const, text: JSON.stringify(data, null, 2) },
+      { type: "text" as const, text: cheaper },
+      { type: "text" as const, text: JSON.stringify({ recommended, link, native }, null, 2) },
     ],
   };
 }

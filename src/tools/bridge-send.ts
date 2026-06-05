@@ -12,7 +12,6 @@
  */
 
 import { z } from "zod";
-import { CONFIG } from "../config.js";
 
 export const BridgeSendInputSchema = z.object({
   src: z.enum(["eth", "avax", "arbitrum"]).describe("Source chain"),
@@ -36,12 +35,34 @@ export const BRIDGE_SEND_TOOL = {
   inputSchema: {
     type: "object" as const,
     properties: {
-      src:      { type: "string" as const, enum: ["eth", "avax", "arbitrum"] },
-      dst:      { type: "string" as const, enum: ["eth", "avax", "arbitrum"] },
-      amount:   { type: "string" as const, description: "USDC amount in raw 6-decimal units" },
-      walletId: { type: "string" as const, description: "Agentic Wallet ID" },
-      feeToken: { type: "string" as const, enum: ["LINK", "native", "auto"], description: "Default: LINK" },
-      sandbox:  { type: "boolean" as const, description: "Sandbox-only. Default true. Set to false for live bridge." },
+      src: {
+        type: "string" as const,
+        enum: ["eth", "avax", "arbitrum"],
+        description: "Source chain.",
+      },
+      dst: {
+        type: "string" as const,
+        enum: ["eth", "avax", "arbitrum"],
+        description: "Destination chain (MUST differ from src).",
+      },
+      amount: {
+        type: "string" as const,
+        pattern: "^[0-9]+$",
+        description: "USDC amount in raw 6-decimal units (e.g. '1000000' = 1 USDC). Integer string only.",
+      },
+      walletId: {
+        type: "string" as const,
+        description: "Agentic Wallet ID (from q402_agentic_info).",
+      },
+      feeToken: {
+        type: "string" as const,
+        enum: ["LINK", "native", "auto"],
+        description: "Fee token. Default: LINK (~10% cheaper). 'auto' picks cheaper at quote time.",
+      },
+      sandbox: {
+        type: "boolean" as const,
+        description: "Sandbox-only in v0.8.3 (live bridging requires dashboard session-binding). Default true.",
+      },
     },
     required: ["src", "dst", "amount", "walletId"],
   },
