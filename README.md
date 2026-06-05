@@ -153,7 +153,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**16 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**20 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -173,8 +173,12 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_recurring_resume` | api key | Resume a paused / stopped rule. |
 | `q402_recurring_skip_next` | api key | Skip only the next scheduled fire. |
 | `q402_recurring_cancel` | api key | Permanently stop a rule. |
+| `q402_bridge_quote` | none | Quote a Chainlink CCIP USDC bridge across eth/avax/arbitrum. Returns LINK + native fee. |
+| `q402_bridge_send` | live mode | Execute the bridge. v0.8.2 ships sandbox-only; live execution lands once session-binding ships. |
+| `q402_bridge_history` | api key | Recent CCIP bridges (50 most recent). |
+| `q402_bridge_gas_tank` | api key | Per-chain LINK + native Gas Tank balance for bridge fees. |
 
-`q402_pay` + `q402_batch_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
+`q402_pay` + `q402_batch_pay` + `q402_bridge_send` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
 > ℹ️ `q402_pay` expects a 0x address — ENS isn't resolved server-side. Resolve client-side first.
 > Per-chain Gas Tank balances + full TX history live in the [dashboard](https://q402.quackai.ai/dashboard) (wallet-signature only).
