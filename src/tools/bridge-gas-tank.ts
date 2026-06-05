@@ -6,9 +6,10 @@
  * the 3 CCIP chains (eth/avax/arbitrum). Surfaces deposit addresses for
  * top-ups.
  *
- * v0.8.3: read-only guidance — full balance fetch requires owner-sig auth
- * which lands in a follow-up release. Tool exists today so doctor/agents
- * can route users to the dashboard's Bridge Gas Tank section.
+ * Current release: read-only guidance — full balance fetch requires
+ * owner-sig auth which lands in a follow-up. Tool exists today so
+ * doctor/agents can route users to the dashboard's Bridge Gas Tank
+ * section.
  */
 
 import { z } from "zod";
@@ -22,7 +23,7 @@ export const BRIDGE_GAS_TANK_TOOL = {
   description:
     "Report the user's Bridge Gas Tank state — LINK + native balance per CCIP chain (eth/avax/arbitrum). " +
     "Q402 charges no markup on bridges; users pay only the actual Chainlink CCIP fee, debited from this Gas Tank. " +
-    "LINK fees are ~10% cheaper than native. Tool returns guidance + dashboard URL in v0.8.3.",
+    "LINK fees are ~10% cheaper than native. Tool returns guidance + dashboard URL until owner-sig wiring lands.",
   inputSchema: {
     type: "object" as const,
     properties: {

@@ -61,7 +61,7 @@ export const BRIDGE_SEND_TOOL = {
       },
       sandbox: {
         type: "boolean" as const,
-        description: "Sandbox-only in v0.8.3 (live bridging requires dashboard session-binding). Default true.",
+        description: "Sandbox-only at the current release (live bridging requires dashboard session-binding). Default true.",
       },
     },
     required: ["src", "dst", "amount", "walletId"],
@@ -85,16 +85,16 @@ export async function runBridgeSend(input: z.infer<typeof BridgeSendInputSchema>
     };
   }
 
-  // Live mode — v1 deferred. /api/ccip/send requires intent-bound EIP-712
+  // Live mode — deferred. /api/ccip/send requires intent-bound EIP-712
   // signature ("ccip.bridge" action) which the MCP CLI can't obtain on
   // its own; it must come from the dashboard or a doctor-bound session.
-  // v0.8.2 ships bridge_send as sandbox-only — agents can plan and quote
-  // but the actual execution happens via the dashboard for now. Live MCP
-  // execution will land once session-binding is plumbed (planned 0.8.x).
+  // bridge_send currently ships as sandbox-only — agents can plan and
+  // quote but the actual execution happens via the dashboard. Live MCP
+  // execution will land once session-binding is plumbed.
   return {
     content: [{
       type: "text" as const,
-      text: "Live CCIP bridge via MCP is not yet wired in v0.8.2 — agents can quote and plan via " +
+      text: "Live CCIP bridge via MCP is not yet wired — agents can quote and plan via " +
             "q402_bridge_quote and q402_bridge_send (sandbox), but actual execution must happen via " +
             "https://q402.quackai.ai/dashboard for now. Live MCP execution lands in a follow-up release.",
     }],

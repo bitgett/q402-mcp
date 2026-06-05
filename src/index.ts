@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes sixteen tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes twenty tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -145,9 +145,9 @@ async function main(): Promise<void> {
       RECURRING_SKIP_NEXT_TOOL,
       RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
-      // CCIP bridge surface (v0.8.2) — USDC routing on the eth/avax/arbitrum
-      // triangle. Bridge_send is sandbox-only in v0.8.2; live execution
-      // happens through the dashboard until session-binding ships.
+      // CCIP bridge surface — USDC routing on the eth/avax/arbitrum
+      // triangle. Bridge_send is sandbox-only; live execution happens
+      // through the dashboard until session-binding ships.
       BRIDGE_QUOTE_TOOL,
       BRIDGE_SEND_TOOL,
       BRIDGE_HISTORY_TOOL,
