@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.8.8",
+  "version": "0.8.9",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.8.8",
+      "version": "0.8.9",
       "transport": {
         "type": "stdio"
       },
@@ -84,7 +84,7 @@
         },
         {
           "name": "Q402_API_KEY",
-          "description": "DEPRECATED legacy single-key env from pre-v0.5.0 installs. The server still reads it as a silent fallback so existing setups keep working, but new users should pick the scoped variant instead: Q402_TRIAL_API_KEY for Free Trial (BNB only), Q402_MULTICHAIN_API_KEY for the full 10-chain surface. Set only one of the three.",
+          "description": "DEPRECATED legacy single-key env from pre-v0.5.0 installs. The server still reads it as a silent fallback so existing setups keep working, but new users should pick a scoped variant instead. Q402_TRIAL_API_KEY (Free Trial, BNB only) and Q402_MULTICHAIN_API_KEY (full 10-chain surface) are designed to coexist — BNB payments auto-route to the trial key, other chains use multichain. Only set Q402_API_KEY if you are migrating an existing pre-v0.5.0 install; do NOT set it alongside the scoped variants on a fresh install.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
