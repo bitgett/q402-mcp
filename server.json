@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 — gasless payments + CCIP bridge on 10 EVM chains. Twenty tools, sandbox-default.",
+  "description": "Q402 — gasless payments on 10 EVM chains + CCIP USDC bridge on the eth/avax/arbitrum triangle. Twenty tools, sandbox-default.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.8.5",
+  "version": "0.8.6",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.8.5",
+      "version": "0.8.6",
       "transport": {
         "type": "stdio"
       },
@@ -78,6 +78,20 @@
         {
           "name": "Q402_AGENT_WALLET_ADDRESS",
           "description": "Server-managed Agent Wallet picker (walletMode='agentic-server' only). Lowercased agent wallet address (the hex 0x... shown on the Agent tab of your dashboard) selecting which of your Agent Wallets to spend from when you hold more than one (max 10 per owner). Omit to use the default wallet. Ignored for the local-signing modes that carry their own private key.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "Q402_API_KEY",
+          "description": "DEPRECATED legacy single-key env from pre-v0.5.0 installs. The server still reads it as a silent fallback so existing setups keep working, but new users should pick the scoped variant instead: Q402_TRIAL_API_KEY for Free Trial (BNB only), Q402_MULTICHAIN_API_KEY for the full 10-chain surface. Set only one of the three.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "Q402_WALLET_ID",
+          "description": "DEPRECATED soft-migration alias for Q402_AGENT_WALLET_ADDRESS (one release of overlap from v0.6.0). The server still accepts it but logs a deprecation notice. New installs should set Q402_AGENT_WALLET_ADDRESS directly.",
           "isRequired": false,
           "isSecret": false,
           "format": "string"

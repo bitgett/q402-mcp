@@ -14,6 +14,12 @@ export const BridgeQuoteInputSchema = z.object({
   dst: z.enum(["eth", "avax", "arbitrum"]).describe("Destination chain"),
   amount: z.string().regex(/^\d+$/).describe("USDC amount in raw 6-decimal units (e.g. '1000000' = 1 USDC)"),
   destReceiver: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Destination receiver address (Agentic Wallet on destination)"),
+}).refine(d => d.src !== d.dst, {
+  // Mirror the rejection in BridgeSendInputSchema so an agent that
+  // accidentally quotes a same-chain "bridge" fails locally instead of
+  // burning a round-trip through /api/ccip/quote.
+  message: "src must differ from dst",
+  path: ["dst"],
 });
 
 export const BRIDGE_QUOTE_TOOL = {

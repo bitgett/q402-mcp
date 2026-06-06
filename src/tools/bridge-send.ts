@@ -20,6 +20,12 @@ export const BridgeSendInputSchema = z.object({
   walletId: z.string().describe("Agentic Wallet ID (from q402_agentic_info)"),
   feeToken: z.enum(["LINK", "native", "auto"]).optional().describe("Fee token. 'auto' picks cheaper of the two; defaults to LINK."),
   sandbox: z.boolean().optional().describe("Sandbox mode (default true). Set to false for live bridge."),
+}).refine(d => d.src !== d.dst, {
+  // Local Zod rejection saves a network round-trip + a Q402 backend log
+  // entry. The /api/ccip/send route also rejects same-chain bridges but
+  // the agent only finds out after burning a request.
+  message: "src must differ from dst",
+  path: ["dst"],
 });
 
 export const BRIDGE_SEND_TOOL = {

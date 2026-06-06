@@ -276,6 +276,8 @@ async function main(): Promise<void> {
   // Stdio MCP servers stay attached to the parent process; the transport keeps
   // the event loop alive until the host (Claude Desktop, Codex CLI, …) closes
   // the pipe.
+  // `$$` is an escape for a literal `$` in a template literal — easy to
+  // misread as a typo. The full token `$${var}` renders as `$<value>`.
   process.stderr.write(
     `${PACKAGE_NAME} v${PACKAGE_VERSION} ready (mode=${CONFIG.mode}, ` +
       `cap=$${CONFIG.maxAmountPerCallUsd}, allowlist=${CONFIG.allowedRecipients.length})\n`,

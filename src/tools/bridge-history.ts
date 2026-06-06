@@ -37,14 +37,26 @@ export const BRIDGE_HISTORY_TOOL = {
 };
 
 export async function runBridgeHistory(_input: z.infer<typeof BridgeHistoryInputSchema>) {
-  // isError: true so an LLM doesn't parse the prose as a successful empty
-  // array. We're explicitly saying "this surface isn't wired here yet".
+  // Return a structured JSON envelope rather than isError:true. MCP
+  // `isError` is reserved for actual execution failures; some agent
+  // frameworks (Codex CLI's plugin runner, LangGraph) treat it as a
+  // tool-failed signal and abort multi-step plans. The `implemented:
+  // false` envelope lets the LLM distinguish "not yet wired" from
+  // "real execution error" without the abort side-effect, and keeps
+  // the empty-result confusion away (an LLM seeing a JSON `bridges:
+  // null` plus `implemented: false` will not interpret it as "the
+  // user has zero bridges").
   return {
     content: [{
       type: "text" as const,
-      text: "Bridge history via MCP requires owner-sig auth, which is dashboard-managed at the current release. " +
-            "View at https://q402.quackai.ai/dashboard → Agent tab → Bridge History.",
+      text: JSON.stringify({
+        implemented: false,
+        reason:
+          "Bridge history via MCP requires owner-sig auth, which is dashboard-bound until " +
+          "session-binding lands in a follow-up release.",
+        dashboardUrl: "https://q402.quackai.ai/dashboard",
+        dashboardPath: "Agent tab → Bridge History",
+      }, null, 2),
     }],
-    isError: true,
   };
 }
