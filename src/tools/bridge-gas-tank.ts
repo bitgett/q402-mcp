@@ -36,6 +36,11 @@ export const BRIDGE_GAS_TANK_TOOL = {
   },
 };
 
+// Keep this in sync with `app/lib/wallets.ts` — GASTANK_ADDRESS is the
+// single deposit sink for both Q402 settlement Gas Tank and Bridge Gas
+// Tank top-ups. Drift here means users mis-route funds.
+const GASTANK_ADDRESS = "0x10fb078594b70ee8024b2ded3d67fc3aa9ea747a";
+
 export async function runBridgeGasTank(_input: z.infer<typeof BridgeGasTankInputSchema>) {
   return {
     content: [{
@@ -47,10 +52,11 @@ export async function runBridgeGasTank(_input: z.infer<typeof BridgeGasTankInput
         "  • LINK (default, ~10% cheaper)",
         "  • native (ETH / AVAX / ETH respectively)",
         "",
-        "Top up by sending LINK or native to the Q402 facilitator address on the source chain. The next " +
-        "deposit-scan cron tick (~5 min) credits your Gas Tank.",
+        `Top up by sending LINK or native to the Q402 Gas Tank address ${GASTANK_ADDRESS} on the ` +
+        "source chain. The deposit-scan cron (every ~5 min) credits your Gas Tank automatically; the " +
+        "dashboard's \"Verify\" button is the immediate self-serve path.",
         "",
-        "Live balance + deposit addresses: https://q402.quackai.ai/dashboard → Agent tab → Bridge Gas Tank",
+        "Live balance + per-chain deposit detail: https://q402.quackai.ai/dashboard → Agent tab → Bridge Gas Tank",
       ].join("\n"),
     }],
   };

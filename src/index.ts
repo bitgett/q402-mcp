@@ -38,6 +38,18 @@
  *   q402_clear_delegation   write, requires key — clears the EIP-7702
  *                           delegation on a chain (Q402-sponsored gas, local
  *                           signing)
+ *   q402_bridge_quote       read-only, no key — CCIP bridge quote across the
+ *                           eth/avax/arbitrum triangle. Surfaces fee + ETA +
+ *                           token path so AI agents can preview before send.
+ *   q402_bridge_send        write, requires key — execute a CCIP bridge from
+ *                           the Agent Wallet. Sandbox-default; real TX needs
+ *                           Q402_ENABLE_REAL_PAYMENTS=1 same as q402_pay.
+ *   q402_bridge_history     read-only, requires key — recent bridge attempts
+ *                           for the caller's Agent Wallet (src/dst/amount/
+ *                           CCIP msgId/status), most-recent first.
+ *   q402_bridge_gas_tank    read-only, requires key — per-chain Gas Tank
+ *                           native balance + auto-fund debit window so AI
+ *                           can decide whether to top up before bridging.
  *
  * Trial-scope policy (server-enforced via API key plan): trial keys are
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per

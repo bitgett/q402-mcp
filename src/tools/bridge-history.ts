@@ -16,9 +16,14 @@ export const BridgeHistoryInputSchema = z.object({
 export const BRIDGE_HISTORY_TOOL = {
   name: "q402_bridge_history",
   description:
-    "List the user's recent Chainlink CCIP bridges (most-recent first, up to 50 records). " +
-    "Each record includes messageId, source/destination chains, USDC amount, fee paid, and " +
-    "CCIP Explorer link. Returns dashboard URL guidance until owner-sig wiring lands in a follow-up.",
+    "READ-ONLY GUIDANCE TOOL — bridge history via MCP is not yet wired in this release. It " +
+    "requires owner-sig auth which is dashboard-bound until session-binding lands (same " +
+    "follow-up as live q402_bridge_send). This tool returns a pointer to the dashboard " +
+    "and intentionally surfaces as an error so an LLM does not interpret the prose as an " +
+    "empty result. Future shape (already finalized): most-recent-first list of up to 50 " +
+    "CCIP bridges with messageId, source/destination chains, USDC amount, fee paid, and " +
+    "CCIP Explorer link. Until then, point the user at https://q402.quackai.ai/dashboard " +
+    "→ Agent tab → Bridge History.",
   inputSchema: {
     type: "object" as const,
     properties: {
