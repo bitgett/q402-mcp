@@ -53,12 +53,21 @@ function mask(key: string | null): string | null {
 }
 
 async function verifyOne(apiKey: string): Promise<unknown> {
-  const resp = await fetch(`${CONFIG.relayBaseUrl}/keys/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey }),
-  });
-  return resp.ok ? await resp.json() : { error: `HTTP ${resp.status}` };
+  try {
+    // 15s timeout — verify is a single KV read + HMAC compare. Anything
+    // slower is upstream-stuck. Without a timeout balance.ts hangs
+    // indefinitely on a degraded socket (Vercel cold-start, partial
+    // outage), wedging the MCP client UI.
+    const resp = await fetch(`${CONFIG.relayBaseUrl}/keys/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    return resp.ok ? await resp.json() : { error: `HTTP ${resp.status}` };
+  } catch (e) {
+    return { error: e instanceof Error ? `fetch_failed: ${e.message}` : "fetch_failed" };
+  }
 }
 
 function extractTrial(verifyJson: unknown): ScopedVerifyResult["trial"] | undefined {

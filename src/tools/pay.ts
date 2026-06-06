@@ -399,6 +399,12 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
     let resp: Response;
     try {
+      // 60s timeout — the route is fully synchronous (signs + relays +
+      // settles + writes idempotency cache) so anything slower than
+      // ~50s is almost certainly stuck. Without a timeout the MCP
+      // client hangs Claude Desktop / Codex CLI indefinitely on a
+      // Vercel cold-start that lost its socket. Same posture as
+      // doctor / receipt / wallet-status / clear-delegation tools.
       resp = await fetch(`${CONFIG.relayBaseUrl}/wallet/agentic/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -410,6 +416,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           amount: input.amount,
           ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
         }),
+        signal: AbortSignal.timeout(60_000),
       });
     } catch (e) {
       const transportErr = failureResult("eip7702");
@@ -640,7 +647,7 @@ export const PAY_TOOL = {
     "anything else → Multichain (paid 10-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
-    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll — " +
+    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum — " +
     "USDC/USDT on most chains, RLUSD on Ethereum only, Injective USDT-only. " +
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set as a valid 32-byte hex key, and " +

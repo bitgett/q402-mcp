@@ -60,11 +60,26 @@ export const BRIDGE_QUOTE_TOOL = {
 
 export async function runBridgeQuote(input: z.infer<typeof BridgeQuoteInputSchema>) {
   const url = new URL("/api/ccip/quote", CONFIG.relayBaseUrl);
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  let res: Response;
+  try {
+    // 15s timeout — quote is a CCIP router read on the source chain.
+    // RPC blips on eth/avax/arbitrum should fail fast so the agent can
+    // retry or fall back, not freeze the MCP client.
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: `Quote fetch failed: ${e instanceof Error ? e.message : String(e)}. Retry in a moment.`,
+      }],
+      isError: true,
+    };
+  }
   type FeeSlice = { raw: string; whole: number; usd: number };
   type QuoteData = {
     recommended?: "link" | "native";

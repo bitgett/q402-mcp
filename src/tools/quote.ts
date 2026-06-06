@@ -104,7 +104,7 @@ export const QUOTE_TOOL = {
   name: "q402_quote",
   description:
     "Compare gas costs and supported tokens across the 10 chains Q402 relays " +
-    "for (avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll). " +
+    "for (avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum). " +
     "Returns the full chain × token matrix unconditionally — this tool does " +
     "not read any API key, so it can't filter by trial vs multichain scope. " +
     "When the caller intends to settle with a Trial API Key, treat any non-BNB " +

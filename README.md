@@ -22,11 +22,14 @@ Quote → route → (optional) settle stablecoin payments across 10 EVM chains, 
 
 | Client | Command / config |
 |---|---|
-| **Claude Desktop / Claude Code** | `claude mcp add q402 -- npx -y @quackai/q402-mcp` |
+| **Claude Code (CLI)** | `claude mcp add q402 -- npx -y @quackai/q402-mcp` |
+| **Claude Desktop (app)** | Edit `claude_desktop_config.json` (Settings → Developer → Edit Config): `{ "mcpServers": { "q402": { "command": "npx", "args": ["-y", "@quackai/q402-mcp"] } } }`. Restart the app. |
 | **OpenAI Codex CLI** | `codex mcp add q402 -- npx -y @quackai/q402-mcp` (Windows fallback: see below) |
 | **Cursor** | Add to `~/.cursor/mcp.json`: `{ "mcpServers": { "q402": { "command": "npx", "args": ["-y", "@quackai/q402-mcp"] } } }` |
 | **Cline** | Cline → Settings → MCP Servers → Edit JSON. Same shape as Cursor. |
 | **Any other stdio MCP client** | Point it at `npx -y @quackai/q402-mcp`. No client-specific code. |
+
+> Claude **Code** (the CLI, `claude` binary) and Claude **Desktop** (the macOS / Windows app) are different products. The `claude mcp add` command only exists in the CLI; the Desktop app needs the JSON config above.
 
 Secrets are NOT in this config. The server reads them from `~/.q402/mcp.env` (same pattern as AWS / Stripe / gh CLIs).
 
@@ -271,6 +274,7 @@ If you set up Q402 before v0.5.0 you may have a single `Q402_API_KEY` env var. T
 | Injective EVM | 1776 | USDT only | Native USDC via Circle CCTP announced for Q2 2026. |
 | Monad | 143 | USDC, USDT0 | Native Circle USDC (CCTP V2) + USDT0 (LayerZero OFT). |
 | Scroll | 534352 | USDC, USDT | zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). |
+| Arbitrum One | 42161 | USDC, USDT | Optimistic rollup — same EIP-7702 signing path as Ethereum. CCIP bridge endpoint (eth ⇄ avax ⇄ arbitrum). |
 
 ---
 
