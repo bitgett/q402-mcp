@@ -21,9 +21,12 @@ export const BridgeGasTankInputSchema = z.object({
 export const BRIDGE_GAS_TANK_TOOL = {
   name: "q402_bridge_gas_tank",
   description:
-    "Report the user's Bridge Gas Tank state — LINK + native balance per CCIP chain (eth/avax/arbitrum). " +
-    "Q402 charges no markup on bridges; users pay only the actual Chainlink CCIP fee, debited from this Gas Tank. " +
-    "LINK fees are ~10% cheaper than native. Tool returns guidance + dashboard URL until owner-sig wiring lands.",
+    "READ-ONLY GUIDANCE TOOL — Bridge Gas Tank live balance via MCP is not yet wired (requires " +
+    "owner-sig auth which is dashboard-bound until session-binding lands, same follow-up as " +
+    "q402_bridge_history). Tool returns static guidance: the LINK/native fee model, the 3-chain " +
+    "CCIP triangle (eth/avax/arbitrum), the canonical Gas Tank deposit address, and a dashboard " +
+    "pointer for the live balance and per-chain deposit detail. Use this to route a user to the " +
+    "right top-up flow; don't expect numbers in the response.",
   inputSchema: {
     type: "object" as const,
     properties: {

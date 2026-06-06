@@ -12,7 +12,9 @@ import { CONFIG } from "../config.js";
 export const BridgeQuoteInputSchema = z.object({
   src: z.enum(["eth", "avax", "arbitrum"]).describe("Source chain"),
   dst: z.enum(["eth", "avax", "arbitrum"]).describe("Destination chain"),
-  amount: z.string().regex(/^\d+$/).describe("USDC amount in raw 6-decimal units (e.g. '1000000' = 1 USDC)"),
+  // Same `> 0` requirement as bridge-send so the quote doesn't
+  // return a meaningless "fee for 0 USDC" envelope.
+  amount: z.string().regex(/^\d*[1-9]\d*$/).describe("USDC amount in raw 6-decimal units, > 0 (e.g. '1000000' = 1 USDC)"),
   destReceiver: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Destination receiver address (Agentic Wallet on destination)"),
 }).refine(d => d.src !== d.dst, {
   // Mirror the rejection in BridgeSendInputSchema so an agent that

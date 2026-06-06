@@ -23,9 +23,12 @@
  *      state.
  *
  * Security policy carried in the response:
- *   "Q402 never asks you to paste your private key into chat. The MCP server
- *   signs payments LOCALLY on your machine — your key never leaves your
- *   device, never goes to a remote server."
+ *   "Q402 never asks you to paste your private key into chat. Custody depends
+ *   on wallet mode: Mode A (Q402_PRIVATE_KEY) and Mode B
+ *   (Q402_AGENTIC_PRIVATE_KEY) sign LOCALLY — those keys never leave the
+ *   user's device. Mode C (Q402_MULTICHAIN_API_KEY only) is server-managed:
+ *   Q402 holds the Agent Wallet's encrypted PK and signs on the user's
+ *   behalf."
  *
  * The tool description tells the AI to surface this notice whenever
  * walking a user through setup, AND to never refuse a key that's already
@@ -369,11 +372,15 @@ Q402_MAX_AMOUNT_PER_CALL=200
 `;
 
 const SECURITY_NOTICE =
-  "Q402 never asks you to paste your private key into chat. The MCP server " +
-  "signs payments LOCALLY on your machine — your key never leaves your device, " +
-  "never goes to a remote server. If a key was already pasted in chat by mistake, " +
-  "treat the wallet as exposed: move funds to a fresh wallet and use that new " +
-  "key in ~/.q402/mcp.env going forward.";
+  "Q402 never asks you to paste your private key into chat. " +
+  "Custody depends on which wallet mode you picked: " +
+  "Mode A (Q402_PRIVATE_KEY) and Mode B (Q402_AGENTIC_PRIVATE_KEY) sign LOCALLY " +
+  "on your machine — those keys never leave your device. " +
+  "Mode C (Q402_MULTICHAIN_API_KEY only, no private-key env) is server-managed: " +
+  "Q402 holds the Agent Wallet's encrypted private key (AES-256-GCM) and signs on your " +
+  "behalf — your MetaMask key is never involved on this side either. " +
+  "If a key was already pasted in chat by mistake, treat that wallet as exposed: " +
+  "move funds to a fresh wallet and use that new key in ~/.q402/mcp.env going forward.";
 
 /**
  * One-shot setup advisory the AI surfaces during the first-install walkthrough.
