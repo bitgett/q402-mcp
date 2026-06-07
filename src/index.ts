@@ -161,8 +161,11 @@ async function main(): Promise<void> {
       RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
       // CCIP bridge surface — USDC routing on the eth/avax/arbitrum
-      // triangle. Bridge_send is sandbox-only; live execution happens
-      // through the dashboard until session-binding ships.
+      // triangle. Bridge_send goes LIVE on Mode C since 0.8.10 (Mode A/B
+      // still fall through to sandbox since the route's API-key auth
+      // path only exists for the server-managed Agent Wallet). History
+      // + Gas Tank tools remain dashboard-pointer until session-binding
+      // exposes owner-sig auth from MCP.
       BRIDGE_QUOTE_TOOL,
       BRIDGE_SEND_TOOL,
       BRIDGE_HISTORY_TOOL,
