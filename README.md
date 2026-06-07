@@ -177,7 +177,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_recurring_skip_next` | api key | Skip only the next scheduled fire. |
 | `q402_recurring_cancel` | api key | Permanently stop a rule. |
 | `q402_bridge_quote` | none | Quote a Chainlink CCIP USDC bridge across eth/avax/arbitrum. Returns LINK + native fee. |
-| `q402_bridge_send` | sandbox only | Plan-and-quote a bridge end-to-end. `sandbox: false` returns `isError:true` with a dashboard pointer until session-binding lands. |
+| `q402_bridge_send` | live mode | Execute a CCIP bridge from the user's Agent Wallet. Mode C only (server-managed). Sandbox-by-default; `sandbox: false` + live Multichain key + `Q402_ENABLE_REAL_PAYMENTS=1` fires a real on-chain bridge. |
 | `q402_bridge_history` | not yet wired | Pointer to the dashboard. Returns `{ implemented: false, dashboardUrl, dashboardPath }` — read-only guidance until owner-sig auth lands in MCP. |
 | `q402_bridge_gas_tank` | not yet wired | Static guidance + dashboard pointer for the Bridge Gas Tank top-up flow. Live balance lookup needs owner-sig auth (dashboard for now). |
 

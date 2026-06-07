@@ -41,9 +41,12 @@
  *   q402_bridge_quote       read-only, no key — CCIP bridge quote across the
  *                           eth/avax/arbitrum triangle. Surfaces fee + ETA +
  *                           token path so AI agents can preview before send.
- *   q402_bridge_send        write, requires key — execute a CCIP bridge from
- *                           the Agent Wallet. Sandbox-default; real TX needs
- *                           Q402_ENABLE_REAL_PAYMENTS=1 same as q402_pay.
+ *   q402_bridge_send        write, requires live Multichain key — execute a
+ *                           CCIP bridge from the Agent Wallet (Mode C). The
+ *                           server signs ccipSend with the AES-GCM-encrypted
+ *                           PK and auto-funds source-chain gas from the
+ *                           user's Gas Tank. Sandbox-default; sandbox: false
+ *                           + Q402_ENABLE_REAL_PAYMENTS=1 fires real bridge.
  *   q402_bridge_history     read-only, requires key — recent bridge attempts
  *                           for the caller's Agent Wallet (src/dst/amount/
  *                           CCIP msgId/status), most-recent first.
