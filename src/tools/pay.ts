@@ -82,9 +82,12 @@ export const PayInputSchema = z.object({
   confirm: z
     .literal(true)
     .describe(
-      "MUST be true. Prove the user explicitly approved this exact recipient and amount " +
-        "in the conversation right before this tool was called. Setting this to true on " +
-        "behalf of the user without confirmation is a violation of the tool contract.",
+      "MUST be true. Prove the user explicitly approved this exact payment in the " +
+        "conversation right before this tool was called. When hookParams is set you MUST " +
+        "confirm what it actually does to the money: the split RECIPIENTS and their shares " +
+        "(funds go to those addresses, not `to`), and any oracle condition gating the " +
+        "settlement — not just the top-level recipient and amount. Setting this to true on " +
+        "behalf of the user without that confirmation is a violation of the tool contract.",
     ),
   hookParams: z
     .object({
