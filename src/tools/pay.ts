@@ -86,6 +86,29 @@ export const PayInputSchema = z.object({
         "in the conversation right before this tool was called. Setting this to true on " +
         "behalf of the user without confirmation is a violation of the tool contract.",
     ),
+  hookParams: z
+    .object({
+      recipientAgentId: z.string().optional().describe("ReputationGate: the recipient's ERC-8004 agent id."),
+      condition: z
+        .object({
+          kind: z.enum(["price", "timestamp"]),
+          feed: z.string().optional().describe('Chainlink feed pair for kind="price", e.g. "BTC/USD".'),
+          op: z.enum([">=", "<=", ">", "<", "after", "before"]),
+          value: z.number().describe('USD price (kind="price") or unix seconds (kind="timestamp").'),
+        })
+        .optional()
+        .describe('ConditionalOracle: settle only when this condition holds, e.g. { kind:"price", feed:"BTC/USD", op:">=", value:80000 }.'),
+      splits: z
+        .array(z.object({ recipient: z.string(), bps: z.number() }))
+        .optional()
+        .describe("MultiPayeeSplit: per-payment N-way split; bps must sum to 10000."),
+    })
+    .optional()
+    .describe(
+      "Q402 Hook parameters (server-managed Agent Wallet path only). Attaches per-payment " +
+        "hook conditions: a ConditionalOracle price/time gate, a MultiPayeeSplit fan-out, or a " +
+        "ReputationGate recipient agent id. Honoured only on walletMode=\"agentic-server\".",
+    ),
 });
 
 export type PayInput = z.infer<typeof PayInputSchema>;
@@ -415,6 +438,11 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           to: input.to,
           amount: input.amount,
           ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
+          // Q402 Hook params — only the Mode C (agentic-server) path runs
+          // the per-wallet hook dispatch, so forwarding here is the only
+          // place hookParams take effect. The landing route ignores them
+          // for owner-sig calls (trust boundary), so this is safe.
+          ...(input.hookParams ? { hookParams: input.hookParams } : {}),
         }),
         signal: AbortSignal.timeout(60_000),
       });
@@ -750,6 +778,33 @@ export const PAY_TOOL = {
         const: true,
         description:
           "MUST be true and only set after the user has confirmed recipient + amount in chat.",
+      },
+      hookParams: {
+        type: "object",
+        description:
+          "Q402 Hook params (server-managed Agent Wallet only). recipientAgentId (ReputationGate), " +
+          "condition (ConditionalOracle price/time gate), or splits (MultiPayeeSplit fan-out, bps sum 10000).",
+        properties: {
+          recipientAgentId: { type: "string" },
+          condition: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: ["price", "timestamp"] },
+              feed: { type: "string" },
+              op: { type: "string", enum: [">=", "<=", ">", "<", "after", "before"] },
+              value: { type: "number" },
+            },
+            required: ["kind", "op", "value"],
+          },
+          splits: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { recipient: { type: "string" }, bps: { type: "number" } },
+              required: ["recipient", "bps"],
+            },
+          },
+        },
       },
     },
     required: ["chain", "to", "amount", "token", "confirm"],
