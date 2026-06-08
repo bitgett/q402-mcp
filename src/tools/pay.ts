@@ -339,6 +339,15 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd}`);
 
   recipientGuard(input.to, CONFIG.allowedRecipients);
+  // A MultiPayeeSplit fans funds out to addresses OTHER than `to`, so the
+  // allowlist must screen every split leg too — otherwise an agent could
+  // route the bulk to an off-allowlist address via hookParams.splits
+  // while `to` (a tiny leg) sits on the allowlist and passes the guard.
+  if (input.hookParams?.splits) {
+    for (const leg of input.hookParams.splits) {
+      recipientGuard(leg.recipient, CONFIG.allowedRecipients);
+    }
+  }
   if (CONFIG.allowedRecipients.length > 0) {
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
