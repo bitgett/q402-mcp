@@ -94,6 +94,8 @@ import { BRIDGE_QUOTE_TOOL,    BridgeQuoteInputSchema,    runBridgeQuote }    fr
 import { BRIDGE_SEND_TOOL,     BridgeSendInputSchema,     runBridgeSend }     from "./tools/bridge-send.js";
 import { BRIDGE_HISTORY_TOOL,  BridgeHistoryInputSchema,  runBridgeHistory }  from "./tools/bridge-history.js";
 import { BRIDGE_GAS_TANK_TOOL, BridgeGasTankInputSchema, runBridgeGasTank } from "./tools/bridge-gas-tank.js";
+import { YIELD_RESERVES_TOOL,  YieldReservesInputSchema,  runYieldReserves }  from "./tools/yield-reserves.js";
+import { YIELD_POSITIONS_TOOL, YieldPositionsInputSchema, runYieldPositions } from "./tools/yield-positions.js";
 import {
   RECURRING_LIST_TOOL,
   RecurringListInputSchema,
@@ -170,6 +172,11 @@ async function main(): Promise<void> {
       BRIDGE_SEND_TOOL,
       BRIDGE_HISTORY_TOOL,
       BRIDGE_GAS_TANK_TOOL,
+      // Q402 Yield surface — read-only Aave lending market list + the
+      // Agent Wallet's own positions. No funds move; positions auths via
+      // the live Multichain apiKey (x-api-key header), reserves is public.
+      YIELD_RESERVES_TOOL,
+      YIELD_POSITIONS_TOOL,
     ],
   }));
 
@@ -260,6 +267,14 @@ async function main(): Promise<void> {
         case "q402_bridge_gas_tank": {
           const parsed = BridgeGasTankInputSchema.parse(args ?? {});
           return await runBridgeGasTank(parsed);
+        }
+        case "q402_yield_reserves": {
+          const parsed = YieldReservesInputSchema.parse(args ?? {});
+          return await runYieldReserves(parsed);
+        }
+        case "q402_yield_positions": {
+          const parsed = YieldPositionsInputSchema.parse(args ?? {});
+          return await runYieldPositions(parsed);
         }
         default:
           return {
