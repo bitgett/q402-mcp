@@ -75,10 +75,13 @@ type HookOutcome =
 
 - **`allow`** — proceed.
 - **`deny`** — block hard. The route returns the hook's `status` (default `403`) and `code`.
-- **`require_approval`** — a *soft* block: a human could approve this. The
-  payment does **not** settle; the route returns `202` with
-  `{ "status": "approval_required", "code", "message" }`. Distinct from
-  `deny` so the caller knows it's holdable, not forbidden.
+- **`require_approval`** — a *soft* block: the payment does **not** settle;
+  the route returns `202` with `{ "status": "approval_required", "code",
+  "message" }`. Distinct from `deny` so the caller knows it's
+  re-submittable rather than forbidden. **v1 does not store a pending
+  request or expose an approve endpoint** — there is no automated resume.
+  The caller (agent/UI) surfaces the hold and re-submits out of band once
+  the payment is approved.
 - **`split`** — replace the single settlement with N legs (beforeSettle only).
 
 ### Per-payment parameters
@@ -162,9 +165,10 @@ caps lack:
 }
 ```
 
-`perCallApprovalUsd` is a **soft** cap — large payments are *held for human
-approval*, not rejected, which is the difference between this and the native
-`perTxMaxUsd` ceiling.
+`perCallApprovalUsd` is a **soft** cap — a payment at/above it is not
+settled and returns `approval_required` (202) instead of a hard deny (the
+difference from the native `perTxMaxUsd` ceiling). v1 surfaces the hold;
+it does not store it or auto-resume (see `require_approval` above).
 
 ### ReputationGate — `beforeSettle`
 
@@ -254,7 +258,7 @@ configuration.
 |---|---|---|
 | allow | 200 | settled |
 | deny | 403 (451 for compliance, 412 for un-met condition) | blocked |
-| require_approval | 202 `{ status: "approval_required" }` | held for a human |
+| require_approval | 202 `{ status: "approval_required" }` | not settled; re-submit out of band (no stored hold in v1) |
 | split | 200 / 207 Multi-Status | fanned out (207 on partial) |
 
 Precedence when multiple hooks fire: **deny > require_approval > split > allow**.

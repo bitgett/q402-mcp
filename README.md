@@ -290,7 +290,7 @@ Single transfers and multi-recipient batches ship today. The next layer — recu
 
 ## Hooks — programmable payment policies
 
-Q402 Hooks 1.0 is a policy engine that attaches rules to the payment lifecycle: OFAC compliance screening, spend caps + recipient allowlists, ERC-8004 reputation gating, Chainlink-oracle conditional settlement ("only when BTC ≥ $80k"), and automatic multi-payee splits — plus human-in-the-loop approval holds. Uniswap v4 brought programmable hooks to DEX liquidity; Q402 brings them to AI-agent payments.
+Q402 Hooks 1.0 is a policy engine that attaches rules to the payment lifecycle: OFAC compliance screening, spend caps + recipient allowlists, ERC-8004 reputation gating, Chainlink-oracle conditional settlement ("only when BTC ≥ $80k"), and automatic multi-payee splits — plus an approval-required soft block for large payments (returns 202 `approval_required`; the caller re-submits out of band, no stored hold in v1). Uniswap v4 brought programmable hooks to DEX liquidity; Q402 brings them to AI-agent payments.
 
 **Developer reference: [docs/HOOKS.md](docs/HOOKS.md)** — lifecycle, the Hook contract, every shipped hook with config + examples.
 

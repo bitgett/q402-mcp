@@ -789,7 +789,10 @@ export const PAY_TOOL = {
         type: "boolean",
         const: true,
         description:
-          "MUST be true and only set after the user has confirmed recipient + amount in chat.",
+          "MUST be true and only set after the user has confirmed this exact payment in chat. " +
+          "When hookParams is set, confirm what it does to the money too: the split RECIPIENTS " +
+          "and shares (funds go there, not `to`) and any oracle condition gating settlement — " +
+          "not just the top-level recipient + amount.",
       },
       hookParams: {
         type: "object",
