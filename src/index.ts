@@ -96,6 +96,8 @@ import { BRIDGE_HISTORY_TOOL,  BridgeHistoryInputSchema,  runBridgeHistory }  fr
 import { BRIDGE_GAS_TANK_TOOL, BridgeGasTankInputSchema, runBridgeGasTank } from "./tools/bridge-gas-tank.js";
 import { YIELD_RESERVES_TOOL,  YieldReservesInputSchema,  runYieldReserves }  from "./tools/yield-reserves.js";
 import { YIELD_POSITIONS_TOOL, YieldPositionsInputSchema, runYieldPositions } from "./tools/yield-positions.js";
+import { YIELD_DEPOSIT_TOOL,   YieldDepositInputSchema,   runYieldDeposit }   from "./tools/yield-deposit.js";
+import { YIELD_WITHDRAW_TOOL,  YieldWithdrawInputSchema,  runYieldWithdraw }  from "./tools/yield-withdraw.js";
 import {
   RECURRING_LIST_TOOL,
   RecurringListInputSchema,
@@ -177,6 +179,12 @@ async function main(): Promise<void> {
       // the live Multichain apiKey (x-api-key header), reserves is public.
       YIELD_RESERVES_TOOL,
       YIELD_POSITIONS_TOOL,
+      // Q402 Yield WRITE surface — supply / withdraw the Agent Wallet's
+      // stablecoin to/from Aave V3. MOVES FUNDS, so both gate on confirm:true
+      // (like q402_pay). Mode C: apiKey in the body, server signs the supply
+      // / withdraw with the encrypted key.
+      YIELD_DEPOSIT_TOOL,
+      YIELD_WITHDRAW_TOOL,
     ],
   }));
 
@@ -275,6 +283,14 @@ async function main(): Promise<void> {
         case "q402_yield_positions": {
           const parsed = YieldPositionsInputSchema.parse(args ?? {});
           return await runYieldPositions(parsed);
+        }
+        case "q402_yield_deposit": {
+          const parsed = YieldDepositInputSchema.parse(args ?? {});
+          return await runYieldDeposit(parsed);
+        }
+        case "q402_yield_withdraw": {
+          const parsed = YieldWithdrawInputSchema.parse(args ?? {});
+          return await runYieldWithdraw(parsed);
         }
         default:
           return {
