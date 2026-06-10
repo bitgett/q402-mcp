@@ -17,14 +17,15 @@
  * with confirm:true after the user approves.
  */
 
+import { id } from "ethers";
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
 
 export const YieldWithdrawInputSchema = z.object({
   chain: z
-    .string()
+    .enum(["bnb"])
     .default("bnb")
-    .describe("Chain slug the Aave market lives on (e.g. 'bnb', 'eth', 'avax'). Defaults to 'bnb'."),
+    .describe("Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted."),
   token: z
     .enum(["USDC", "USDT"])
     .describe("Stablecoin to withdraw from Aave. USDC or USDT."),
@@ -39,6 +40,15 @@ export const YieldWithdrawInputSchema = z.object({
       "Optional Agent Wallet address to withdraw to (max 10 per owner). " +
         "Omit to use Q402_AGENT_WALLET_ADDRESS env, then the owner's default " +
         "wallet (resolved server-side from the API key).",
+    ),
+  idempotencyKey: z
+    .string()
+    .optional()
+    .describe(
+      "Optional durable idempotency key for this logical withdrawal. When omitted the " +
+        "tool derives a STABLE key from (walletId, chain, token, amount) so a lost " +
+        "response can be safely retried without double-withdrawing. Pass your own only " +
+        "if you need two genuinely distinct same-amount withdrawals to be treated separately.",
     ),
   confirm: z
     .boolean()
@@ -59,12 +69,19 @@ export const YIELD_WITHDRAW_TOOL = {
     "the FULL position. Server-managed Agent Wallet path (Mode C): authenticated by the " +
     "configured live Multichain API key — the server holds the encrypted key, signs the " +
     "Aave withdraw, and sponsors gas. " +
+    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today; ETH / AVAX and other chains " +
+    "are not yet available. " +
     "\n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
     "`confirm: true` is set. Call it FIRST without confirm to get a one-line preview of " +
     "exactly what will happen (amount, token, chain, wallet); show that to the user, get " +
     "explicit approval, THEN re-call with confirm:true. Never set confirm:true on the " +
     "user's behalf without that approval. " +
+    "\n\n" +
+    "SANDBOX BY DEFAULT — like q402_pay, no funds move unless a live Multichain key " +
+    "(q402_live_*) is configured AND Q402_ENABLE_REAL_PAYMENTS=1. Without both, " +
+    "confirm:true returns a sandbox preview (no on-chain withdraw) with a setup hint — " +
+    "confirm:true alone does NOT move real funds. " +
     "\n\n" +
     "Use q402_yield_positions first to see the current position size (especially before an " +
     "amount=\"max\" withdrawal).",
@@ -73,7 +90,8 @@ export const YIELD_WITHDRAW_TOOL = {
     properties: {
       chain: {
         type: "string" as const,
-        description: "Chain slug the Aave market lives on (e.g. 'bnb', 'eth', 'avax'). Defaults to 'bnb'.",
+        enum: ["bnb"],
+        description: "Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted.",
       },
       token: {
         type: "string" as const,
@@ -92,6 +110,13 @@ export const YIELD_WITHDRAW_TOOL = {
           "Optional Agent Wallet address to withdraw to when the owner holds multiple " +
           "wallets. Defaults to Q402_AGENT_WALLET_ADDRESS env, then the owner's default " +
           "wallet on the server.",
+      },
+      idempotencyKey: {
+        type: "string" as const,
+        description:
+          "Optional durable idempotency key. Omit and the tool derives a stable key from " +
+          "(walletId, chain, token, amount) so a lost response is safe to retry without " +
+          "double-withdrawing. Pass your own only to force two same-amount withdrawals apart.",
       },
       confirm: {
         type: "boolean" as const,
@@ -119,12 +144,33 @@ interface WithdrawData {
 }
 
 export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputSchema>) {
+  // Strictly-positive amount (unless the literal "max"). The schema regex
+  // accepts "0" / "0.0" — a zero withdraw is a no-op gas burn, so reject it.
+  if (input.amount !== "max" && !(Number(input.amount) > 0)) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: `amount must be greater than zero (got "${input.amount}"), or the literal "max".`,
+      }],
+      isError: true,
+    };
+  }
+
   // Resolution order: tool input → Q402_AGENT_WALLET_ADDRESS env → server
   // default (omit walletId so the route resolves the apiKey owner's default).
   const walletId =
     typeof input.walletId === "string" && input.walletId.length > 0
       ? input.walletId.toLowerCase()
       : CONFIG.walletId ?? undefined;
+
+  // Durable idempotency key — stable for retries of the SAME logical
+  // withdrawal so a lost response can't re-execute after the server's 30-min
+  // claim TTL expires (the server keys its no-TTL settled marker on this).
+  // When the caller doesn't supply one, derive it from the request params.
+  const idempotencyKey =
+    typeof input.idempotencyKey === "string" && input.idempotencyKey.length > 0
+      ? input.idempotencyKey
+      : id(`yield:withdraw:${walletId ?? "default"}:${input.chain}:${input.token}:${input.amount}`);
 
   // "max" withdraws the full position — phrase the preview accordingly so the
   // user understands the whole balance is leaving Aave.
@@ -167,6 +213,32 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
     };
   }
 
+  // ── Real-payments gate — mirrors q402_pay's Mode C path ──────────────────
+  // A live key + confirm:true is NOT enough to move real funds. Like
+  // q402_pay, this server-mediated write also requires Q402_ENABLE_REAL_PAYMENTS=1.
+  // Without it we return a sandbox preview (no /api call, no on-chain withdraw)
+  // so confirm:true alone can never move money when real payments are off.
+  if (!CONFIG.realPaymentsRequested) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({
+          sandbox: true,
+          success: false,
+          status: "sandbox",
+          action: "yield_withdraw",
+          chain: input.chain,
+          token: input.token,
+          amount: input.amount,
+          walletId: walletId ?? null,
+          setupHint:
+            "Sandbox mode — set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real Q402 Yield " +
+            "withdrawal. No funds moved.",
+        }, null, 2),
+      }],
+    };
+  }
+
   let res: Response;
   try {
     // 60s timeout — the route signs + withdraws + settles synchronously (same
@@ -180,6 +252,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
         chain: input.chain,
         token: input.token,
         amount: input.amount,
+        idempotencyKey,
         ...(walletId ? { walletId } : {}),
       }),
       signal: AbortSignal.timeout(60_000),

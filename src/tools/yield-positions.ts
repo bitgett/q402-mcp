@@ -21,13 +21,13 @@ export const YieldPositionsInputSchema = z.object({
     .optional()
     .describe(
       "Optional Agent Wallet address whose positions to read (max 10 per owner). " +
-        "Omit to use Q402_AGENT_WALLET_ADDRESS env, then the owner's default wallet " +
-        "(resolved server-side from the API key).",
+        "Omit and the server defaults to the owner's default wallet (resolved from the " +
+        "API key); Q402_AGENT_WALLET_ADDRESS env fills it in when set.",
     ),
   chain: z
-    .string()
+    .enum(["bnb"])
     .optional()
-    .describe("Optional chain slug to filter positions (e.g. 'eth', 'avax'). Omit for all chains."),
+    .describe("Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit for all supported chains."),
 });
 
 export const YIELD_POSITIONS_TOOL = {
@@ -36,22 +36,26 @@ export const YIELD_POSITIONS_TOOL = {
     "READ-ONLY — show the Agent Wallet's current Q402 Yield (Aave) lending positions. Returns each " +
     "position's protocol, chain, asset, market address, balance, principal, accrued interest, and " +
     "supply APY, plus the aggregate total supplied in USD. Authenticated by the configured live " +
-    "Multichain API key — no private key required and no funds move. Accepts an optional walletId for " +
-    "owners who hold more than one wallet (omit to use the server-default wallet) and an optional " +
-    "chain filter. Use this whenever the user asks 'how much am I earning?' or 'what are my open " +
-    "lending positions?'",
+    "Multichain API key — no private key required and no funds move. " +
+    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today. " +
+    "walletId is OPTIONAL: omit it and the server reads the owner's default Agent Wallet " +
+    "(resolved from the API key); pass one only when the owner holds more than one wallet. " +
+    "An optional chain filter is also accepted. Use this whenever the user asks 'how much am I " +
+    "earning?' or 'what are my open lending positions?'",
   inputSchema: {
     type: "object" as const,
     properties: {
       walletId: {
         type: "string" as const,
         description:
-          "Optional Agent Wallet address when the owner holds multiple wallets. Defaults to " +
-          "Q402_AGENT_WALLET_ADDRESS env, then the owner's default wallet on the server.",
+          "Optional Agent Wallet address. Omit to read the owner's default wallet (the server " +
+          "resolves it from the API key); pass one only when the owner holds multiple wallets. " +
+          "Q402_AGENT_WALLET_ADDRESS env fills it in when set.",
       },
       chain: {
         type: "string" as const,
-        description: "Optional chain slug to filter positions (e.g. 'eth', 'avax'). Omit for all chains.",
+        enum: ["bnb"],
+        description: "Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit for all supported chains.",
       },
     },
     additionalProperties: false,
@@ -106,7 +110,11 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
       ? input.walletId.toLowerCase()
       : CONFIG.walletId ?? undefined;
 
-  const url = new URL("/wallet/agentic/yield/positions", CONFIG.relayBaseUrl + "/");
+  // Build off CONFIG.relayBaseUrl by STRING CONCAT (same as pay.ts) so the
+  // base's `/api` segment is preserved. `new URL("/path", origin)` would
+  // resolve the absolute "/path" against the origin only and silently drop
+  // `/api`, 404-ing the call.
+  const url = new URL(`${CONFIG.relayBaseUrl}/wallet/agentic/yield/positions`);
   if (walletId) url.searchParams.set("walletId", walletId);
   if (input.chain) url.searchParams.set("chain", input.chain);
 

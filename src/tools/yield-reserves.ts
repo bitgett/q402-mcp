@@ -14,9 +14,9 @@ import { CONFIG } from "../config.js";
 
 export const YieldReservesInputSchema = z.object({
   chain: z
-    .string()
+    .enum(["bnb"])
     .optional()
-    .describe("Optional chain slug to filter markets (e.g. 'eth', 'avax'). Omit to list all supported chains."),
+    .describe("Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit to list all supported chains."),
 });
 
 export const YIELD_RESERVES_TOOL = {
@@ -25,15 +25,17 @@ export const YIELD_RESERVES_TOOL = {
     "READ-ONLY — list the Q402 Yield (Aave) lending markets the Agent Wallet can supply into. " +
     "Returns each market's protocol, chain, asset, asset address, position token, market address, " +
     "and current supply APY (shown as a %). No auth required and no funds move — this is purely a " +
-    "preview of available yield. Pass an optional `chain` to filter to one chain; omit it to see " +
-    "every supported chain. Use this whenever the user asks 'where can I earn yield?' or 'what's the " +
-    "lending APY on <asset>?' before supplying via the dashboard.",
+    "preview of available yield. " +
+    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today. " +
+    "Pass an optional `chain` to filter; omit it to see every supported chain. Use this whenever " +
+    "the user asks 'where can I earn yield?' or 'what's the lending APY on <asset>?' before supplying.",
   inputSchema: {
     type: "object" as const,
     properties: {
       chain: {
         type: "string" as const,
-        description: "Optional chain slug to filter markets (e.g. 'eth', 'avax'). Omit for all chains.",
+        enum: ["bnb"],
+        description: "Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit for all supported chains.",
       },
     },
     additionalProperties: false,
@@ -59,7 +61,11 @@ interface ReservesData {
 }
 
 export async function runYieldReserves(input: z.infer<typeof YieldReservesInputSchema>) {
-  const url = new URL("/wallet/agentic/yield/reserves", CONFIG.relayBaseUrl + "/");
+  // Build off CONFIG.relayBaseUrl by STRING CONCAT (same as pay.ts) so the
+  // base's `/api` segment is preserved. `new URL("/path", origin)` would
+  // resolve the absolute "/path" against the origin only and silently drop
+  // `/api`, 404-ing the call.
+  const url = new URL(`${CONFIG.relayBaseUrl}/wallet/agentic/yield/reserves`);
   if (input.chain) url.searchParams.set("chain", input.chain);
 
   let res: Response;

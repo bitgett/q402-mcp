@@ -15,14 +15,15 @@
  * with confirm:true after the user approves.
  */
 
+import { id } from "ethers";
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
 
 export const YieldDepositInputSchema = z.object({
   chain: z
-    .string()
+    .enum(["bnb"])
     .default("bnb")
-    .describe("Chain slug the Aave market lives on (e.g. 'bnb', 'eth', 'avax'). Defaults to 'bnb'."),
+    .describe("Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted."),
   token: z
     .enum(["USDC", "USDT"])
     .describe("Stablecoin to supply into Aave. USDC or USDT."),
@@ -37,6 +38,15 @@ export const YieldDepositInputSchema = z.object({
       "Optional Agent Wallet address to supply from (max 10 per owner). " +
         "Omit to use Q402_AGENT_WALLET_ADDRESS env, then the owner's default " +
         "wallet (resolved server-side from the API key).",
+    ),
+  idempotencyKey: z
+    .string()
+    .optional()
+    .describe(
+      "Optional durable idempotency key for this logical deposit. When omitted the " +
+        "tool derives a STABLE key from (walletId, chain, token, amount) so a lost " +
+        "response can be safely retried without double-supplying. Pass your own only " +
+        "if you need two genuinely distinct same-amount deposits to be treated separately.",
     ),
   confirm: z
     .boolean()
@@ -56,12 +66,19 @@ export const YIELD_DEPOSIT_TOOL = {
     "Aave V3 (Q402 Yield) so it starts earning supply APY. Server-managed Agent Wallet " +
     "path (Mode C): authenticated by the configured live Multichain API key — the server " +
     "holds the encrypted key, signs the Aave supply, and sponsors gas. " +
+    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today; ETH / AVAX and other chains " +
+    "are not yet available. " +
     "\n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
     "`confirm: true` is set. Call it FIRST without confirm to get a one-line preview of " +
     "exactly what will happen (amount, token, chain, wallet); show that to the user, get " +
     "explicit approval, THEN re-call with confirm:true. Never set confirm:true on the " +
     "user's behalf without that approval. " +
+    "\n\n" +
+    "SANDBOX BY DEFAULT — like q402_pay, no funds move unless a live Multichain key " +
+    "(q402_live_*) is configured AND Q402_ENABLE_REAL_PAYMENTS=1. Without both, " +
+    "confirm:true returns a sandbox preview (no on-chain supply) with a setup hint — " +
+    "confirm:true alone does NOT move real funds. " +
     "\n\n" +
     "Use q402_yield_reserves first to show available markets + APY, and q402_yield_positions " +
     "afterward to confirm the supplied balance.",
@@ -70,7 +87,8 @@ export const YIELD_DEPOSIT_TOOL = {
     properties: {
       chain: {
         type: "string" as const,
-        description: "Chain slug the Aave market lives on (e.g. 'bnb', 'eth', 'avax'). Defaults to 'bnb'.",
+        enum: ["bnb"],
+        description: "Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted.",
       },
       token: {
         type: "string" as const,
@@ -87,6 +105,13 @@ export const YIELD_DEPOSIT_TOOL = {
           "Optional Agent Wallet address to supply from when the owner holds multiple " +
           "wallets. Defaults to Q402_AGENT_WALLET_ADDRESS env, then the owner's default " +
           "wallet on the server.",
+      },
+      idempotencyKey: {
+        type: "string" as const,
+        description:
+          "Optional durable idempotency key. Omit and the tool derives a stable key from " +
+          "(walletId, chain, token, amount) so a lost response is safe to retry without " +
+          "double-supplying. Pass your own only to force two same-amount deposits apart.",
       },
       confirm: {
         type: "boolean" as const,
@@ -114,12 +139,35 @@ interface DepositData {
 }
 
 export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSchema>) {
+  // Strictly-positive amount. The schema regex accepts "0" / "0.0" — a zero
+  // supply is a no-op gas burn at best, so reject it before any network call.
+  if (!(Number(input.amount) > 0)) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: `amount must be greater than zero (got "${input.amount}").`,
+      }],
+      isError: true,
+    };
+  }
+
   // Resolution order: tool input → Q402_AGENT_WALLET_ADDRESS env → server
   // default (omit walletId so the route resolves the apiKey owner's default).
   const walletId =
     typeof input.walletId === "string" && input.walletId.length > 0
       ? input.walletId.toLowerCase()
       : CONFIG.walletId ?? undefined;
+
+  // Durable idempotency key — stable for retries of the SAME logical deposit
+  // so a lost response can't re-execute after the server's 30-min claim TTL
+  // expires (the server keys its no-TTL settled marker on this). When the
+  // caller doesn't supply one, derive it from the request params; that means
+  // a deliberate second same-amount deposit must pass a distinct key. We fold
+  // walletId in so two wallets supplying the same amount stay independent.
+  const idempotencyKey =
+    typeof input.idempotencyKey === "string" && input.idempotencyKey.length > 0
+      ? input.idempotencyKey
+      : id(`yield:supply:${walletId ?? "default"}:${input.chain}:${input.token}:${input.amount}`);
 
   // ── Confirm gate — MOVES FUNDS, so refuse without explicit approval ──────
   // Mirrors q402_pay: when confirm !== true we DO NOT hit the endpoint. We
@@ -158,6 +206,32 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
     };
   }
 
+  // ── Real-payments gate — mirrors q402_pay's Mode C path ──────────────────
+  // A live key + confirm:true is NOT enough to move real funds. Like
+  // q402_pay, this server-mediated write also requires Q402_ENABLE_REAL_PAYMENTS=1.
+  // Without it we return a sandbox preview (no /api call, no on-chain supply)
+  // so confirm:true alone can never move money when real payments are off.
+  if (!CONFIG.realPaymentsRequested) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({
+          sandbox: true,
+          success: false,
+          status: "sandbox",
+          action: "yield_deposit",
+          chain: input.chain,
+          token: input.token,
+          amount: input.amount,
+          walletId: walletId ?? null,
+          setupHint:
+            "Sandbox mode — set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real Q402 Yield " +
+            "deposit. No funds moved.",
+        }, null, 2),
+      }],
+    };
+  }
+
   let res: Response;
   try {
     // 60s timeout — the route signs + supplies + settles synchronously (same
@@ -171,6 +245,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
         chain: input.chain,
         token: input.token,
         amount: input.amount,
+        idempotencyKey,
         ...(walletId ? { walletId } : {}),
       }),
       signal: AbortSignal.timeout(60_000),
