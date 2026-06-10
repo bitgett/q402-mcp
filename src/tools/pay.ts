@@ -479,13 +479,111 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           error?: string;
           message?: string;
           pending?: boolean;
-          status?: "processing" | "complete" | "failed";
+          status?: "processing" | "complete" | "failed" | "partial" | "relay_unreachable_uncertain";
           retryAfterSec?: number;
           idempotent?: boolean;
           sendId?: string;
+          // MultiPayeeSplit fan-out shape — present on BOTH fresh splits
+          // (200/207/502) and durable-replay splits (replayed:true).
+          split?: boolean;
+          legs?: Array<{ recipient: string; amount: string; txHash?: string; error?: string }>;
+          settled?: number;
+          failed?: number;
+          replayed?: boolean;
         }
       | Record<string, never>;
     const txHash = (data as { txHash?: string }).txHash ?? "";
+
+    // ── MultiPayeeSplit fan-out ──────────────────────────────────────────
+    // When hookParams.splits fired, the server settles N legs instead of a
+    // single recipient and returns { split:true, legs:[…], settled, failed,
+    // status:'complete'|'partial'|… }. Both the FRESH split (HTTP 200/207/
+    // 502) and the durable-REPLAY split (replayed:true) carry this shape, so
+    // we parse them identically here — otherwise the same on-chain outcome
+    // would report differently on first call vs replay.
+    //
+    // Pre-fix this whole branch was absent: `success = resp.ok && txHash>0`
+    // reported a fully-settled split as success:false with an empty txHash
+    // (the agent told the user the payment FAILED while funds had moved),
+    // and a partial (HTTP 207) looked identical to a hard failure. We must
+    // derive success from the split status and surface the per-leg detail.
+    const isSplit =
+      (data as { split?: boolean }).split === true ||
+      Array.isArray((data as { legs?: unknown }).legs);
+    if (isSplit) {
+      const legs = Array.isArray((data as { legs?: unknown }).legs)
+        ? ((data as { legs: Array<{ recipient: string; amount: string; txHash?: string; error?: string }> }).legs)
+        : [];
+      const status = (data as { status?: string }).status;
+      const replayed = (data as { replayed?: boolean }).replayed === true;
+      // settled/failed counts: trust the server's tallies when present,
+      // else derive from the legs array (a leg with a txHash settled).
+      const settledCount =
+        typeof (data as { settled?: number }).settled === "number"
+          ? (data as { settled: number }).settled
+          : legs.filter((l) => typeof l.txHash === "string" && l.txHash.length > 0).length;
+      const failedCount =
+        typeof (data as { failed?: number }).failed === "number"
+          ? (data as { failed: number }).failed
+          : legs.filter((l) => !l.txHash).length;
+      // complete (HTTP 200, status==='complete', all legs settled) → success.
+      // partial (HTTP 207, status==='partial') → NOT a plain failure: some
+      //   legs landed; surface as a distinct partial so the AI reports which
+      //   legs settled and does NOT tell the user to blindly retry.
+      // anything else (failed / relay_unreachable_uncertain / 0 settled) →
+      //   success:false.
+      const isComplete = status === "complete" && failedCount === 0;
+      const isPartial = status === "partial" || resp.status === 207;
+      const success = isComplete;
+      const message =
+        "message" in data
+          ? (data as { message?: string }).message
+          : "error" in data
+            ? (data as { error?: string }).error
+            : undefined;
+      return {
+        result: {
+          success,
+          sandbox: false,
+          // Top-level txHash mirrors the server's (first settled leg). Per-leg
+          // hashes in `legs` remain authoritative.
+          txHash,
+          tokenAmount: input.amount,
+          token: input.token,
+          chain: chain.key,
+          method: "eip7702",
+          split: true,
+          legs,
+          settledLegs: settledCount,
+          failedLegs: failedCount,
+          ...(isPartial && !isComplete ? { partial: true } : {}),
+          ...(replayed ? { replayed: true } : {}),
+          explorerUrl: txHash ? undefined : null,
+        } satisfies PayResult,
+        guardsApplied: [
+          ...guardsApplied,
+          "wallet=agentic-server",
+          "mode=live",
+          "settlement=split",
+          `split_settled=${settledCount}`,
+          `split_failed=${failedCount}`,
+          `split_status=${status ?? "unknown"}`,
+          ...(replayed ? ["replayed=true"] : []),
+          ...(message ? [`server_message=${message}`] : []),
+        ],
+        senderWallet,
+        ...(isPartial && !isComplete
+          ? {
+              setupHint:
+                `Split PARTIALLY settled: ${settledCount} leg(s) landed on-chain, ` +
+                `${failedCount} did NOT. The settled legs already moved funds — do NOT ` +
+                `blindly retry the whole payment (a retry replays only the unsettled ` +
+                `intent, it will not double-pay the settled legs). Inspect legs[] for ` +
+                `which recipients received funds and which still need handling.`,
+            }
+          : {}),
+      };
+    }
 
     // Server returns HTTP 202 + `pending: true` when a concurrent
     // identical request beats us to the SET NX claim — the relay

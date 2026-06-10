@@ -37,6 +37,15 @@ export const BridgeSendInputSchema = z.object({
   feeToken: z.enum(["LINK", "native"]).optional().describe("Fee token. Defaults to LINK (~10% cheaper than native)."),
   sandbox: z.boolean().optional().describe("Sandbox mode (default true). Set to false for a live on-chain bridge."),
   maxFeeRaw: z.string().regex(/^\d+$/).optional().describe("Optional client-side fee cap in raw 18-dec wei. Server still clamps to its 10% slippage ceiling; clients may LOWER but not RAISE."),
+  confirm: z
+    .boolean()
+    .optional()
+    .describe(
+      "MUST be true to fire a LIVE bridge (ignored in sandbox). Set this only after the " +
+        "user has explicitly approved this exact bridge (src, dst, amount, feeToken) in the " +
+        "conversation. When omitted or false on a live call the tool previews the action and " +
+        "does NOT move any funds. Never set confirm:true on the user's behalf without approval.",
+    ),
 }).refine(d => d.src !== d.dst, {
   // Local Zod rejection saves a network round-trip + a Q402 backend log
   // entry. The bridge route also rejects same-chain bridges but the
@@ -53,8 +62,13 @@ export const BRIDGE_SEND_TOOL = {
     "synthetic messageId unless `sandbox: false` is passed AND Q402_ENABLE_REAL_PAYMENTS=1 AND a " +
     "live Multichain API key is configured. The server signs ccipSend with the Agent Wallet's " +
     "encrypted PK, auto-funds source-chain gas from the user's Gas Tank, and debits both the auto- " +
-    "fund cost and the CCIP fee per the bridge's settled receipt. Recommended flow: q402_bridge_quote " +
-    "first → confirm cost with the user → q402_bridge_send with sandbox: false. Live mode needs a " +
+    "fund cost and the CCIP fee per the bridge's settled receipt. " +
+    "REQUIRES CONFIRMATION — like q402_pay and q402_yield_deposit, a LIVE bridge (sandbox: false) " +
+    "refuses to execute unless confirm: true is set. Call it first WITHOUT confirm to get a one-line " +
+    "preview (src, dst, amount, fee token); show that to the user, get explicit approval, THEN re-call " +
+    "with sandbox: false AND confirm: true. Never set confirm: true on the user's behalf. " +
+    "Recommended flow: q402_bridge_quote first → preview + confirm cost with the user → " +
+    "q402_bridge_send with sandbox: false, confirm: true. Live mode needs a " +
     "Multichain subscription; trial keys are rejected. If the bridge returns AGENT_WALLET_DELEGATED, " +
     "run q402_clear_delegation on the source chain first.",
   inputSchema: {
@@ -93,6 +107,13 @@ export const BRIDGE_SEND_TOOL = {
         pattern: "^[0-9]+$",
         description: "Optional client-side fee cap in raw 18-dec wei.",
       },
+      confirm: {
+        type: "boolean" as const,
+        description:
+          "MUST be true to fire a LIVE bridge (ignored in sandbox) — set only after the user " +
+          "explicitly approved this exact bridge in chat. Omit (or false) on a live call to " +
+          "preview without moving funds.",
+      },
     },
     required: ["src", "dst", "amount"],
   },
@@ -130,6 +151,30 @@ export async function runBridgeSend(input: z.infer<typeof BridgeSendInputSchema>
           sandbox(input, "Sandbox response. Pass `sandbox: false` AND set Q402_ENABLE_REAL_PAYMENTS=1 (with a live Q402_MULTICHAIN_API_KEY) to fire a real bridge."),
           null, 2,
         ),
+      }],
+    };
+  }
+
+  // ── Confirm gate — LIVE bridge MOVES FUNDS, refuse without approval ─────
+  // Mirrors q402_yield_deposit: a live call (sandbox:false) must carry
+  // confirm:true. When it doesn't we DO NOT hit the bridge endpoint — we
+  // return a plain (non-error) preview the agent must show the user before
+  // re-calling with confirm:true. q402_pay enforces the same intent via
+  // confirm:z.literal(true); this tool keeps confirm optional (so sandbox
+  // previews don't require it) and gates at runtime on the live path only.
+  if (input.confirm !== true) {
+    const walletDesc =
+      typeof input.walletId === "string" && input.walletId.length > 0
+        ? `wallet ${input.walletId.toLowerCase()}`
+        : "your default Agent Wallet";
+    const fee = input.feeToken === "native" ? "native" : "LINK";
+    return {
+      content: [{
+        type: "text" as const,
+        text:
+          `Will bridge ${input.amount} raw USDC units from ${input.src} → ${input.dst} ` +
+          `via Chainlink CCIP from ${walletDesc} (fee paid in ${fee}). This MOVES FUNDS ` +
+          `on-chain. Re-call with confirm:true to execute.`,
       }],
     };
   }
