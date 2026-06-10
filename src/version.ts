@@ -1,7 +1,14 @@
 /**
  * Single source of truth for the published package version inside the MCP
- * server's own code. Mirrors package.json — the package-drift test asserts
- * the two stay in sync at publish time.
+ * server's own code — DERIVED from package.json so the runtime banner can
+ * never drift from the published version again. (0.8.16 shipped with a
+ * stale hardcoded "0.8.15" banner because a manual constant wasn't bumped;
+ * importing the manifest removes that whole class of mistake.)
+ *
+ * resolveJsonModule + esModuleInterop are enabled in tsconfig, and tsup
+ * inlines the import at build time.
  */
-export const PACKAGE_NAME    = "@quackai/q402-mcp";
-export const PACKAGE_VERSION = "0.8.15";
+import pkg from "../package.json";
+
+export const PACKAGE_NAME = pkg.name as string;
+export const PACKAGE_VERSION = pkg.version as string;
