@@ -217,21 +217,25 @@ the feed's on-chain description, and rejected if stale. Supported price feeds:
 One intent → automatic N-way fan-out (royalty / revenue-share / protocol fee).
 
 ```jsonc
+// hook config: just turn it on. There is NO stored default split.
 {
-  "multiPayeeSplit": {
-    "enabled": true,
-    "defaultSplits": [
-      { "recipient": "0xRoyalty...", "bps": 7000 },   // 70%
-      { "recipient": "0xRevenue...", "bps": 2500 },   // 25%
-      { "recipient": "0xFee...",     "bps": 500 }     // 5%
-    ]
-  }
+  "multiPayeeSplit": { "enabled": true }
 }
 ```
 
+The split is **per-payment and explicit** — you pass the legs on every call.
+The runtime no longer reads a `defaultSplits` config: there is no stored split
+that applies on its own, so an empty `hookParams.splits` does NOT fan out to
+some saved default (it's simply a single ordinary transfer). Always declare the
+legs you want on the payment itself:
+
 ```jsonc
-// per-payment override
-{ "hookParams": { "splits": [{ "recipient": "0xA...", "bps": 9000 }, { "recipient": "0xB...", "bps": 1000 }] } }
+// per-payment: declare the split legs explicitly (required on every call)
+{ "hookParams": { "splits": [
+  { "recipient": "0xRoyalty...", "bps": 7000 },   // 70%
+  { "recipient": "0xRevenue...", "bps": 2500 },   // 25%
+  { "recipient": "0xFee...",     "bps": 500 }      // 5%
+] } }
 ```
 
 Basis points must sum to `10000`. Leg amounts are computed in raw token units

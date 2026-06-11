@@ -49,7 +49,10 @@ export const YieldWithdrawInputSchema = z.object({
         "tool generates a FRESH random key per invocation, so each call executes a " +
         "distinct withdrawal (a re-deposit followed by another `withdraw max` is NOT " +
         "replayed). Pass your own STABLE key only when you want retry-safety: re-calling " +
-        "with the same key replays the first result instead of double-withdrawing.",
+        "with the same key replays the first result instead of double-withdrawing. " +
+        'IMPORTANT: if a call returns status="uncertain" (timeout / unconfirmed ' +
+        "broadcast), it echoes back the idempotencyKey it used — pass THAT exact value " +
+        "here to safely resume the same withdrawal instead of starting a new one.",
     ),
   confirm: z
     .boolean()
@@ -83,6 +86,12 @@ export const YIELD_WITHDRAW_TOOL = {
     "(q402_live_*) is configured AND Q402_ENABLE_REAL_PAYMENTS=1. Without both, " +
     "confirm:true returns a sandbox preview (no on-chain withdraw) with a setup hint — " +
     "confirm:true alone does NOT move real funds. " +
+    "\n\n" +
+    "RETRY SAFETY — on a timeout or an unconfirmed broadcast the tool returns " +
+    'status="uncertain" and echoes back the idempotencyKey it used. The withdrawal MAY ' +
+    "have settled, so do NOT blindly call again — that starts a NEW withdrawal and can " +
+    "double-withdraw. To resume the SAME operation, re-call with idempotencyKey set to " +
+    "the echoed value; the server dedupes on it and replays the original result. " +
     "\n\n" +
     "Use q402_yield_positions first to see the current position size (especially before an " +
     "amount=\"max\" withdrawal).",
@@ -118,7 +127,9 @@ export const YIELD_WITHDRAW_TOOL = {
           "Optional durable idempotency key. Omit and the tool generates a FRESH random " +
           "key per invocation, so every call executes a distinct withdrawal. Pass your own " +
           "STABLE key only for opt-in retry-safety — re-calling with the same key replays " +
-          "the first result instead of double-withdrawing.",
+          "the first result instead of double-withdrawing. If a call returns " +
+          'status="uncertain", it echoes the idempotencyKey it used — pass that exact ' +
+          "value back here to resume the same withdrawal rather than start a new one.",
       },
       confirm: {
         type: "boolean" as const,
@@ -263,10 +274,32 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       signal: AbortSignal.timeout(60_000),
     });
   } catch (e) {
+    // NETWORK-UNCERTAIN — the request may or may not have reached the server
+    // (timeout, dropped socket, cold-start). The withdrawal could already be
+    // in flight or settled. We MUST NOT let the caller retry with a fresh
+    // random key — that would be a NEW withdrawal (double-withdraw, e.g. two
+    // `withdraw max`). Surface THIS call's idempotencyKey so a retry passing
+    // it back resumes the SAME logical withdrawal (the server dedupes on it)
+    // instead of starting another.
     return {
       content: [{
         type: "text" as const,
-        text: `Yield withdraw failed: ${e instanceof Error ? e.message : String(e)}. Retry in a moment.`,
+        text: JSON.stringify({
+          status: "uncertain",
+          success: false,
+          action: "yield_withdraw",
+          chain: input.chain,
+          token: input.token,
+          amount: input.amount,
+          idempotencyKey,
+          error: e instanceof Error ? e.message : String(e),
+          message:
+            "Network error before a confirmed response — the withdrawal may or may not " +
+            "have been submitted. Do NOT start a new withdrawal. To safely resume THIS " +
+            `operation, retry with idempotencyKey="${idempotencyKey}" (the server dedupes ` +
+            "on it, so a retry that already landed replays the original result instead of " +
+            "double-withdrawing).",
+        }, null, 2),
       }],
       isError: true,
     };
@@ -274,6 +307,37 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
 
   const data = (await res.json().catch(() => ({}))) as WithdrawData;
   if (!res.ok) {
+    // 502 settlement_uncertain — the tx was broadcast but the receipt is
+    // unconfirmed; the funds MAY have moved. Same rule as the network-error
+    // path: a retry must reuse THIS idempotencyKey, never a fresh one, or it
+    // risks a second on-chain withdrawal. Surface the key + the no-blind-retry
+    // guidance. (Other non-2xx codes — 402/403/409/429/503 — are clean
+    // pre-settlement rejections where no funds moved; the server already
+    // explains them, so we pass the body through unchanged.)
+    if (res.status === 502) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            status: "uncertain",
+            success: false,
+            action: "yield_withdraw",
+            chain: input.chain,
+            token: input.token,
+            amount: input.amount,
+            idempotencyKey,
+            txHash: data.txHash ?? null,
+            error: data.error ?? "settlement_uncertain",
+            message:
+              "Broadcast but unconfirmed — the withdrawal may have settled on-chain. Do NOT " +
+              "blindly start a new withdrawal. Verify on-chain first; if you must retry, reuse " +
+              `idempotencyKey="${idempotencyKey}" so the server resumes THIS operation ` +
+              "(replays the original result) instead of withdrawing again.",
+          }, null, 2),
+        }],
+        isError: true,
+      };
+    }
     return {
       content: [{
         type: "text" as const,

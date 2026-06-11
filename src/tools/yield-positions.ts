@@ -1,9 +1,17 @@
 /**
  * q402_yield_positions — read-only Q402 Yield (Aave) position snapshot.
  *
- * Returns the Agent Wallet's current lending positions: per-market
- * balance, principal, accrued interest, and supply APY, plus an
- * aggregate total supplied in USD. No state change, no funds move.
+ * Returns the Agent Wallet's current lending positions: per-market the
+ * CURRENT supplied position value (the live aToken balance, which already
+ * includes accrued interest but is NOT broken out into principal vs.
+ * earnings) and the live supply APY, plus an aggregate current value in
+ * USD. No state change, no funds move.
+ *
+ * NOTE: this Phase-0 read does NOT report principal or accrued earnings as
+ * separate figures — the server returns those as null (it tracks no
+ * deposit-time principal yet), so we surface only what's real: the current
+ * position value + APY. Do not present a "you've earned $X" number from this
+ * tool; it isn't available.
  *
  * Authenticated by the live Multichain API key, sent in the `x-api-key`
  * header (the same resolved key the Mode C pay path uses). The walletId
@@ -34,14 +42,17 @@ export const YIELD_POSITIONS_TOOL = {
   name: "q402_yield_positions",
   description:
     "READ-ONLY — show the Agent Wallet's current Q402 Yield (Aave) lending positions. Returns each " +
-    "position's protocol, chain, asset, market address, balance, principal, accrued interest, and " +
-    "supply APY, plus the aggregate total supplied in USD. Authenticated by the configured live " +
-    "Multichain API key — no private key required and no funds move. " +
+    "position's protocol, chain, asset, market address, CURRENT supplied position value (the live " +
+    "aToken balance, in token units), and live supply APY, plus the aggregate current value in USD. " +
+    "Authenticated by the configured live Multichain API key — no private key required and no funds move. " +
     "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today. " +
+    "DOES NOT report principal or accrued earnings as separate numbers — the aToken balance already " +
+    "includes accrued interest but is not broken out, so do NOT claim a specific 'earnings/profit/" +
+    "interest earned' figure from this tool; report only the current position value and the APY. " +
     "walletId is OPTIONAL: omit it and the server reads the owner's default Agent Wallet " +
     "(resolved from the API key); pass one only when the owner holds more than one wallet. " +
-    "An optional chain filter is also accepted. Use this whenever the user asks 'how much am I " +
-    "earning?' or 'what are my open lending positions?'",
+    "An optional chain filter is also accepted. Use this whenever the user asks 'what is my position " +
+    "worth?', 'what's my current yield balance / APY?', or 'what are my open lending positions?'",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -67,9 +78,15 @@ interface Position {
   chain: string;
   asset: string;
   marketAddress: string;
+  /** CURRENT supplied position value in token units (live aToken balance).
+   *  This is the redeemable amount and already includes any accrued
+   *  interest — it is NOT split into principal vs. earnings. */
   balance: string;
-  principal: string;
-  accrued: string;
+  /** Phase-0 server returns these as null — deposit-time principal isn't
+   *  tracked yet, so accrued earnings can't be derived. Typed nullable so we
+   *  never present a fabricated earnings figure. */
+  principal: string | null;
+  accrued: string | null;
   /** Fraction — 0.021 means 2.1% APY. */
   supplyApy: number;
 }
@@ -168,17 +185,21 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
   const unavailableChains = Array.isArray(data.unavailableChains) ? data.unavailableChains : [];
   const hasUnavailable = data.unavailable === true || unavailableChains.length > 0;
 
-  // One-line aggregate so the LLM can answer "how much am I earning?"
+  // One-line aggregate so the LLM can answer "what's my position worth?"
   // without parsing the blob; full position list follows for traceability.
-  // When some chains failed to read, say so explicitly instead of implying a
-  // zero balance — the snapshot is PARTIAL, not necessarily empty.
+  // This is CURRENT VALUE (live aToken balance), not "earnings" — the server
+  // doesn't report accrued profit, so don't imply one. When some chains
+  // failed to read, say so explicitly instead of implying a zero balance —
+  // the snapshot is PARTIAL, not necessarily empty.
   const unavailableNote = hasUnavailable
     ? ` Some chains could not be read this cycle${
         unavailableChains.length ? ` (${unavailableChains.join(", ")})` : ""
       } — this snapshot may be incomplete; retry before treating a balance as zero.`
     : "";
   const summary = positions.length
-    ? `Total supplied: $${(data.totalSuppliedUsd ?? 0).toFixed(2)} across ${positions.length} position(s).${unavailableNote}`
+    ? `Total current position value: $${(data.totalSuppliedUsd ?? 0).toFixed(2)} across ` +
+      `${positions.length} position(s) (live aToken balance incl. accrued interest; ` +
+      `earnings are not broken out).${unavailableNote}`
     : hasUnavailable
       ? `No positions returned, but a read failure occurred${
           unavailableChains.length ? ` on ${unavailableChains.join(", ")}` : ""
@@ -192,11 +213,23 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
         type: "text" as const,
         text: JSON.stringify({
           walletId: data.walletId ?? walletId ?? null,
+          // Surface only what's real: the current position value (live aToken
+          // balance) + APY. `principal`/`accrued` come back null from this
+          // Phase-0 read, so they're included ONLY when the server actually
+          // populated them — never as a null placeholder that reads like a
+          // real (zero) earnings figure.
           positions: positions.map(p => ({
-            ...p,
+            protocol: p.protocol,
+            chain: p.chain,
+            asset: p.asset,
+            marketAddress: p.marketAddress,
+            currentValue: p.balance,
+            supplyApy: p.supplyApy,
             supplyApyPct: Math.round(p.supplyApy * 100 * 100) / 100,
+            ...(p.principal != null ? { principal: p.principal } : {}),
+            ...(p.accrued != null ? { accrued: p.accrued } : {}),
           })),
-          totalSuppliedUsd: data.totalSuppliedUsd ?? null,
+          totalCurrentValueUsd: data.totalSuppliedUsd ?? null,
           asOf: data.asOf ?? null,
           unavailable: hasUnavailable,
           unavailableChains,
