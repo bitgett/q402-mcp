@@ -79,6 +79,16 @@ interface PositionsData {
   positions?: Position[];
   totalSuppliedUsd?: number;
   asOf?: string;
+  /**
+   * Chains the server could NOT read this cycle (per-chain RPC blip while
+   * fetching aToken balances + rates). Surfaced so a read FAILURE is
+   * distinguishable from a genuinely empty position — dropping it would make
+   * a transient RPC error look like "no position" and could mislead a
+   * downstream `withdraw max` decision. `unavailable` is the boolean form
+   * some server builds return alongside (or instead of) the list.
+   */
+  unavailable?: boolean;
+  unavailableChains?: string[];
 }
 
 export async function runYieldPositions(input: z.infer<typeof YieldPositionsInputSchema>) {
@@ -152,11 +162,28 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
   }
 
   const positions = data.positions ?? [];
+  // Surface per-chain read failures so an RPC blip isn't reported as an empty
+  // position. The server flags them via `unavailableChains` (list) and/or
+  // `unavailable` (boolean) — honour either form.
+  const unavailableChains = Array.isArray(data.unavailableChains) ? data.unavailableChains : [];
+  const hasUnavailable = data.unavailable === true || unavailableChains.length > 0;
+
   // One-line aggregate so the LLM can answer "how much am I earning?"
   // without parsing the blob; full position list follows for traceability.
+  // When some chains failed to read, say so explicitly instead of implying a
+  // zero balance — the snapshot is PARTIAL, not necessarily empty.
+  const unavailableNote = hasUnavailable
+    ? ` Some chains could not be read this cycle${
+        unavailableChains.length ? ` (${unavailableChains.join(", ")})` : ""
+      } — this snapshot may be incomplete; retry before treating a balance as zero.`
+    : "";
   const summary = positions.length
-    ? `Total supplied: $${(data.totalSuppliedUsd ?? 0).toFixed(2)} across ${positions.length} position(s).`
-    : "No open Q402 Yield positions for this wallet.";
+    ? `Total supplied: $${(data.totalSuppliedUsd ?? 0).toFixed(2)} across ${positions.length} position(s).${unavailableNote}`
+    : hasUnavailable
+      ? `No positions returned, but a read failure occurred${
+          unavailableChains.length ? ` on ${unavailableChains.join(", ")}` : ""
+        } — this is NOT a confirmed empty position; retry.`
+      : "No open Q402 Yield positions for this wallet.";
 
   return {
     content: [
@@ -171,6 +198,8 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
           })),
           totalSuppliedUsd: data.totalSuppliedUsd ?? null,
           asOf: data.asOf ?? null,
+          unavailable: hasUnavailable,
+          unavailableChains,
         }, null, 2),
       },
     ],

@@ -156,7 +156,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**20 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**24 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -180,8 +180,12 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_bridge_send` | live mode | Execute a CCIP bridge from the user's Agent Wallet. Mode C only (server-managed). Sandbox-by-default; `sandbox: false` + live Multichain key + `Q402_ENABLE_REAL_PAYMENTS=1` fires a real on-chain bridge. |
 | `q402_bridge_history` | not yet wired | Pointer to the dashboard. Returns `{ implemented: false, dashboardUrl, dashboardPath }` — read-only guidance until owner-sig auth lands in MCP. |
 | `q402_bridge_gas_tank` | not yet wired | Static guidance + dashboard pointer for the Bridge Gas Tank top-up flow. Live balance lookup needs owner-sig auth (dashboard for now). |
+| `q402_yield_reserves` | none | List Q402 Yield (Aave V3) lending markets — protocol, chain, asset, market address, supply APY. BNB Chain only today. |
+| `q402_yield_positions` | api key | Show the Agent Wallet's open Q402 Yield positions (balance, principal, accrued interest, APY) + total supplied in USD. Mode C. |
+| `q402_yield_deposit` | live mode | Supply the Agent Wallet's USDC/USDT into Aave V3 (Q402 Yield) to earn supply APY. Mode C, BNB-only. Requires `confirm: true`; sandbox-by-default. |
+| `q402_yield_withdraw` | live mode | Withdraw supplied USDC/USDT out of Aave V3 back to the Agent Wallet (`amount: "max"` = full position). Mode C, BNB-only. Requires `confirm: true`; sandbox-by-default. |
 
-`q402_pay` + `q402_batch_pay` + `q402_bridge_send` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
+`q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
 > ℹ️ `q402_pay` expects a 0x address — ENS isn't resolved server-side. Resolve client-side first.
 > Per-chain Gas Tank balances + full TX history live in the [dashboard](https://q402.quackai.ai/dashboard) (wallet-signature only).

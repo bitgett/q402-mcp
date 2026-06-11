@@ -17,7 +17,7 @@
  * with confirm:true after the user approves.
  */
 
-import { id } from "ethers";
+import { hexlify, randomBytes } from "ethers";
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
 
@@ -46,9 +46,10 @@ export const YieldWithdrawInputSchema = z.object({
     .optional()
     .describe(
       "Optional durable idempotency key for this logical withdrawal. When omitted the " +
-        "tool derives a STABLE key from (walletId, chain, token, amount) so a lost " +
-        "response can be safely retried without double-withdrawing. Pass your own only " +
-        "if you need two genuinely distinct same-amount withdrawals to be treated separately.",
+        "tool generates a FRESH random key per invocation, so each call executes a " +
+        "distinct withdrawal (a re-deposit followed by another `withdraw max` is NOT " +
+        "replayed). Pass your own STABLE key only when you want retry-safety: re-calling " +
+        "with the same key replays the first result instead of double-withdrawing.",
     ),
   confirm: z
     .boolean()
@@ -114,9 +115,10 @@ export const YIELD_WITHDRAW_TOOL = {
       idempotencyKey: {
         type: "string" as const,
         description:
-          "Optional durable idempotency key. Omit and the tool derives a stable key from " +
-          "(walletId, chain, token, amount) so a lost response is safe to retry without " +
-          "double-withdrawing. Pass your own only to force two same-amount withdrawals apart.",
+          "Optional durable idempotency key. Omit and the tool generates a FRESH random " +
+          "key per invocation, so every call executes a distinct withdrawal. Pass your own " +
+          "STABLE key only for opt-in retry-safety — re-calling with the same key replays " +
+          "the first result instead of double-withdrawing.",
       },
       confirm: {
         type: "boolean" as const,
@@ -163,14 +165,17 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       ? input.walletId.toLowerCase()
       : CONFIG.walletId ?? undefined;
 
-  // Durable idempotency key — stable for retries of the SAME logical
-  // withdrawal so a lost response can't re-execute after the server's 30-min
-  // claim TTL expires (the server keys its no-TTL settled marker on this).
-  // When the caller doesn't supply one, derive it from the request params.
+  // Idempotency key. The server keys a no-TTL "settled" marker on this, so a
+  // PARAM-DERIVED default would be permanent: re-deposit then `withdraw max`
+  // again with the same (walletId, chain, token, amount) would replay the OLD
+  // txHash forever and the second withdrawal would never run. So the default
+  // is a FRESH random 32-byte key per invocation: each distinct call executes.
+  // A caller who wants retry-safety can still pass an explicit STABLE key
+  // (opt-in) to dedupe a lost-response retry without double-withdrawing.
   const idempotencyKey =
     typeof input.idempotencyKey === "string" && input.idempotencyKey.length > 0
       ? input.idempotencyKey
-      : id(`yield:withdraw:${walletId ?? "default"}:${input.chain}:${input.token}:${input.amount}`);
+      : hexlify(randomBytes(32));
 
   // "max" withdraws the full position — phrase the preview accordingly so the
   // user understands the whole balance is leaving Aave.

@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes twenty tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes twenty-four tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -53,6 +53,16 @@
  *   q402_bridge_gas_tank    read-only, requires key — per-chain Gas Tank
  *                           native balance + auto-fund debit window so AI
  *                           can decide whether to top up before bridging.
+ *   q402_yield_reserves     read-only, no key — list Q402 Yield (Aave V3)
+ *                           lending markets + supply APY. BNB Chain only.
+ *   q402_yield_positions    read-only, requires key — Agent Wallet's open
+ *                           Q402 Yield positions + total supplied (USD)
+ *   q402_yield_deposit      write, requires key — supply USDC/USDT into
+ *                           Aave V3 (Q402 Yield). Mode C, BNB-only,
+ *                           confirm-gated, sandbox-default
+ *   q402_yield_withdraw     write, requires key — withdraw USDC/USDT out of
+ *                           Aave V3 (amount "max" = full). Mode C, BNB-only,
+ *                           confirm-gated, sandbox-default
  *
  * Trial-scope policy (server-enforced via API key plan): trial keys are
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
