@@ -59,6 +59,38 @@ export interface PayResult {
    */
   pending?: boolean;
   retryAfterSec?: number;
+  /**
+   * Mode C MultiPayeeSplit only — `true` when the server fanned the
+   * payment out to N legs instead of a single recipient. When set, the
+   * funds went to the addresses in `legs` (NOT the top-level `to`), and
+   * the top-level `txHash` mirrors the first settled leg's hash. The AI
+   * should report the per-leg breakdown, not just the top-level hash.
+   */
+  split?: boolean;
+  /**
+   * Per-leg settlement results for a split. Each leg is its own on-chain
+   * transfer: settled legs carry a `txHash`, failed legs carry an `error`.
+   */
+  legs?: Array<{ recipient: string; amount: string; txHash?: string; error?: string }>;
+  /** Number of legs that settled on-chain (split only). */
+  settledLegs?: number;
+  /** Number of legs that failed (split only). Non-zero with success:true is impossible. */
+  failedLegs?: number;
+  /**
+   * Split only — `true` when NOT every leg settled (server HTTP 207 /
+   * status==='partial'). Funds DID move for the settled legs; this is NOT
+   * a plain failure and the AI must NOT tell the user to blindly "retry"
+   * (a retry would replay only the still-pending intent, never double-pay
+   * the legs that already landed). Inspect `legs[]` to see which landed.
+   */
+  partial?: boolean;
+  /**
+   * Mode C only — `true` when the server returned a cached settlement for
+   * a duplicate request (durable replay guard) rather than firing a fresh
+   * one. Outcome is identical to the original; surfaced so the AI can say
+   * "already settled earlier" instead of implying a second payment.
+   */
+  replayed?: boolean;
 }
 
 export interface PayInput {
