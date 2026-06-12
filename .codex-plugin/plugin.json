@@ -1,6 +1,6 @@
 {
   "name": "q402",
-  "version": "0.8.20",
+  "version": "0.8.21",
   "description": "Q402 — gasless USDC, USDT, and RLUSD payments on 10 EVM chains (BNB, Ethereum, Avalanche, X Layer, Stable, Mantle, Injective, Monad, Scroll, Arbitrum) + Chainlink CCIP USDC bridge on the eth/avax/arbitrum triangle + Q402 Yield (gasless Aave V3 supply/withdraw on BNB Chain). Twenty-four tools: q402_doctor (first-install onboarding + health check), q402_quote, q402_balance, q402_pay, q402_batch_pay, q402_receipt, q402_wallet_status, q402_agentic_info, q402_clear_delegation, q402_recurring_list, q402_recurring_create, q402_recurring_fires, q402_recurring_pause, q402_recurring_resume, q402_recurring_skip_next, q402_recurring_cancel, q402_bridge_quote, q402_bridge_send, q402_bridge_history, q402_bridge_gas_tank, q402_yield_reserves, q402_yield_positions, q402_yield_deposit, q402_yield_withdraw. Sandbox-by-default; real on-chain TX requires explicit live-mode env vars.",
   "author": "QuackAI <hello@quackai.ai>",
   "homepage": "https://q402.quackai.ai",
