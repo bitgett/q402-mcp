@@ -339,15 +339,14 @@ export function loadConfig(): Config {
     classifyApiKey(trialApiKey) === "live" ||
     classifyApiKey(multichainApiKey) === "live" ||
     classifyApiKey(legacyApiKey) === "live";
-  // Live default reflects "is at least one signer key configured" the
-  // same way isLiveModeFor() does — either Mode A (Q402_PRIVATE_KEY)
-  // or Mode B (Q402_AGENTIC_PRIVATE_KEY) is enough. Mode C is a live
-  // path too but only resolves per-call (apiKey live + endpoint
-  // reachable), so we don't try to encode it in this default snapshot.
-  const hasAnySignerKey =
-    (typeof privateKey === "string" && privateKey.length > 0) ||
-    (typeof agenticPrivateKey === "string" && agenticPrivateKey.length > 0);
-  const live = realPaymentsRequested && anyLiveKey && hasAnySignerKey;
+  // Live default = real payments requested AND at least one configured key is
+  // live. This covers ALL three modes: Mode A (Q402_PRIVATE_KEY) and Mode B
+  // (Q402_AGENTIC_PRIVATE_KEY) sign locally, while Mode C signs server-side at
+  // the relay using only a live API key (no local signer). The previous gate
+  // additionally required a local signer key, which mislabeled a Mode-C-only
+  // session (live api key, no private key) as `mode=sandbox` at startup even
+  // though its BNB / bridge / yield pays settle live.
+  const live = realPaymentsRequested && anyLiveKey;
 
   return {
     trialApiKey,

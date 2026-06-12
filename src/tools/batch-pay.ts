@@ -160,6 +160,7 @@ export interface BatchPaySummary {
     | "aborted"
     | "sandbox"
     | "ambiguous"
+    | "settlement_uncertain"
     | "trial_cap_exceeded"
     | "needs_wallet_choice"
     | "wallet_mode_unavailable";
@@ -539,6 +540,28 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
         data && typeof data === "object" && "error" in data
           ? String((data as { error: unknown }).error)
           : `relay_http_${resp.status}`;
+      // Relay outcome UNCERTAIN (server 502 status:"uncertain"): one or more
+      // rows may have settled on-chain even though the response was lost. This
+      // is NOT a clean abort — re-sending re-signs with a fresh nonce and could
+      // double-pay. The server's idempotency guard already refuses to re-fire
+      // THIS exact batch; the agent must verify on-chain, NOT retry.
+      if ((data as { status?: string }).status === "uncertain") {
+        return {
+          mode: "live",
+          status: "settlement_uncertain",
+          guardsApplied: [
+            ...guardsApplied,
+            "wallet=agentic-server",
+            "mode=live",
+            `http=${resp.status}`,
+          ],
+          senderWallet,
+          error: errMsg,
+          setupHint:
+            "The relay did not confirm whether these payments settled — they MAY have been sent. " +
+            "DO NOT retry this batch; verify the recipients' on-chain balances first. Re-sending could double-pay.",
+        };
+      }
       return {
         mode: "live",
         status: "aborted",
