@@ -400,6 +400,15 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     ...(input.hookParams?.splits
       ? { splits: input.hookParams.splits.map((s) => ({ r: s.recipient.toLowerCase(), bps: s.bps })) }
       : {}),
+    // Bind the settlement-gating hooks too — a ConditionalOracle gate or a
+    // ReputationGate materially changes WHEN/IF money moves, so dropping or
+    // altering them after the preview must invalidate consent.
+    ...(input.hookParams?.condition
+      ? { cond: { kind: input.hookParams.condition.kind, op: input.hookParams.condition.op, value: input.hookParams.condition.value, feed: input.hookParams.condition.feed ?? null } }
+      : {}),
+    ...(input.hookParams?.recipientAgentId
+      ? { ragent: input.hookParams.recipientAgentId }
+      : {}),
   };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (!consent.ok) {

@@ -192,6 +192,9 @@ export async function runBridgeSend(input: z.infer<typeof BridgeSendInputSchema>
     dst: input.dst,
     amount: input.amount,
     feeToken: input.feeToken === "native" ? "native" : "LINK",
+    // Bind the fee ceiling too — it bounds what the user actually pays, so it
+    // must not be addable/changeable after the preview.
+    maxFeeRaw: input.maxFeeRaw ?? null,
     // Bind the funding wallet too (see q402_pay).
     wid: (input.walletId ?? "").toLowerCase(),
   };
