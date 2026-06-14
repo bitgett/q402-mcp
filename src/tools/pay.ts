@@ -393,6 +393,10 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     to: input.to.toLowerCase(),
     amount: input.amount,
     token: input.token,
+    // Bind the funding source too — the user is consenting to spend from THIS
+    // wallet, so a different walletMode/walletId needs a fresh preview.
+    wm: effectiveMode,
+    wid: (input.walletId ?? "").toLowerCase(),
     ...(input.hookParams?.splits
       ? { splits: input.hookParams.splits.map((s) => ({ r: s.recipient.toLowerCase(), bps: s.bps })) }
       : {}),

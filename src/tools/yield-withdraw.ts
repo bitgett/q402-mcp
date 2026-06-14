@@ -20,6 +20,7 @@
 import { hexlify, randomBytes } from "ethers";
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
+import { checkConsent } from "../consent.js";
 
 export const YieldWithdrawInputSchema = z.object({
   chain: z
@@ -62,6 +63,15 @@ export const YieldWithdrawInputSchema = z.object({
         "explicitly approved this exact withdrawal (amount, token, chain, wallet) in " +
         "the conversation. When omitted or false the tool previews the action and " +
         "does NOT move any funds.",
+    ),
+  consentToken: z
+    .string()
+    .optional()
+    .describe(
+      "Two-phase consent. LEAVE UNSET on the first call: the tool previews the " +
+        "withdrawal (no funds move) and returns a consentToken. Relay the preview to " +
+        "the user, get an explicit yes, then re-call with confirm:true AND this " +
+        "consentToken. The token is re-derived from (chain, token, amount, wallet).",
     ),
 });
 
@@ -137,6 +147,13 @@ export const YIELD_WITHDRAW_TOOL = {
           "MUST be true to actually withdraw funds — set only after the user explicitly " +
           "approved this exact withdrawal in chat. Omit (or false) to preview without moving funds.",
       },
+      consentToken: {
+        type: "string" as const,
+        description:
+          "Two-phase consent token. Leave unset on the first call to get a preview + token; " +
+          "re-call with confirm:true AND this token after the user approves. Bound to " +
+          "(chain, token, amount, wallet).",
+      },
     },
     required: ["token", "amount"],
     additionalProperties: false,
@@ -192,18 +209,27 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
   // user understands the whole balance is leaving Aave.
   const amountDesc = input.amount === "max" ? "the FULL position" : `${input.amount} ${input.token}`;
 
-  // ── Confirm gate — MOVES FUNDS, so refuse without explicit approval ──────
-  // Mirrors q402_pay: when confirm !== true we DO NOT hit the endpoint. We
-  // return a plain (non-error) preview the agent must show the user before
-  // re-calling with confirm:true.
-  if (input.confirm !== true) {
+  // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────
+  // Requires BOTH confirm:true AND a consentToken bound to the withdrawal
+  // intent, so confirm:true alone can't move funds and the previewed params
+  // are the ones that execute.
+  const consentIntent = {
+    t: "yield-withdraw",
+    chain: input.chain,
+    token: input.token,
+    amount: input.amount,
+    walletId: walletId ?? null,
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (input.confirm !== true || !consent.ok) {
     const walletDesc = walletId ? `wallet ${walletId}` : "your default Agent Wallet";
     return {
       content: [{
         type: "text" as const,
         text:
           `Will withdraw ${amountDesc} from Aave on ${input.chain} back to ` +
-          `${walletDesc}. This MOVES FUNDS. Re-call with confirm:true to execute.`,
+          `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
+          `confirm:true AND consentToken="${consent.expected}".`,
       }],
     };
   }

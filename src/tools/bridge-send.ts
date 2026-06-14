@@ -192,6 +192,8 @@ export async function runBridgeSend(input: z.infer<typeof BridgeSendInputSchema>
     dst: input.dst,
     amount: input.amount,
     feeToken: input.feeToken === "native" ? "native" : "LINK",
+    // Bind the funding wallet too (see q402_pay).
+    wid: (input.walletId ?? "").toLowerCase(),
   };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (input.confirm !== true || !consent.ok) {

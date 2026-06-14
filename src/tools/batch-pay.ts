@@ -287,6 +287,9 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     chain: input.chain,
     token: input.token,
     recipients: input.recipients.map((r) => ({ to: r.to.toLowerCase(), amount: r.amount })),
+    // Bind the funding source too (see q402_pay).
+    wm: input.walletMode ?? "",
+    wid: (input.walletId ?? "").toLowerCase(),
   };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (!consent.ok) {

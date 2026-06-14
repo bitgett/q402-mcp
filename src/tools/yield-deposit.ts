@@ -18,6 +18,7 @@
 import { hexlify, randomBytes } from "ethers";
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
+import { checkConsent } from "../consent.js";
 
 export const YieldDepositInputSchema = z.object({
   chain: z
@@ -61,6 +62,16 @@ export const YieldDepositInputSchema = z.object({
         "explicitly approved this exact deposit (amount, token, chain, wallet) in " +
         "the conversation. When omitted or false the tool previews the action and " +
         "does NOT move any funds.",
+    ),
+  consentToken: z
+    .string()
+    .optional()
+    .describe(
+      "Two-phase consent. LEAVE UNSET on the first call: the tool previews the " +
+        "deposit (no funds move) and returns a consentToken. Relay the preview to " +
+        "the user, get an explicit yes, then re-call with confirm:true AND this " +
+        "consentToken. The token is re-derived from (chain, token, amount, wallet) " +
+        "and refused on mismatch, so a previewed deposit can't be swapped.",
     ),
 });
 
@@ -133,6 +144,13 @@ export const YIELD_DEPOSIT_TOOL = {
           "MUST be true to actually supply funds — set only after the user explicitly " +
           "approved this exact deposit in chat. Omit (or false) to preview without moving funds.",
       },
+      consentToken: {
+        type: "string" as const,
+        description:
+          "Two-phase consent token. Leave unset on the first call to get a preview + token; " +
+          "re-call with confirm:true AND this token after the user approves. Bound to " +
+          "(chain, token, amount, wallet) and refused on mismatch.",
+      },
     },
     required: ["token", "amount"],
     additionalProperties: false,
@@ -184,18 +202,29 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
       ? input.idempotencyKey
       : hexlify(randomBytes(32));
 
-  // ── Confirm gate — MOVES FUNDS, so refuse without explicit approval ──────
-  // Mirrors q402_pay: when confirm !== true we DO NOT hit the endpoint. We
-  // return a plain (non-error) preview the agent must show the user before
-  // re-calling with confirm:true.
-  if (input.confirm !== true) {
+  // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────
+  // Requires BOTH confirm:true AND a consentToken bound to the deposit intent.
+  // confirm:true alone is a model-filled boolean; the token forces the deposit
+  // through a human-visible preview and pins the exact params. When either is
+  // missing/stale we DO NOT hit the endpoint — we return a preview carrying the
+  // token the agent must echo back after the user approves.
+  const consentIntent = {
+    t: "yield-deposit",
+    chain: input.chain,
+    token: input.token,
+    amount: input.amount,
+    walletId: walletId ?? null,
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (input.confirm !== true || !consent.ok) {
     const walletDesc = walletId ? `wallet ${walletId}` : "your default Agent Wallet";
     return {
       content: [{
         type: "text" as const,
         text:
           `Will supply ${input.amount} ${input.token} into Aave on ${input.chain} from ` +
-          `${walletDesc}. This MOVES FUNDS. Re-call with confirm:true to execute.`,
+          `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
+          `confirm:true AND consentToken="${consent.expected}".`,
       }],
     };
   }
