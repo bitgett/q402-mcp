@@ -28,6 +28,7 @@ import {
   type KeyScope,
 } from "../config.js";
 import { Q402NodeClient, sandboxPay, type PayResult } from "../client.js";
+import { checkConsent } from "../consent.js";
 
 /** Which wallet the agent should spend from. */
 export type WalletModeRequest = "eoa" | "agentic-local" | "agentic-server";
@@ -89,6 +90,18 @@ export const PayInputSchema = z.object({
         "settlement — not just the top-level recipient and amount. Setting this to true on " +
         "behalf of the user without that confirmation is a violation of the tool contract.",
     ),
+  consentToken: z
+    .string()
+    .optional()
+    .describe(
+      "Two-phase consent. LEAVE THIS UNSET on the first call: the tool will NOT " +
+        "send — it returns status=\"needs_confirmation\" with a human-readable " +
+        "`preview` of the exact payment and a `consentToken`. Relay that preview " +
+        "to the user verbatim, get their explicit yes, then call again with the " +
+        "SAME args plus this `consentToken`. The tool re-derives the token from the " +
+        "params it is about to execute and refuses on mismatch, so you cannot " +
+        "preview one payment and execute another. Never fabricate a token.",
+    ),
   hookParams: z
     .object({
       recipientAgentId: z.string().optional().describe("ReputationGate: the recipient's ERC-8004 agent id."),
@@ -129,6 +142,17 @@ export interface PaySummary {
   result: PayResult;
   guardsApplied: string[];
   setupHint?: string;
+  /**
+   * Two-phase consent. Set (with `result.success: false`, no on-chain tx)
+   * when the call arrived without a valid `consentToken`. The AI must relay
+   * `preview` to the user verbatim, get an explicit yes, then re-call with the
+   * same args plus `needsConsent.consentToken`. Nothing was sent.
+   */
+  needsConsent?: {
+    status: "needs_confirmation";
+    preview: string;
+    consentToken: string;
+  };
   /** Set when more than one wallet mode is configured AND the caller did
    *  NOT pass `walletMode`. The AI must relay `question` to the user,
    *  collect the answer, and retry with the chosen `walletMode`. */
@@ -353,6 +377,45 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   }
   if (CONFIG.allowedRecipients.length > 0) {
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
+  }
+
+  // ── Two-phase consent (F3) ──────────────────────────────────────────────
+  // confirm:true is a model-filled boolean, not proof a human approved THIS
+  // exact payment — a prompt-injected agent can set it and send in one covert
+  // call. Require a consentToken bound to the money intent: the first call
+  // (no / stale token) returns a preview and does NOT send; the agent relays
+  // the preview to the user and only re-calls with the token after a yes. The
+  // source of funds (walletMode / walletId) is deliberately excluded from the
+  // bound intent so picking a wallet after the preview doesn't void consent.
+  const consentIntent = {
+    t: "pay",
+    chain: input.chain,
+    to: input.to.toLowerCase(),
+    amount: input.amount,
+    token: input.token,
+    ...(input.hookParams?.splits
+      ? { splits: input.hookParams.splits.map((s) => ({ r: s.recipient.toLowerCase(), bps: s.bps })) }
+      : {}),
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (!consent.ok) {
+    const splitNote = input.hookParams?.splits
+      ? ` — split ${input.hookParams.splits.length} ways; funds go to the split recipients, not ${input.to}`
+      : "";
+    const fromNote = senderWallet ? ` from ${senderWallet.addressShort}` : "";
+    return {
+      result: failureResult("consent"),
+      guardsApplied: [...guardsApplied, "two_phase_consent"],
+      senderWallet,
+      needsConsent: {
+        status: "needs_confirmation",
+        preview:
+          `Send ${input.amount} ${input.token} to ${input.to} on ${chain.key}${fromNote}${splitNote}. ` +
+          `Confirm with the user, then re-call q402_pay with the same args plus ` +
+          `consentToken="${consent.expected}".`,
+        consentToken: consent.expected,
+      },
+    };
   }
 
   // Two-key resolution. Sandbox-default: never throws. When a scope can't be

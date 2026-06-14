@@ -26,6 +26,7 @@
 
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
+import { checkConsent } from "../consent.js";
 
 export const BridgeSendInputSchema = z.object({
   src: z.enum(["eth", "avax", "arbitrum"]).describe("Source chain"),
@@ -46,6 +47,16 @@ export const BridgeSendInputSchema = z.object({
         "user has explicitly approved this exact bridge (src, dst, amount, feeToken) in the " +
         "conversation. When omitted or false on a live call the tool previews the action and " +
         "does NOT move any funds. Never set confirm:true on the user's behalf without approval.",
+    ),
+  consentToken: z
+    .string()
+    .optional()
+    .describe(
+      "Two-phase consent. LEAVE UNSET on the first live call: the tool previews " +
+        "the bridge (without moving funds) and returns a `consentToken`. Relay the " +
+        "preview to the user, get an explicit yes, then re-call with sandbox:false, " +
+        "confirm:true, AND this consentToken. The tool re-derives it from the bridge " +
+        "it is about to execute (src, dst, amount, feeToken) and refuses on mismatch.",
     ),
 }).refine(d => d.src !== d.dst, {
   // Local Zod rejection saves a network round-trip + a Q402 backend log
@@ -116,6 +127,13 @@ export const BRIDGE_SEND_TOOL = {
           "explicitly approved this exact bridge in chat. Omit (or false) on a live call to " +
           "preview without moving funds.",
       },
+      consentToken: {
+        type: "string" as const,
+        description:
+          "Two-phase consent token. Leave unset on the first live call to get a preview + " +
+          "token; re-call with confirm:true AND this token after the user approves. Bound to " +
+          "(src, dst, amount, feeToken) — re-derived server-side-of-the-tool and refused on mismatch.",
+      },
     },
     required: ["src", "dst", "amount"],
   },
@@ -157,14 +175,25 @@ export async function runBridgeSend(input: z.infer<typeof BridgeSendInputSchema>
     };
   }
 
-  // ── Confirm gate — LIVE bridge MOVES FUNDS, refuse without approval ─────
-  // Mirrors q402_yield_deposit: a live call (sandbox:false) must carry
-  // confirm:true. When it doesn't we DO NOT hit the bridge endpoint — we
-  // return a plain (non-error) preview the agent must show the user before
-  // re-calling with confirm:true. q402_pay enforces the same intent via
-  // confirm:z.literal(true); this tool keeps confirm optional (so sandbox
-  // previews don't require it) and gates at runtime on the live path only.
-  if (input.confirm !== true) {
+  // ── Two-phase consent gate — LIVE bridge MOVES FUNDS (F3) ───────────────
+  // A live call (sandbox:false) must carry BOTH confirm:true AND a
+  // consentToken bound to the money intent (src, dst, amount, feeToken).
+  // confirm:true alone is a model-filled boolean a prompt-injected agent can
+  // set; the token forces the bridge through a human-visible preview and pins
+  // the exact params. When either is missing/stale we DO NOT hit the bridge
+  // endpoint — we return a preview carrying the token the agent must echo back
+  // after the user approves. The token is re-derived from the params about to
+  // execute, so the previewed bridge is provably the one that fires. (walletId
+  // is excluded so picking a wallet after the preview doesn't void consent.)
+  const consentIntent = {
+    t: "bridge",
+    src: input.src,
+    dst: input.dst,
+    amount: input.amount,
+    feeToken: input.feeToken === "native" ? "native" : "LINK",
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (input.confirm !== true || !consent.ok) {
     const walletDesc =
       typeof input.walletId === "string" && input.walletId.length > 0
         ? `wallet ${input.walletId.toLowerCase()}`
@@ -174,9 +203,10 @@ export async function runBridgeSend(input: z.infer<typeof BridgeSendInputSchema>
       content: [{
         type: "text" as const,
         text:
-          `Will bridge ${input.amount} raw USDC units from ${input.src} → ${input.dst} ` +
+          `Will bridge ${input.amount} raw USDC units from ${input.src} -> ${input.dst} ` +
           `via Chainlink CCIP from ${walletDesc} (fee paid in ${fee}). This MOVES FUNDS ` +
-          `on-chain. Re-call with confirm:true to execute.`,
+          `on-chain. Confirm with the user, then re-call with sandbox:false, confirm:true, ` +
+          `AND consentToken="${consent.expected}".`,
       }],
     };
   }

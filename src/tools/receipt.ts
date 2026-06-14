@@ -85,6 +85,16 @@ function digest(canonical: string): string {
   return keccak256(toUtf8Bytes(canonical));
 }
 
+// The Q402 relayer EOA that signs every Trust Receipt — app/lib/wallets.ts
+// RELAYER_ADDRESS, which app/lib/relayer-key.ts asserts the signing key derives
+// to. The `verified` boolean is only a real trust signal if it anchors here:
+// recovering against the receipt's OWN self-reported signedBy (the previous
+// behaviour) just checks internal consistency, so a receipt forged + signed by
+// any attacker key and labelled with a matching signedBy would pass. Hardcoded
+// — the signer is a stable, publicly-known address; the on-chain key-rotation
+// guard keeps every receipt anchored to it.
+const RELAYER_SIGNER = "0xfc77ff29178b7286a8ba703d7a70895ca74ff466";
+
 function verifyReceiptSignature(r: Receipt): boolean {
   try {
     const fields: SignedFields = {
@@ -101,7 +111,8 @@ function verifyReceiptSignature(r: Receipt): boolean {
       sandbox:        r.sandbox,
     };
     const recovered = verifyMessage(getBytes(digest(canonicalize(fields))), r.signature).toLowerCase();
-    return recovered === r.signedBy.toLowerCase();
+    // Must recover to the known relayer AND the receipt must claim that signer.
+    return recovered === RELAYER_SIGNER && r.signedBy.toLowerCase() === RELAYER_SIGNER;
   } catch {
     return false;
   }

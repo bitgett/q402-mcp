@@ -4,11 +4,15 @@
  *
  * Mode-C-only (apiKey auth). Single-recipient — for multi-recipient
  * payroll rules the user opens the dashboard. The recurring scheduler
- * itself handles cancel-window alerts, per-tx cap enforcement, and the
- * hourly heartbeat that drives every cadence. The wallet-level
- * `dailyLimitUsd` cap does NOT apply to recurring fires (the rule is
- * the spend ceiling, authorised at create time); it gates manual
- * `q402_pay` calls only. `perTxMaxUsd` IS re-checked at fire time.
+ * itself handles cancel-window alerts and the hourly heartbeat that
+ * drives every cadence. Each fire is gated server-side by BOTH the
+ * wallet's `perTxMaxUsd` (per-fire cap) AND its `dailyLimitUsd`: the
+ * rule's daily total reserves against the same daily bucket as manual
+ * sends (a 2026-06-10 fix — the cron skips the fire if the bucket can't
+ * cover it), so scheduled rules can't outrun the dashboard caps. This
+ * tool additionally applies the client-side Q402_MAX_AMOUNT_PER_CALL +
+ * Q402_ALLOWED_RECIPIENTS rails to (recipient, amount) at author time,
+ * matching the one-shot q402_pay / q402_batch_pay guards.
  *
  * Frequency strings (validated server-side):
  *   "hourly:N"      N=1..23. Fires every N hours, snapped to the next
@@ -115,11 +119,12 @@ export const RECURRING_CREATE_TOOL = {
     "requires the paid Multichain subscription on EVERY chain including " +
     "bnb — trial keys are rejected at create time with MULTICHAIN_REQUIRED " +
     "and should keep using q402_pay for one-shot Trial sends. Each fire is " +
-    "bounded by the wallet's perTxMax (configured on the dashboard) — the " +
-    "dashboard's dailyLimit cap currently applies to manual sends only, NOT " +
-    "recurring fires, so an attacker with the apiKey could schedule N rules " +
-    "at perTxMax and drain the wallet's USDC balance over time. The user " +
-    "can stop a rule any time via q402_recurring_cancel.",
+    "bounded server-side by BOTH the wallet's perTxMax AND its dailyLimit — a " +
+    "rule's daily total reserves against the same daily bucket as manual sends " +
+    "(the scheduler skips the fire if the bucket can't cover it), so scheduled " +
+    "rules can't outrun the dashboard caps. This tool also enforces your local " +
+    "Q402_MAX_AMOUNT_PER_CALL + Q402_ALLOWED_RECIPIENTS rails at create time. " +
+    "The user can stop a rule any time via q402_recurring_cancel.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -232,6 +237,42 @@ export async function runRecurringCreate(
         "Recurring payments require a paid Multichain API key " +
         "(Q402_MULTICHAIN_API_KEY). Trial keys can't schedule recurring " +
         "rules. Activate a paid plan at https://q402.quackai.ai/payment.",
+      dashboardUrl,
+    };
+  }
+
+  // F10: apply the SAME client-side rails q402_pay / q402_batch_pay apply.
+  // A recurring rule schedules future sends the user won't click through
+  // one-by-one, so each fire's (recipient, amount) must clear the per-call
+  // amount cap and the recipient allowlist the user configured — otherwise
+  // an agent could schedule payouts above the cap or to an off-allowlist
+  // address that the one-shot tools would have refused.
+  const amountNum = Number(input.amount);
+  if (Number.isFinite(amountNum) && amountNum > CONFIG.maxAmountPerCallUsd) {
+    return {
+      ok:       false,
+      walletId: null,
+      rule:     null,
+      error:    "AMOUNT_EXCEEDS_CAP",
+      message:
+        `Per-fire amount $${input.amount} exceeds your Q402_MAX_AMOUNT_PER_CALL cap of ` +
+        `$${CONFIG.maxAmountPerCallUsd}. Each recurring fire is bounded by the same per-call ` +
+        `cap as a one-shot q402_pay — raise the cap if this schedule is intentional.`,
+      dashboardUrl,
+    };
+  }
+  if (
+    CONFIG.allowedRecipients.length > 0 &&
+    !CONFIG.allowedRecipients.includes(input.recipient.toLowerCase())
+  ) {
+    return {
+      ok:       false,
+      walletId: null,
+      rule:     null,
+      error:    "RECIPIENT_NOT_ALLOWED",
+      message:
+        `Recipient ${input.recipient} is not in Q402_ALLOWED_RECIPIENTS. A recurring rule would ` +
+        `send to it on every fire — add it to the allowlist or unset the env var to disable the guard.`,
       dashboardUrl,
     };
   }

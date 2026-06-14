@@ -25,8 +25,9 @@
  * failure modes (paid-pool charged when user expected free; or 5-cap
  * server error masking user intent).
  *
- * The per-call amount cap and recipient allowlist guards run *per
- * recipient* — every row in the batch must clear them independently.
+ * The recipient allowlist runs per recipient — every row must clear it.
+ * The amount cap runs both per recipient AND on the batch total, so a
+ * large sum can't be fanned across many sub-cap rows to slip the limit.
  *
  * Server-side execution is sequential. The first recipient installs
  * the EIP-7702 delegation on the owner's EOA; remaining recipients
@@ -54,6 +55,7 @@ import {
   type PayResult,
 } from "../client.js";
 import type { AvailableWallet, WalletModeRequest } from "./pay.js";
+import { checkConsent } from "../consent.js";
 
 const RECIPIENT_LIMIT_TRIAL = 5;
 const RECIPIENT_LIMIT_PAID  = 20;
@@ -138,6 +140,18 @@ export const BatchPayInputSchema = z.object({
         "before this tool was called. Setting confirm=true on behalf of the " +
         "user without that approval is a violation of the tool contract.",
     ),
+  consentToken: z
+    .string()
+    .optional()
+    .describe(
+      "Two-phase consent. LEAVE UNSET on the first call: the tool will NOT send " +
+        "— it returns status=\"needs_confirmation\" with a `setupHint` preview of " +
+        "every recipient + amount and a `consentToken`. Relay that preview to the " +
+        "user, get an explicit yes, then re-call with the SAME args plus this " +
+        "`consentToken`. The tool re-derives it from the batch it is about to send " +
+        "and refuses on mismatch, so you cannot preview one batch and execute " +
+        "another. Never fabricate a token.",
+    ),
 });
 
 export type BatchPayInput = z.infer<typeof BatchPayInputSchema>;
@@ -163,10 +177,14 @@ export interface BatchPaySummary {
     | "settlement_uncertain"
     | "trial_cap_exceeded"
     | "needs_wallet_choice"
-    | "wallet_mode_unavailable";
+    | "wallet_mode_unavailable"
+    | "needs_confirmation";
   result?: BatchPayResult | { sandbox: PayResult[]; reason: string };
   guardsApplied: string[];
   setupHint?: string;
+  /** Two-phase consent token to echo back on the confirming re-call. Present
+   *  only with status="needs_confirmation"; nothing was sent. */
+  consentToken?: string;
   error?: string;
   /**
    * Echoes the sender wallet (the EOA derived from Q402_PRIVATE_KEY). AI
@@ -189,10 +207,12 @@ export interface BatchPaySummary {
 }
 
 function maxAmountGuardBatch(recipients: BatchPayInput["recipients"], cap: number): void {
-  // Each row must individually clear the cap. Total batch amount has
-  // no separate ceiling — that's a deliberate design choice: the cap
-  // is per-call to bound blast radius of a single agent decision, and
-  // the trial-key recipient count itself bounds the batch.
+  // Each row must individually clear the cap, AND the batch TOTAL must
+  // clear it too. F7: the env is named PER_CALL and a batch is one call,
+  // but the old code only checked each row — so an agent could fan a large
+  // sum across many sub-cap rows (e.g. 20 × $200 = $4,000 under a $200 cap)
+  // and slip past the exact limit the user set to bound a single decision.
+  let total = 0;
   for (let i = 0; i < recipients.length; i++) {
     const r = recipients[i]!;
     const numeric = Number(r.amount);
@@ -205,6 +225,14 @@ function maxAmountGuardBatch(recipients: BatchPayInput["recipients"], cap: numbe
           `Set Q402_MAX_AMOUNT_PER_CALL to a higher value if intentional.`,
       );
     }
+    total += numeric;
+  }
+  if (total > cap) {
+    throw new Error(
+      `batch total $${total.toFixed(2)} across ${recipients.length} recipients exceeds the ` +
+        `per-call cap of $${cap}. Q402_MAX_AMOUNT_PER_CALL bounds the WHOLE batch, not each ` +
+        `row. Raise the cap if this batch is intentional, or split it into smaller batches.`,
+    );
   }
 }
 
@@ -240,11 +268,43 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   const guardsApplied: string[] = [];
 
   maxAmountGuardBatch(input.recipients, CONFIG.maxAmountPerCallUsd);
-  guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd} (per recipient)`);
+  guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd} (per row AND batch total)`);
 
   recipientAllowlistGuardBatch(input.recipients, CONFIG.allowedRecipients);
   if (CONFIG.allowedRecipients.length > 0) {
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
+  }
+
+  // ── Two-phase consent (F3) ──────────────────────────────────────────────
+  // confirm:true alone can't prove the human approved THIS batch — a single
+  // injected call could fan funds to attacker rows. Bind a consentToken to the
+  // exact recipient set: the first call (no / stale token) previews the full
+  // list WITHOUT sending, and the agent must re-call with the token after a
+  // human yes. The tool re-derives the token from the batch it is about to
+  // send and refuses on mismatch.
+  const consentIntent = {
+    t: "batch",
+    chain: input.chain,
+    token: input.token,
+    recipients: input.recipients.map((r) => ({ to: r.to.toLowerCase(), amount: r.amount })),
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (!consent.ok) {
+    const total = input.recipients.reduce((s, r) => s + Number(r.amount), 0);
+    const lines = input.recipients
+      .map((r, i) => `  ${i + 1}. ${r.amount} ${input.token} -> ${r.to}`)
+      .join("\n");
+    return {
+      mode: "none",
+      status: "needs_confirmation",
+      guardsApplied: [...guardsApplied, "two_phase_consent"],
+      consentToken: consent.expected,
+      setupHint:
+        `Batch on ${input.chain}: ${input.recipients.length} recipients, total ` +
+        `${total} ${input.token}.\n${lines}\n` +
+        `Confirm the full list with the user, then re-call q402_batch_pay with the ` +
+        `same args plus consentToken="${consent.expected}".`,
+    };
   }
 
   // ── Wallet mode disambiguation ─────────────────────────────────────────
