@@ -44,7 +44,7 @@ export const PayInputSchema = z.object({
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string")
     .describe('Human-readable decimal amount, e.g. "5.00".'),
   token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
-    'Stablecoin symbol. USDC / USDT supported on most chains (Injective is USDT-only). ' +
+    'Stablecoin symbol. USDC / USDT supported on most chains. ' +
       'RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.',
   ),
   keyScope: z
@@ -214,7 +214,7 @@ function recipientGuard(to: string, allow: string[]): void {
 
 export async function runPay(input: PayInput): Promise<PaySummary> {
   const chain = getChain(input.chain);
-  // Surface the chain-level token gate (Injective USDT-only) early.
+  // Surface the chain-level token gate (per-chain supportedTokens) early.
   tokenFor(chain, input.token);
   if (chain.supportedTokens && !chain.supportedTokens.includes(input.token)) {
     throw new Error(
@@ -862,7 +862,7 @@ export const PAY_TOOL = {
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
     "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum — " +
-    "USDC/USDT on most chains, RLUSD on Ethereum only, Injective USDT-only. " +
+    "USDC/USDT on most chains, RLUSD on Ethereum only. " +
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set as a valid 32-byte hex key, and " +
     "Q402_ENABLE_REAL_PAYMENTS=1. Sandbox responses come back with " +
@@ -936,7 +936,7 @@ export const PAY_TOOL = {
         type: "string",
         enum: ["USDC", "USDT", "RLUSD"],
         description:
-          "Stablecoin to send. USDC / USDT supported on most chains; Injective is USDT-only. " +
+          "Stablecoin to send. USDC / USDT supported on most chains. " +
           "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.",
       },
       keyScope: {

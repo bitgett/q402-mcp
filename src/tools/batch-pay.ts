@@ -73,8 +73,8 @@ const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 export const BatchPayInputSchema = z.object({
   chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum"]),
   token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
-    "Stablecoin symbol. USDC / USDT supported on most chains (Injective is " +
-      "USDT-only). RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
+    "Stablecoin symbol. USDC / USDT supported on most chains. " +
+      "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
       "Ethereum-only. The same token applies to every recipient in the batch.",
   ),
   recipients: z
@@ -906,7 +906,7 @@ export const BATCH_PAY_TOOL = {
         enum: ["USDC", "USDT", "RLUSD"],
         description:
           "Stablecoin for the entire batch. USDC / USDT supported on most chains; " +
-          "Injective is USDT-only; RLUSD (decimals 18) is Ethereum-only.",
+          "RLUSD (decimals 18) is Ethereum-only.",
       },
       recipients: {
         type: "array",
