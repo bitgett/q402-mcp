@@ -144,7 +144,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Mantle",
     chainId: 5000,
     domainName: "Q402 Mantle",
-    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    implContract: "0xa9a7dcE76DEF2AC36057FeF0d8103dF10581d61e",
     gasToken: "MNT",
     explorer: "https://mantlescan.xyz",
     usdc: { address: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9", decimals: 6 },
