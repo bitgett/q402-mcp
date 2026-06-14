@@ -144,7 +144,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Mantle",
     chainId: 5000,
     domainName: "Q402 Mantle",
-    implContract: "0xa9a7dcE76DEF2AC36057FeF0d8103dF10581d61e",
+    implContract: "0xE5b90D564650bdcE7C2Bb4344F777f6582e05699",
     gasToken: "MNT",
     explorer: "https://mantlescan.xyz",
     usdc: { address: "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9", decimals: 6 },
@@ -158,7 +158,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Injective EVM",
     chainId: 1776,
     domainName: "Q402 Injective",
-    implContract: "0x892E647FbbAdc8Ee8342710244931ea98529EA9C",
+    implContract: "0xa9a7dcE76DEF2AC36057FeF0d8103dF10581d61e",
     gasToken: "INJ",
     explorer: "https://blockscout.injective.network",
     // Native Circle USDC (CCTP) + canonical Tether (USDT0), both 6 dec.
@@ -173,7 +173,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Monad",
     chainId: 143,
     domainName: "Q402 Monad",
-    implContract: "0x5a8fde1851491D9eD512a9eDa1c63CA7627BECb8",
+    implContract: "0xc5d4dFA6D2e545409C1abf86f336Dd43bb87621f",
     gasToken: "MON",
     explorer: "https://monadscan.com",
     // Native Circle USDC via CCTP V2 (not bridged) + USDT0 (LayerZero OFT).
@@ -187,7 +187,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Scroll",
     chainId: 534352,
     domainName: "Q402 Scroll",
-    implContract: "0x8D854436ab0426F5BC6Cc70865C90576AD523E73",
+    implContract: "0x7635F32D893B64b5944CB8cbF2AC4cd3dA41B2f1",
     gasToken: "ETH",
     explorer: "https://scrollscan.com",
     // Native Circle USDC + canonical Tether on Scroll mainnet (addresses
@@ -203,7 +203,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Arbitrum One",
     chainId: 42161,
     domainName: "Q402 Arbitrum",
-    implContract: "0xE5b90D564650bdcE7C2Bb4344F777f6582e05699",
+    implContract: "0x8D854436ab0426F5BC6Cc70865C90576AD523E73",
     gasToken: "ETH",
     explorer: "https://arbiscan.io",
     // Native Circle USDC (CCTP) + canonical Tether on Arbitrum One.

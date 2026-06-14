@@ -275,7 +275,7 @@ If you set up Q402 before v0.5.0 you may have a single `Q402_API_KEY` env var. T
 | X Layer | 196 | USDC, USDT | |
 | Stable | 988 | USDT0 (USDC and USDT both alias) | Gas paid in USDT0. |
 | Mantle | 5000 | USDC, USDT0 | LayerZero OFT USDT0 since 2025-11-27. |
-| Injective EVM | 1776 | USDT only | Native USDC via Circle CCTP announced for Q2 2026. |
+| Injective EVM | 1776 | USDC, USDT | Native Circle USDC (CCTP) live since 2026-06 + canonical Tether (USDT0). |
 | Monad | 143 | USDC, USDT0 | Native Circle USDC (CCTP V2) + USDT0 (LayerZero OFT). |
 | Scroll | 534352 | USDC, USDT | zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). |
 | Arbitrum One | 42161 | USDC, USDT | Optimistic rollup — same EIP-7702 signing path as Ethereum. CCIP bridge endpoint (eth ⇄ avax ⇄ arbitrum). |
