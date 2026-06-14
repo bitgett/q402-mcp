@@ -174,7 +174,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Monad",
     chainId: 143,
     domainName: "Q402 Monad",
-    implContract: "0x39Ba9520718eE069D7f72882FF4C28a5Ea8a2acC",
+    implContract: "0x5a8fde1851491D9eD512a9eDa1c63CA7627BECb8",
     gasToken: "MON",
     explorer: "https://monadscan.com",
     // Native Circle USDC via CCTP V2 (not bridged) + USDT0 (LayerZero OFT).
@@ -188,7 +188,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Scroll",
     chainId: 534352,
     domainName: "Q402 Scroll",
-    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    implContract: "0x8D854436ab0426F5BC6Cc70865C90576AD523E73",
     gasToken: "ETH",
     explorer: "https://scrollscan.com",
     // Native Circle USDC + canonical Tether on Scroll mainnet (addresses
@@ -204,7 +204,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Arbitrum One",
     chainId: 42161,
     domainName: "Q402 Arbitrum",
-    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    implContract: "0xE5b90D564650bdcE7C2Bb4344F777f6582e05699",
     gasToken: "ETH",
     explorer: "https://arbiscan.io",
     // Native Circle USDC (CCTP) + canonical Tether on Arbitrum One.

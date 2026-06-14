@@ -36,6 +36,9 @@ export function canonicalIntent(intent: unknown): string {
       for (const k of Object.keys(src).sort()) out[k] = sortValue(src[k]);
       return out;
     }
+    // Normalize numbers to their string form so equivalent spellings (0.10 vs
+    // 0.1, 1e3 vs 1000) can't produce different tokens for the same intent.
+    if (typeof v === "number") return String(v);
     return v;
   };
   return JSON.stringify(sortValue(intent));

@@ -1,6 +1,6 @@
 {
   "name": "@quackai/q402-mcp",
-  "version": "0.8.26",
+  "version": "0.8.27",
   "description": "MCP server for Q402 — gasless USDC/USDT/RLUSD payments on 10 EVM chains + Chainlink CCIP USDC bridge on the eth/avax/arbitrum triangle, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.",
   "mcpName": "io.github.bitgett/q402-mcp",
   "keywords": [
