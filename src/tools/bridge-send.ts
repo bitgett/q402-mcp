@@ -75,12 +75,13 @@ export const BRIDGE_SEND_TOOL = {
     "live Multichain API key is configured. The server signs ccipSend with the Agent Wallet's " +
     "encrypted PK, auto-funds source-chain gas from the user's Gas Tank, and debits both the auto- " +
     "fund cost and the CCIP fee per the bridge's settled receipt. " +
-    "REQUIRES CONFIRMATION — like q402_pay and q402_yield_deposit, a LIVE bridge (sandbox: false) " +
-    "refuses to execute unless confirm: true is set. Call it first WITHOUT confirm to get a one-line " +
-    "preview (src, dst, amount, fee token); show that to the user, get explicit approval, THEN re-call " +
-    "with sandbox: false AND confirm: true. Never set confirm: true on the user's behalf. " +
+    "TWO-PHASE CONSENT — a LIVE bridge (sandbox: false) refuses to execute unless BOTH confirm: true " +
+    "AND a matching consentToken are set. Call it first WITHOUT consentToken to get a preview (src, " +
+    "dst, amount, fee token) plus a consentToken; show that to the user, get explicit approval, THEN " +
+    "re-call with sandbox: false, confirm: true, AND that consentToken. The token is re-derived from " +
+    "the bridge about to run, so the previewed bridge can't be swapped. Never fabricate a token. " +
     "Recommended flow: q402_bridge_quote first → preview + confirm cost with the user → " +
-    "q402_bridge_send with sandbox: false, confirm: true. Live mode needs a " +
+    "q402_bridge_send with sandbox: false, confirm: true, consentToken. Live mode needs a " +
     "Multichain subscription; trial keys are rejected. If the bridge returns AGENT_WALLET_DELEGATED, " +
     "clear the delegation first: server-managed Agent Wallets (Mode C / API key) use the Clear " +
     "delegation button on the dashboard; local-key modes (Q402_PRIVATE_KEY set) can run q402_clear_delegation.",

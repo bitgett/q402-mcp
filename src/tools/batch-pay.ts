@@ -880,7 +880,13 @@ export const BATCH_PAY_TOOL = {
     "\n\n" +
     "ALWAYS get explicit user confirmation " +
     "of the complete recipient + amount list, chain, and token in conversation immediately " +
-    "before calling this tool — the user must approve the full batch, not the individual rows.",
+    "before calling this tool — the user must approve the full batch, not the individual rows. " +
+    "\n\n" +
+    "TWO-PHASE CONSENT: confirm:true alone does NOT send. Call this tool first WITHOUT " +
+    "consentToken — it returns status=\"needs_confirmation\" with a `setupHint` preview of every " +
+    "recipient + amount and a `consentToken`, and moves no money. Relay that preview to the user, " +
+    "get an explicit yes, then re-call with the SAME args plus the `consentToken` to execute. The " +
+    "token is re-derived from the batch about to run, so the previewed batch can't be swapped.",
   inputSchema: {
     type: "object" as const,
     properties: {

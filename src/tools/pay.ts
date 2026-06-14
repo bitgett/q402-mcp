@@ -894,7 +894,15 @@ export const PAY_TOOL = {
     "\n\n" +
     "ALWAYS get explicit user confirmation of the exact recipient address, " +
     "amount, chain, and token in conversation immediately before calling " +
-    "this tool.",
+    "this tool. " +
+    "\n\n" +
+    "TWO-PHASE CONSENT: confirm:true alone does NOT send. Call this tool first " +
+    "WITHOUT consentToken — it returns status=\"needs_confirmation\" with a " +
+    "`preview` of the exact payment and a `consentToken`, and moves no money. " +
+    "Relay that preview to the user, get their explicit yes, then re-call with " +
+    "the SAME args plus that `consentToken` to execute. The token is re-derived " +
+    "from the params about to run, so a previewed payment can't be swapped for " +
+    "a different one.",
   inputSchema: {
     type: "object" as const,
     properties: {
