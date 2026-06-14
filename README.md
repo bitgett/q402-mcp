@@ -66,7 +66,7 @@ The agent runs `q402_doctor`. On first install:
 | Mode | Env | Signer | Notes |
 |---|---|---|---|
 | **A** | `Q402_PRIVATE_KEY` | MetaMask EOA, local | Simplest. Shows "Smart account" after first use (reversible via `q402_clear_delegation`). |
-| **B** | `Q402_AGENTIC_PRIVATE_KEY` | Agent Wallet, local | Export PK from the [dashboard](https://q402.quackai.ai/dashboard) Agent tab. MetaMask untouched. |
+| **B** | `Q402_AGENTIC_PRIVATE_KEY` | Agent Wallet, local | Export PK from the [dashboard](https://q402.quackai.ai/dashboard) → Wallets → Danger Zone → Export private key. MetaMask untouched. |
 | **C** | (just an API key) | Agent Wallet, server-managed | No PK on the client. One-shot pays accept Trial or Multichain keys; recurring needs Multichain on every chain (BNB included). |
 
 When more than one mode is set, `q402_pay` asks the user which to use. Picker: `walletMode = "agentic-server" \| "agentic-local" \| "eoa"`.

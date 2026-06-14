@@ -19,8 +19,9 @@
  *     to cover the CCIP fee + auto-fund the Agent Wallet's
  *     source-chain gas
  *   - Agent Wallet is NOT EIP-7702 delegated to Q402 impl on the
- *     source chain (delegation blocks native auto-fund; run
- *     q402_clear_delegation first if it is)
+ *     source chain (delegation blocks native auto-fund; clear it first —
+ *     server-managed Mode C uses the dashboard Clear-delegation button,
+ *     local-key modes A/B use the q402_clear_delegation tool)
  */
 
 import { z } from "zod";
@@ -70,7 +71,8 @@ export const BRIDGE_SEND_TOOL = {
     "Recommended flow: q402_bridge_quote first → preview + confirm cost with the user → " +
     "q402_bridge_send with sandbox: false, confirm: true. Live mode needs a " +
     "Multichain subscription; trial keys are rejected. If the bridge returns AGENT_WALLET_DELEGATED, " +
-    "run q402_clear_delegation on the source chain first.",
+    "clear the delegation first: server-managed Agent Wallets (Mode C / API key) use the Clear " +
+    "delegation button on the dashboard; local-key modes (Q402_PRIVATE_KEY set) can run q402_clear_delegation.",
   inputSchema: {
     type: "object" as const,
     properties: {
