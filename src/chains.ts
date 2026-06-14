@@ -158,16 +158,15 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Injective EVM",
     chainId: 1776,
     domainName: "Q402 Injective",
-    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    implContract: "0x892E647FbbAdc8Ee8342710244931ea98529EA9C",
     gasToken: "INJ",
     explorer: "https://blockscout.injective.network",
-    // Mirror entry for the registry shape — both API tokens point at the same USDT.
-    // q402_pay rejects token: "USDC" with chain: "injective" upfront via supportedTokens.
-    usdc: { address: "0x88f7F2b685F9692caf8c478f5BADF09eE9B1Cc13", decimals: 6 },
+    // Native Circle USDC (CCTP) + canonical Tether (USDT0), both 6 dec.
+    usdc: { address: "0xa00C59fF5a080D2b954d0c75e46E22a0c371235a", decimals: 6 },
     usdt: { address: "0x88f7F2b685F9692caf8c478f5BADF09eE9B1Cc13", decimals: 6 },
-    supportedTokens: ["USDT"],
+    supportedTokens: ["USDC", "USDT"],
     approxGasCostUsd: 0.004,
-    note: "USDT only until Circle CCTP native USDC ships (announced for Q2 2026).",
+    note: "Native Circle USDC (CCTP) live since 2026-06; USDT0 also supported.",
   },
   monad: {
     key: "monad",
