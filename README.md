@@ -156,7 +156,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**24 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**27 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -184,8 +184,11 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_yield_positions` | api key | Show the Agent Wallet's open Q402 Yield positions (balance, principal, accrued interest, APY) + total supplied in USD. Mode C. |
 | `q402_yield_deposit` | live mode | Supply the Agent Wallet's USDC/USDT into Aave V3 (Q402 Yield) to earn supply APY. Mode C, BNB-only. Requires `confirm: true`; sandbox-by-default. |
 | `q402_yield_withdraw` | live mode | Withdraw supplied USDC/USDT out of Aave V3 back to the Agent Wallet (`amount: "max"` = full position). Mode C, BNB-only. Requires `confirm: true`; sandbox-by-default. |
+| `q402_request_create` | api key | Publish a payment request (invoice). No funds move — returns a shareable `/pay` link + `req_…` id. Recipient defaults to the Agent Wallet. |
+| `q402_request_status` | none | Look up a payment request by `req_…` id (amount, token, chain, recipient, status). Read-only; `notFound` instead of throwing. |
+| `q402_request_pay` | live mode | Pay a request gaslessly from the payer's own Agent Wallet (Mode C). Terms come from the stored request — can't be redirected. Requires `confirm: true`. |
 
-`q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
+`q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` + `q402_request_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
 > ℹ️ `q402_pay` expects a 0x address — ENS isn't resolved server-side. Resolve client-side first.
 > Per-chain Gas Tank balances + full TX history live in the [dashboard](https://q402.quackai.ai/dashboard) (wallet-signature only).

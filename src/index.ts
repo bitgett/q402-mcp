@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes twenty-four tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes twenty-seven tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -63,6 +63,15 @@
  *   q402_yield_withdraw     write, requires key — withdraw USDC/USDT out of
  *                           Aave V3 (amount "max" = full). Mode C, BNB-only,
  *                           confirm-gated, sandbox-default
+ *   q402_request_create     write, requires key — publish a payment request
+ *                           (invoice). No funds move; returns a /pay link +
+ *                           req_ id. Recipient defaults to the Agent Wallet.
+ *   q402_request_status     read-only, no key — look up a request by req_ id
+ *                           (amount/token/chain/recipient/status). notFound
+ *                           instead of throw.
+ *   q402_request_pay        write, requires key — pay a request gaslessly from
+ *                           the payer's own Agent Wallet (Mode C). terms come
+ *                           from the request; confirm-gated like q402_pay.
  *
  * Trial-scope policy (server-enforced via API key plan): trial keys are
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
@@ -143,6 +152,9 @@ import {
   RecurringSkipNextInputSchema,
   runRecurringSkipNext,
 } from "./tools/recurring-skip-next.js";
+import { REQUEST_CREATE_TOOL, RequestCreateInputSchema, runRequestCreate } from "./tools/request-create.js";
+import { REQUEST_STATUS_TOOL, RequestStatusInputSchema, runRequestStatus } from "./tools/request-status.js";
+import { REQUEST_PAY_TOOL,    RequestPayInputSchema,    runRequestPay }    from "./tools/request-pay.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -195,6 +207,13 @@ async function main(): Promise<void> {
       // / withdraw with the encrypted key.
       YIELD_DEPOSIT_TOOL,
       YIELD_WITHDRAW_TOOL,
+      // Payment Requests — the receive side. create publishes an invoice
+      // (no funds move, apiKey only), status is a public id lookup, pay
+      // settles a request gaslessly from the payer's own Agent Wallet
+      // (Mode C, confirm-gated like q402_pay). Enables agent-to-agent billing.
+      REQUEST_CREATE_TOOL,
+      REQUEST_STATUS_TOOL,
+      REQUEST_PAY_TOOL,
     ],
   }));
 
@@ -301,6 +320,18 @@ async function main(): Promise<void> {
         case "q402_yield_withdraw": {
           const parsed = YieldWithdrawInputSchema.parse(args ?? {});
           return await runYieldWithdraw(parsed);
+        }
+        case "q402_request_create": {
+          const parsed = RequestCreateInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRequestCreate(parsed))] };
+        }
+        case "q402_request_status": {
+          const parsed = RequestStatusInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRequestStatus(parsed))] };
+        }
+        case "q402_request_pay": {
+          const parsed = RequestPayInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRequestPay(parsed))] };
         }
         default:
           return {
