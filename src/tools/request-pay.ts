@@ -14,6 +14,7 @@
 
 import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
+import { checkConsent } from "../consent.js";
 
 export const RequestPayInputSchema = z.object({
   requestId: z
@@ -23,9 +24,17 @@ export const RequestPayInputSchema = z.object({
   confirm: z
     .literal(true)
     .describe(
-      "REQUIRED. Must be literally `true`. Paying a request moves real funds from your Agent " +
-        "Wallet. Echo back the amount + token + recipient + chain from q402_request_status, get an " +
-        "explicit user yes, and ONLY then call with confirm:true. Same guard as q402_pay.",
+      "REQUIRED. Must be literally `true`. Acknowledges this moves real funds from your Agent Wallet.",
+    ),
+  consentToken: z
+    .string()
+    .optional()
+    .describe(
+      "Two-phase consent, identical to q402_pay. Call FIRST WITHOUT it: the tool moves no money and " +
+        "returns status=\"needs_consent\" with a `preview` of the exact payment plus a `consentToken`. " +
+        "Relay the preview to the user, get an explicit yes, then re-call with the SAME requestId PLUS " +
+        "this consentToken. The token is re-derived from the request's terms, so a previewed payment " +
+        "cannot be swapped for a different one. confirm:true alone does NOT fire a payment.",
     ),
   walletId: z
     .string()
@@ -48,7 +57,7 @@ interface PublicRequest {
 
 export interface RequestPayResult {
   ok: boolean;
-  status: "paid" | "failed" | "not_payable" | "sandbox";
+  status: "paid" | "failed" | "not_payable" | "sandbox" | "needs_consent";
   requestId: string;
   txHash: string | null;
   receiptId: string | null;
@@ -59,6 +68,10 @@ export interface RequestPayResult {
   error?: string;
   message?: string;
   setupHint?: string;
+  /** Set when called without a valid consentToken — the AI must relay the
+   *  preview to the user and re-call with the same args + this consentToken.
+   *  No funds moved. */
+  needsConsent?: { status: "needs_confirmation"; preview: string; consentToken: string };
 }
 
 export async function runRequestPay(input: RequestPayInput): Promise<RequestPayResult> {
@@ -90,6 +103,37 @@ export async function runRequestPay(input: RequestPayInput): Promise<RequestPayR
   }
   if (CONFIG.allowedRecipients.length > 0 && !CONFIG.allowedRecipients.includes(req.recipient.toLowerCase())) {
     return { ok: false, status: "not_payable", requestId: req.id, txHash: null, receiptId: null, ...terms, error: "RECIPIENT_NOT_ALLOWED", message: `Recipient ${req.recipient} is not in Q402_ALLOWED_RECIPIENTS.` };
+  }
+
+  // 2.5 Two-phase consent — identical to q402_pay. A first call without a valid
+  // consentToken moves NO money: it returns a preview + token the agent must
+  // relay to the user and echo back. Defeats one-shot prompt-injected pays.
+  const consentIntent = {
+    t: "request_pay",
+    requestId: req.id,
+    to: req.recipient.toLowerCase(),
+    amount: req.amount,
+    token: req.token,
+    chain: req.chain,
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (!consent.ok) {
+    return {
+      ok: false,
+      status: "needs_consent",
+      requestId: req.id,
+      txHash: null,
+      receiptId: null,
+      ...terms,
+      message:
+        "Relay this preview to the user and get an explicit yes, then re-call with the same requestId " +
+        "plus consentToken. No funds moved.",
+      needsConsent: {
+        status: "needs_confirmation",
+        preview: `Pay ${req.amount} ${req.token} to ${req.recipient} on ${req.chain} (request ${req.id}).`,
+        consentToken: consent.expected,
+      },
+    };
   }
 
   // 3. Resolve a LIVE key for the request's chain + require explicit opt-in.
