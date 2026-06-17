@@ -966,6 +966,14 @@ export const BATCH_PAY_TOOL = {
         description:
           "MUST be true and only set after the user has confirmed the entire batch in chat.",
       },
+      consentToken: {
+        type: "string",
+        description:
+          "Two-phase consent. Omit on the FIRST call to get a needs_confirmation preview of " +
+          "every recipient + amount plus a consentToken (no funds move); re-call with the SAME " +
+          "args plus this token to execute. Re-derived from the batch, so the previewed batch " +
+          "cannot be swapped. confirm:true alone does NOT send.",
+      },
     },
     required: ["chain", "token", "recipients", "confirm"],
     additionalProperties: false,

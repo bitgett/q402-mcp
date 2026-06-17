@@ -976,6 +976,14 @@ export const PAY_TOOL = {
           "and shares (funds go there, not `to`) and any oracle condition gating settlement — " +
           "not just the top-level recipient + amount.",
       },
+      consentToken: {
+        type: "string",
+        description:
+          "Two-phase consent. Omit on the FIRST call to get a needs_confirmation preview " +
+          "plus a consentToken (no funds move); re-call with the SAME args plus this token " +
+          "to execute. Re-derived from the payment params, so a previewed payment cannot be " +
+          "swapped for a different one. confirm:true alone does NOT send.",
+      },
       hookParams: {
         type: "object",
         description:

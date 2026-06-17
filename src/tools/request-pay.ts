@@ -115,9 +115,17 @@ export async function runRequestPay(input: RequestPayInput): Promise<RequestPayR
     amount: req.amount,
     token: req.token,
     chain: req.chain,
+    // Bind the funding source too — the user is consenting to pay from THIS
+    // wallet, so swapping walletId after the preview must void consent. Mirrors
+    // q402_pay's consentIntent. Empty string = the server-default Agent Wallet
+    // (resolved at settle time); pinning a specific wallet re-triggers consent.
+    wid: (input.walletId ?? "").toLowerCase(),
   };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (!consent.ok) {
+    const fromNote = input.walletId
+      ? ` from wallet ${input.walletId}`
+      : "";
     return {
       ok: false,
       status: "needs_consent",
@@ -130,7 +138,7 @@ export async function runRequestPay(input: RequestPayInput): Promise<RequestPayR
         "plus consentToken. No funds moved.",
       needsConsent: {
         status: "needs_confirmation",
-        preview: `Pay ${req.amount} ${req.token} to ${req.recipient} on ${req.chain} (request ${req.id}).`,
+        preview: `Pay ${req.amount} ${req.token} to ${req.recipient} on ${req.chain}${fromNote} (request ${req.id}).`,
         consentToken: consent.expected,
       },
     };
@@ -223,6 +231,14 @@ export const REQUEST_PAY_TOOL = {
       walletId: {
         type: "string" as const,
         description: "Optional. Agent Wallet address to pay from. Defaults to the configured / server-default wallet.",
+      },
+      consentToken: {
+        type: "string" as const,
+        description:
+          "Two-phase consent. Omit on the FIRST call to get a needs_confirmation preview " +
+          "plus a consentToken (no funds move); re-call with the SAME requestId plus this " +
+          "token to execute. Re-derived from the request terms + funding wallet, so a " +
+          "previewed payment cannot be swapped for a different one.",
       },
     },
     required: ["requestId", "confirm"],
