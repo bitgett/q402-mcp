@@ -385,8 +385,8 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   // call. Require a consentToken bound to the money intent: the first call
   // (no / stale token) returns a preview and does NOT send; the agent relays
   // the preview to the user and only re-calls with the token after a yes. The
-  // source of funds (walletMode / walletId) is deliberately excluded from the
-  // bound intent so picking a wallet after the preview doesn't void consent.
+  // funding source (walletMode / walletId) IS bound into the intent below, so
+  // swapping wallets after the preview correctly voids consent.
   const consentIntent = {
     t: "pay",
     chain: input.chain,
