@@ -9,7 +9,7 @@
  * this file *and* the @quackai/q402-mcp version in lock-step.
  *
  * Emergency BNB-only narrowing: `BNB_FOCUS_MODE` (defined below) is currently
- * false — the full 10-chain matrix is live. The flag stays in the module as a
+ * false — the full 11-chain matrix is live. The flag stays in the module as a
  * one-line revert path in case we ever need to temporarily collapse the
  * supported set to BNB. Trial-key restrictions are enforced server-side
  * via TRIAL_BNB_ONLY (separate code path) and don't depend on this flag.
@@ -25,7 +25,8 @@ export type ChainKey =
   | "injective"
   | "monad"
   | "scroll"
-  | "arbitrum";
+  | "arbitrum"
+  | "base";
 
 export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "avax",
@@ -38,6 +39,7 @@ export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "monad",
   "scroll",
   "arbitrum",
+  "base",
 ];
 
 export interface TokenInfo {
@@ -214,10 +216,25 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     approxGasCostUsd: 0.001,
     note: "Optimistic Rollup L2 — EIP-7702 live on Arbitrum One since ArbOS 40 'Callisto'; ArbOS 51 'Dia' (activated 2026-01-08) refined precompile delegation. Data-availability cost dominates per-tx gas.",
   },
+  base: {
+    key: "base",
+    name: "Base",
+    chainId: 8453,
+    domainName: "Q402 Base",
+    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    gasToken: "ETH",
+    explorer: "https://basescan.org",
+    // Native Circle USDC + bridged Tether USD on Base, both 6 decimals.
+    usdc: { address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6 },
+    usdt: { address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", decimals: 6 },
+    supportedTokens: ["USDC", "USDT"],
+    approxGasCostUsd: 0.001,
+    note: "OP Stack L2 — EIP-7702 live on Base mainnet via the Isthmus upgrade. Native Circle USDC; USDT is bridged. Data-availability cost dominates per-tx gas.",
+  },
 };
 
 // ─── BNB-only emergency flag (mirrors q402-landing app/lib/feature-flags.ts) ──
-// Currently false: the full 10-chain matrix is live. The flag exists as a
+// Currently false: the full 11-chain matrix is live. The flag exists as a
 // one-line revert path — flipping to true rewrites `supportedTokens` for
 // every non-BNB chain to [] at module load, which makes every non-BNB
 // quote/pay call produce a single deterministic rejection message. The

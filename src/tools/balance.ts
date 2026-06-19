@@ -113,7 +113,7 @@ export async function runBalance(): Promise<BalanceSummary> {
         "offer to create ~/.q402/mcp.env with placeholders that the user can " +
         "fill in. (Manual path: set Q402_TRIAL_API_KEY for BNB-only sponsored " +
         "free trial (https://q402.quackai.ai/event) or Q402_MULTICHAIN_API_KEY " +
-        "for the paid 10-chain plan (https://q402.quackai.ai/payment).)",
+        "for the paid 11-chain plan (https://q402.quackai.ai/payment).)",
     };
   }
 

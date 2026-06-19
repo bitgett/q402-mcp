@@ -21,7 +21,7 @@
  *                           Receipt
  *   q402_wallet_status      read-only, requires key — per-chain EIP-7702
  *   q402_agentic_info       read-only, requires key — Agent Wallet info + balance
- *                           delegation state across all 10 chains
+ *                           delegation state across all 11 chains
  *   q402_recurring_list     read-only, requires key — list Agent Wallet's
  *                           recurring rules + status + next-run time
  *   q402_recurring_create   write, requires key — author a new recurring
@@ -75,7 +75,7 @@
  *
  * Trial-scope policy (server-enforced via API key plan): trial keys are
  * restricted to BNB Chain + USDC/USDT and capped at 5 recipients per
- * batch. Paid keys get the full 10-chain surface and 20-recipient batches.
+ * batch. Paid keys get the full 11-chain surface and 20-recipient batches.
  *
  * Configuration is read from `~/.q402/mcp.env` (created by q402_doctor
  * on first install) AND from `process.env` (process.env wins on

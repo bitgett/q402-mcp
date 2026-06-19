@@ -106,7 +106,7 @@ export const BatchPayInputSchema = z.object({
         'the tool returns status="ambiguous" WITHOUT executing so the agent ' +
         'can ask the user which path to take. Use keyScope="trial" to force ' +
         'the BNB-only sponsored key (≤5 recipients). keyScope="multichain" ' +
-        'forces the paid 10-chain key (≤20 recipients).',
+        'forces the paid 11-chain key (≤20 recipients).',
     ),
   walletMode: z
     .enum(["eoa", "agentic-local", "agentic-server"])
@@ -829,7 +829,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   if (noEnable) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route to the right tier: trial scope → /event (free 2k TX, BNB only),
-  // multichain scope → /payment (paid plan, all 10 chains).
+  // multichain scope → /payment (paid plan, all 11 chains).
   const tier = scope === "trial" ? "Free Trial" : "Multichain";
   const url  =
     scope === "trial"
