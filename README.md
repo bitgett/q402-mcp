@@ -301,6 +301,7 @@ If you set up Q402 before v0.5.0 you may have a single `Q402_API_KEY` env var. T
 | Monad | 143 | USDC, USDT0 | Native Circle USDC (CCTP V2) + USDT0 (LayerZero OFT). |
 | Scroll | 534352 | USDC, USDT | zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). |
 | Arbitrum One | 42161 | USDC, USDT | Optimistic rollup — same EIP-7702 signing path as Ethereum. CCIP bridge endpoint (eth ⇄ avax ⇄ arbitrum). |
+| Base | 8453 | USDC, USDT | OP Stack L2 — same EIP-7702 signing path as Ethereum. Native Circle USDC + bridged Tether USD. |
 
 ---
 
