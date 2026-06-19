@@ -35,6 +35,15 @@ export type WalletModeRequest = "eoa" | "agentic-local" | "agentic-server";
 
 export const PayInputSchema = z.object({
   chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"]),
+  rail: z
+    .enum(["q402", "x402"])
+    .optional()
+    .describe(
+      'Settlement rail. Base only — leave unset everywhere else. "q402" (default) ' +
+        '= Q402 gasless EIP-7702 (USDC + USDT). "x402" = the Coinbase x402 standard ' +
+        '(EIP-3009 USDC transferWithAuthorization), settled gaslessly by the Q402 ' +
+        'facilitator — Base USDC only, no Hooks. walletMode="agentic-server" only.',
+    ),
   to: z
     .string()
     .refine(isAddress, "to must be a valid 0x-prefixed EVM address")
@@ -531,6 +540,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           // place hookParams take effect. The landing route ignores them
           // for owner-sig calls (trust boundary), so this is safe.
           ...(input.hookParams ? { hookParams: input.hookParams } : {}),
+          ...(input.rail ? { rail: input.rail } : {}),
         }),
         signal: AbortSignal.timeout(60_000),
       });
@@ -923,6 +933,14 @@ export const PAY_TOOL = {
         type: "string",
         enum: CHAIN_KEYS as readonly string[],
         description: "Target chain.",
+      },
+      rail: {
+        type: "string",
+        enum: ["q402", "x402"],
+        description:
+          'Settlement rail (Base only). "q402" (default) = gasless EIP-7702 ' +
+          '(USDC+USDT). "x402" = Coinbase x402 standard (EIP-3009), Base USDC ' +
+          'only, agentic-server only. Leave unset elsewhere.',
       },
       to: {
         type: "string",
