@@ -23,7 +23,7 @@ export const QuoteInputSchema = z.object({
         "RLUSD here narrows the quote to chain=\"eth\".",
     ),
   chain: z
-    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"])
+    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"])
     .optional()
     .describe(
       "Optional chain filter. When omitted, all 11 chains are compared and ranked by gas cost.",

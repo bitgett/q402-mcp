@@ -27,7 +27,7 @@ export const RequestCreateInputSchema = z.object({
     .default("USDT")
     .describe("Stablecoin to be paid. USDC or USDT. Both peg USD-1."),
   chain: z
-    .enum(["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"])
+    .enum(["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"])
     .default("bnb")
     .describe("Chain the request settles on. Defaults to bnb."),
   recipient: z
@@ -172,7 +172,7 @@ export const REQUEST_CREATE_TOOL = {
       },
       chain: {
         type: "string" as const,
-        enum: ["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"],
+        enum: ["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"],
         description: "Default 'bnb'. Chain the request settles on.",
       },
       recipient: {

@@ -30,6 +30,7 @@ const DEFAULT_RPC: Record<number, string> = {
   988:    "https://rpc.stable.xyz",
   1776:   "https://sentry.evm-rpc.injective.network/",
   5000:   "https://rpc.mantle.xyz",
+  8453:   "https://mainnet.base.org",
   42161:  "https://arb1.arbitrum.io/rpc",
   43114:  "https://api.avax.network/ext/bc/C/rpc",
   534352: "https://rpc.scroll.io",
@@ -37,7 +38,7 @@ const DEFAULT_RPC: Record<number, string> = {
 
 export const ClearDelegationInputSchema = z.object({
   chain: z
-    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"])
+    .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"])
     .describe("Which Q402 chain to clear the delegation on."),
 });
 

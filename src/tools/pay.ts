@@ -34,7 +34,7 @@ import { checkConsent } from "../consent.js";
 export type WalletModeRequest = "eoa" | "agentic-local" | "agentic-server";
 
 export const PayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum"]),
+  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"]),
   to: z
     .string()
     .refine(isAddress, "to must be a valid 0x-prefixed EVM address")
