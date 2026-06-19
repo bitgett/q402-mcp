@@ -27,7 +27,26 @@ Quote → route → (optional) settle stablecoin payments across 10 EVM chains, 
 | **OpenAI Codex CLI** | `codex mcp add q402 -- npx -y @quackai/q402-mcp` (Windows fallback: see below) |
 | **Cursor** | Add to `~/.cursor/mcp.json`: `{ "mcpServers": { "q402": { "command": "npx", "args": ["-y", "@quackai/q402-mcp"] } } }` |
 | **Cline** | Cline → Settings → MCP Servers → Edit JSON. Same shape as Cursor. |
+| **GitHub Copilot (VS Code)** | Add to `.vscode/mcp.json` — root key is `servers`, **not** `mcpServers`: `{ "servers": { "q402": { "command": "npx", "args": ["-y", "@quackai/q402-mcp"] } } }`. Reload VS Code, then enable q402 in the Copilot Chat tools picker. |
+| **Hermes Agent (Nous Research)** | YAML, not JSON. Add under `mcp_servers` in `~/.hermes/config.yaml` (see below), then run `/reload-mcp`. |
 | **Any other stdio MCP client** | Point it at `npx -y @quackai/q402-mcp`. No client-specific code. |
+
+<details>
+<summary>Hermes Agent — YAML config (<code>~/.hermes/config.yaml</code>)</summary>
+
+Hermes reads MCP servers from `~/.hermes/config.yaml` under `mcp_servers` (YAML, not JSON):
+
+```yaml
+mcp_servers:
+  q402:
+    command: "npx"
+    args: ["-y", "@quackai/q402-mcp"]
+    enabled: true
+```
+
+After editing, run `/reload-mcp` in Hermes to load the tools. Or use the CLI: `hermes mcp add q402 --command npx --args -y @quackai/q402-mcp`.
+
+</details>
 
 > Claude **Code** (the CLI, `claude` binary) and Claude **Desktop** (the macOS / Windows app) are different products. The `claude mcp add` command only exists in the CLI; the Desktop app needs the JSON config above.
 
