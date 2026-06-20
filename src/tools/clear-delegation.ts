@@ -1,22 +1,33 @@
 /**
- * q402_clear_delegation — write, requires Q402_PRIVATE_KEY.
+ * q402_clear_delegation — clear an EIP-7702 delegation on a Q402 chain.
  *
- * Clears the EIP-7702 delegation on a specific chain for the EOA derived
- * from Q402_PRIVATE_KEY. The signing happens locally inside this process
- * (so the private key never leaves the user's machine), and the signed
- * authorization is POSTed to Q402's /api/wallet/clear-delegation
- * endpoint which broadcasts the type-0x04 TX from the sponsor wallet
- * (gas paid by Q402 — the user pays nothing).
+ * Three wallet modes, mirroring q402_pay:
  *
- * After clearing, `eth_getCode` for that EOA on that chain returns
- * `0x` again. The next q402_pay on the same chain auto-creates a fresh
- * delegation (no permanent state change).
+ *   - eoa            (Mode A) — sign locally with Q402_PRIVATE_KEY, POST the
+ *                    signed authorization to /api/wallet/clear-delegation
+ *                    (the signature IS the auth). Key never leaves the machine.
+ *   - agentic-local  (Mode B) — same local-sign path, but with the Agent
+ *                    Wallet's exported key (Q402_AGENTIC_PRIVATE_KEY).
+ *   - agentic-server (Mode C) — NO local key. The MCP only holds a live
+ *                    apiKey; it POSTs { apiKey, chain, walletId? } to
+ *                    /api/wallet/agentic/clear-delegation, where the server
+ *                    decrypts the Agent Wallet key and signs the clear. This
+ *                    is the path that lets a server-managed wallet switch off
+ *                    the q402 rail (e.g. to use x402) without the dashboard.
+ *
+ * Q402 sponsors the on-chain type-0x04 TX in every mode (the user pays zero
+ * gas). After clearing, eth_getCode for that wallet on that chain returns
+ * 0x again; the next q402_pay on the same chain re-creates the delegation.
+ *
+ * Mode resolution: an explicit `walletMode` wins. Otherwise, when exactly one
+ * mode is configured it's used; when several are, the tool refuses and asks
+ * (AMBIGUOUS_WALLET_MODE) rather than guessing — same contract as q402_pay.
  */
 
 import { z } from "zod";
 import { Wallet, JsonRpcProvider } from "ethers";
-import { CONFIG } from "../config.js";
-import { CHAIN_CONFIG, CHAIN_KEYS, type ChainKey } from "../chains.js";
+import { CONFIG, detectAgenticModes, resolveApiKey } from "../config.js";
+import { CHAIN_CONFIG, CHAIN_KEYS, type ChainConfig, type ChainKey } from "../chains.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -40,14 +51,34 @@ export const ClearDelegationInputSchema = z.object({
   chain: z
     .enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"])
     .describe("Which Q402 chain to clear the delegation on."),
+  walletMode: z
+    .enum(["eoa", "agentic-local", "agentic-server"])
+    .optional()
+    .describe(
+      'Which wallet to clear. "eoa" = Q402_PRIVATE_KEY, "agentic-local" = ' +
+        'Q402_AGENTIC_PRIVATE_KEY (both sign locally), "agentic-server" = ' +
+        "server-managed Agent Wallet (apiKey only, no private key). Omit when " +
+        "only one mode is configured; required when several are.",
+    ),
+  walletId: z
+    .string()
+    .optional()
+    .describe(
+      'Server-managed Agent Wallet only (walletMode="agentic-server"). ' +
+        "Lowercased Agent Wallet address when you hold more than one; omit to " +
+        "use your single/default wallet (the server refuses with AMBIGUOUS_WALLET " +
+        "if you have several and don't specify).",
+    ),
 });
 
 export type ClearDelegationInput = z.infer<typeof ClearDelegationInputSchema>;
 
 interface ClearDelegationResult {
   ok:           boolean;
+  mode?:        "eoa" | "agentic-local" | "agentic-server";
   chain?:       ChainKey;
   address?:     string;
+  walletId?:    string;
   txHash?:      string;
   blockNumber?: number;
   gasUsed?:     string;
@@ -57,6 +88,10 @@ interface ClearDelegationResult {
    *  but the on-chain state didn't update — likely a stale authorization
    *  nonce; retry after refreshing the wallet's tx count. */
   cleared?:     boolean;
+  /** True when the wallet was already undelegated (no TX needed). */
+  alreadyCleared?: boolean;
+  /** When ok=false and the mode was ambiguous, the modes the env can drive. */
+  availableModes?: string[];
   /** When ok=false, machine-readable code. */
   error?:       string;
   /** When ok=false, human-readable next step. */
@@ -64,29 +99,89 @@ interface ClearDelegationResult {
 }
 
 export async function runClearDelegation(input: ClearDelegationInput): Promise<ClearDelegationResult> {
-  if (!CONFIG.privateKey) {
-    return {
-      ok:    false,
-      error: "MISSING_PRIVATE_KEY",
-      hint:  "Set Q402_PRIVATE_KEY in the MCP environment — same key q402_pay uses. The MCP tool signs locally and never sends the key to Q402.",
-    };
-  }
-
   const cfg = CHAIN_CONFIG[input.chain];
   if (!cfg) {
     return { ok: false, error: "INVALID_CHAIN", hint: `Unknown chain: ${input.chain}` };
   }
 
+  // ── Resolve the effective wallet mode (mirror q402_pay's contract) ────
+  const modes = detectAgenticModes();
+  let mode: "eoa" | "agentic-local" | "agentic-server";
+  if (input.walletMode) {
+    mode = input.walletMode;
+    if (mode === "eoa" && !modes.modeA) {
+      return modeUnavailable("eoa", "Q402_PRIVATE_KEY");
+    }
+    if (mode === "agentic-local" && !modes.modeB) {
+      return modeUnavailable("agentic-local", "Q402_AGENTIC_PRIVATE_KEY");
+    }
+    if (mode === "agentic-server" && !modes.modeC) {
+      return modeUnavailable("agentic-server", "a live Q402_MULTICHAIN_API_KEY (q402_live_…)");
+    }
+  } else {
+    if (modes.count === 0) {
+      return {
+        ok:    false,
+        error: "MISSING_CREDENTIALS",
+        hint:
+          "No wallet is configured. Set Q402_PRIVATE_KEY (Mode A), " +
+          "Q402_AGENTIC_PRIVATE_KEY (Mode B), or a live Q402_MULTICHAIN_API_KEY " +
+          "(Mode C) in the MCP environment.",
+      };
+    }
+    if (modes.count > 1) {
+      const available = [
+        modes.modeA ? "eoa" : null,
+        modes.modeB ? "agentic-local" : null,
+        modes.modeC ? "agentic-server" : null,
+      ].filter((m): m is string => m !== null);
+      return {
+        ok:    false,
+        error: "AMBIGUOUS_WALLET_MODE",
+        hint:
+          "Multiple wallet modes are configured. Pass walletMode to choose " +
+          `which wallet to clear (one of: ${available.join(", ")}).`,
+        availableModes: available,
+      };
+    }
+    mode = modes.primary === "A" ? "eoa" : modes.primary === "B" ? "agentic-local" : "agentic-server";
+  }
+
+  if (mode === "agentic-server") {
+    return runClearModeC(input, cfg);
+  }
+  const signingKey = mode === "agentic-local" ? CONFIG.agenticPrivateKey : CONFIG.privateKey;
+  return runClearLocal(input, cfg, mode, signingKey!);
+}
+
+function modeUnavailable(mode: string, envHint: string): ClearDelegationResult {
+  return {
+    ok:    false,
+    error: "WALLET_MODE_UNAVAILABLE",
+    hint:  `walletMode="${mode}" requested but ${envHint} is not configured in the MCP environment.`,
+  };
+}
+
+/**
+ * Mode A/B — sign the EIP-7702 clear authorization LOCALLY with the given
+ * private key and POST it to /api/wallet/clear-delegation (signature == auth).
+ */
+async function runClearLocal(
+  input: ClearDelegationInput,
+  cfg: ChainConfig,
+  mode: "eoa" | "agentic-local",
+  signingKey: string,
+): Promise<ClearDelegationResult> {
   // ── 1. Derive EOA + read current nonce ────────────────────────────────
   let wallet: Wallet;
   try {
     const provider = new JsonRpcProvider(DEFAULT_RPC[cfg.chainId]);
-    wallet = new Wallet(CONFIG.privateKey, provider);
+    wallet = new Wallet(signingKey, provider);
   } catch {
     return {
       ok:    false,
       error: "INVALID_PRIVATE_KEY",
-      hint:  "Q402_PRIVATE_KEY is set but does not parse as a valid 32-byte hex private key.",
+      hint:  `The ${mode === "agentic-local" ? "Q402_AGENTIC_PRIVATE_KEY" : "Q402_PRIVATE_KEY"} is set but does not parse as a valid 32-byte hex private key.`,
     };
   }
 
@@ -104,11 +199,6 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
   }
 
   // ── 2. Sign EIP-7702 authorization (address = 0x0 → clear) ────────────
-  // ethers v6 `wallet.authorize()` handles the spec-correct RLP+keccak
-  // encoding and produces the canonical { chainId, address, nonce,
-  // signature } object. Sponsored mode: target's nonce isn't bumped by
-  // its own TX (the sponsor sends it), so the authorization nonce
-  // equals the current eth_getTransactionCount value.
   let auth;
   try {
     auth = await wallet.authorize({
@@ -143,10 +233,6 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
   let res: Response;
   let json: unknown;
   try {
-    // 30s timeout — write path: sponsor wallet has to mine the
-    // type-0x04 TX. Real BNB confirmation is 3-5s, headroom for
-    // congested chains; anything beyond 30s means the relay or
-    // chain is degraded and the user should retry.
     res  = await fetch(url, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -163,10 +249,6 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
     };
   }
 
-  // The endpoint returns 422 (not 200) when the TX confirmed but the
-  // on-chain state didn't actually clear — typically a stale authorization
-  // nonce. In that case `json` still carries the diagnostic fields
-  // (txHash, finalCode) so we surface them alongside the error.
   const payload = json as {
     ok?:          boolean;
     txHash?:      string;
@@ -182,6 +264,7 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
   if (!res.ok || payload.cleared !== true) {
     return {
       ok:          false,
+      mode,
       chain:       input.chain,
       address,
       txHash:      payload.txHash,
@@ -196,6 +279,7 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
 
   return {
     ok:          true,
+    mode,
     chain:       input.chain,
     address,
     txHash:      payload.txHash!,
@@ -206,17 +290,146 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
   };
 }
 
+/**
+ * Mode C — server-managed Agent Wallet. No local key: present the live apiKey
+ * and let the server sign the clear with the encrypted Agent Wallet key.
+ */
+async function runClearModeC(
+  input: ClearDelegationInput,
+  cfg: ChainConfig,
+): Promise<ClearDelegationResult> {
+  // BNB prefers the Trial key (server allows clearing on BNB with it);
+  // every other chain routes to the Multichain key.
+  const resolved = resolveApiKey(input.chain, "auto");
+  if (!resolved.apiKey || !resolved.apiKey.startsWith("q402_live_")) {
+    return {
+      ok:    false,
+      mode:  "agentic-server",
+      error: "NO_LIVE_API_KEY",
+      hint:
+        resolved.sandboxReason ??
+        "Mode C clear needs a live API key (q402_live_…). Set Q402_MULTICHAIN_API_KEY in the MCP environment.",
+    };
+  }
+  if (!CONFIG.realPaymentsRequested) {
+    return {
+      ok:    false,
+      mode:  "agentic-server",
+      error: "REAL_PAYMENTS_DISABLED",
+      hint:
+        "Set Q402_ENABLE_REAL_PAYMENTS=1 in your MCP env to let the server " +
+        "broadcast the clear (it submits a real on-chain TX).",
+    };
+  }
+
+  const walletId =
+    typeof input.walletId === "string" && input.walletId.length > 0
+      ? input.walletId.toLowerCase()
+      : CONFIG.walletId ?? undefined;
+
+  const url  = `${CONFIG.relayBaseUrl}/wallet/agentic/clear-delegation`;
+  const body = {
+    apiKey: resolved.apiKey,
+    chain:  input.chain,
+    ...(walletId ? { walletId } : {}),
+  };
+
+  let res: Response;
+  let json: unknown;
+  try {
+    // 45s — the server signs + mines a sponsored type-0x04 TX; matches the
+    // route's maxDuration headroom.
+    res  = await fetch(url, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(45_000),
+    });
+    json = await res.json();
+  } catch (e) {
+    return {
+      ok:    false,
+      mode:  "agentic-server",
+      error: "RELAY_UNREACHABLE",
+      hint:  `Could not reach Q402 relay at ${url}: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+
+  const payload = json as {
+    success?:       boolean;
+    alreadyCleared?: boolean;
+    txHash?:        string;
+    blockNumber?:   number;
+    gasUsed?:       string;
+    finalCode?:     string;
+    address?:       string;
+    chain?:         string;
+    message?:       string;
+    error?:         string;
+    detail?:        string;
+    wallets?:       string[];
+  };
+
+  // Already undelegated — no TX, treat as success.
+  if (res.ok && payload.alreadyCleared === true) {
+    return {
+      ok:             true,
+      mode:           "agentic-server",
+      chain:          input.chain,
+      address:        payload.address,
+      walletId,
+      cleared:        true,
+      alreadyCleared: true,
+    };
+  }
+
+  if (!res.ok || payload.success !== true) {
+    return {
+      ok:          false,
+      mode:        "agentic-server",
+      chain:       input.chain,
+      address:     payload.address,
+      walletId,
+      txHash:      payload.txHash,
+      cleared:     payload.finalCode === "0x" ? true : false,
+      error:       payload.error ?? `HTTP ${res.status}`,
+      hint:
+        payload.detail ??
+        payload.message ??
+        (payload.wallets
+          ? `You have multiple Agent Wallets (${payload.wallets.join(", ")}). Pass walletId to choose one.`
+          : "The server did not clear the delegation. If a txHash is present, the TX confirmed but the wallet is still delegated (commonly a stale nonce) — retry shortly."),
+    };
+  }
+
+  return {
+    ok:          true,
+    mode:        "agentic-server",
+    chain:       input.chain,
+    address:     payload.address,
+    walletId,
+    txHash:      payload.txHash,
+    blockNumber: payload.blockNumber,
+    gasUsed:     payload.gasUsed,
+    cleared:     payload.finalCode === "0x",
+    explorerUrl: payload.txHash ? `${cfg.explorer.replace(/\/$/, "")}/tx/${payload.txHash}` : undefined,
+  };
+}
+
 export const CLEAR_DELEGATION_TOOL = {
   name: "q402_clear_delegation",
   description:
     "Clear the EIP-7702 delegation on a Q402 chain for the configured wallet. " +
-    "Call this only when the user explicitly asks to reset or clean up their " +
-    "Q402 wallet on a chain — the next q402_pay will recreate the delegation " +
-    "automatically, so calling clear right before another payment just wastes " +
-    "a TX. Pair with q402_wallet_status first to see which chains actually " +
-    "have an active delegation. " +
-    "Signing happens locally with Q402_PRIVATE_KEY (same key q402_pay uses); " +
-    "Q402 sponsors the on-chain TX so the user pays zero gas.",
+    "Call this when the user wants to reset a chain's delegation, OR to switch " +
+    "a wallet off the q402 rail so it can use the x402 (EIP-3009) rail on Base " +
+    "(a q402-delegated wallet can't settle x402). The next q402_pay on the same " +
+    "chain re-creates the delegation automatically, so don't clear right before " +
+    "a normal pay. Pair with q402_wallet_status / q402_agentic_info first to see " +
+    "which chains have an active delegation. " +
+    "Works in all three wallet modes: eoa (Q402_PRIVATE_KEY) and agentic-local " +
+    "(Q402_AGENTIC_PRIVATE_KEY) sign LOCALLY; agentic-server (Mode C) holds only " +
+    "a live apiKey and the server signs with the encrypted Agent Wallet key. " +
+    "Q402 sponsors the on-chain TX in every mode (the user pays zero gas).",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -224,6 +437,22 @@ export const CLEAR_DELEGATION_TOOL = {
         type: "string",
         enum: CHAIN_KEYS as readonly string[],
         description: "Which Q402 chain to clear the delegation on.",
+      },
+      walletMode: {
+        type: "string",
+        enum: ["eoa", "agentic-local", "agentic-server"],
+        description:
+          'Which wallet to clear. "eoa" = Q402_PRIVATE_KEY, "agentic-local" = ' +
+          'Q402_AGENTIC_PRIVATE_KEY (both sign locally), "agentic-server" = ' +
+          "server-managed Agent Wallet (apiKey only, no private key). Omit when " +
+          "only one mode is configured; required when several are.",
+      },
+      walletId: {
+        type: "string",
+        description:
+          'Server-managed Agent Wallet only (walletMode="agentic-server"). ' +
+          "Lowercased Agent Wallet address when you hold more than one; omit to " +
+          "use your single/default wallet.",
       },
     },
     required: ["chain"],

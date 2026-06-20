@@ -193,6 +193,18 @@ export interface PaySummary {
    * ticket — without it users open MetaMask, see the new badge, and worry.
    */
   postPaymentTip?: string;
+  /**
+   * Set when the relay fail-closed on x402 because the Agent Wallet is still
+   * EIP-7702 delegated to the q402 rail (X402_WALLET_DELEGATED). Tells the AI
+   * it can clear the delegation in one step (Mode C, no dashboard) and retry —
+   * or just resend with rail "q402". Informational; the AI decides whether to
+   * act and should confirm the rail switch with the user.
+   */
+  recommendedAction?: {
+    tool: string;
+    args: Record<string, unknown>;
+    why: string;
+  };
 }
 
 function maxAmountGuard(amount: string, cap: number): void {
@@ -727,6 +739,14 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         : "error" in data
           ? (data as { error?: string }).error
           : undefined;
+    // x402 on Base fails closed when the Agent Wallet is still q402-delegated
+    // (EIP-7702) — USDC V2.2 routes a delegated account's EIP-3009 signature
+    // through ERC-1271, which the Q402 impl doesn't implement. Surface the
+    // one-step fix so the AI doesn't dead-end at the dashboard: clear the
+    // delegation (Mode C, gasless) then retry x402 — or resend with rail
+    // "q402". stringify match is nesting-agnostic (the code may arrive in
+    // `error`, a nested relay body, or a forwarded message).
+    const x402Blocked = !success && JSON.stringify(data).includes("X402_WALLET_DELEGATED");
     return {
       result: {
         success,
@@ -743,8 +763,26 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         "wallet=agentic-server",
         "mode=live",
         ...(message ? [`server_message=${message}`] : []),
+        ...(x402Blocked ? ["x402_blocked=wallet_delegated"] : []),
       ],
       senderWallet,
+      ...(x402Blocked
+        ? {
+            recommendedAction: {
+              tool: "q402_clear_delegation",
+              args: {
+                chain: chain.key,
+                walletMode: "agentic-server",
+                ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
+              },
+              why:
+                "This wallet is EIP-7702 delegated to the q402 rail, so the x402 " +
+                "(EIP-3009) path can't verify its signature. Clear the delegation " +
+                "with q402_clear_delegation (gasless, no dashboard), then retry the " +
+                'x402 pay — or resend with rail "q402".',
+            },
+          }
+        : {}),
     };
   }
 
