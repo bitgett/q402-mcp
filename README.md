@@ -186,7 +186,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_batch_pay` | live mode | Up to 20 recipients per call (trial: 5). Same auto-routing as `q402_pay`. 6+ BNB batches with Trial set return `status="ambiguous"` so the agent asks how to split. xlayer + stable not batchable — use `q402_pay` in a loop. |
 | `q402_receipt` | none | Fetch + locally verify a Trust Receipt (`rct_…` id, ECDSA against the relayer EOA). |
 | `q402_wallet_status` | private key | Per-chain EIP-7702 state for the EOA derived from `Q402_PRIVATE_KEY`. |
-| `q402_clear_delegation` | private key | Clear EIP-7702 delegation; Q402 sponsors the on-chain TX. |
+| `q402_clear_delegation` | private key / api key | Clear EIP-7702 delegation (Mode A/B local key OR Mode C api key, server-signed). Sponsored on every chain except Ethereum (billed to your Gas Tank). Needs `confirm: true`. |
 | `q402_agentic_info` | api key | Agent Wallet info (addresses, per-wallet caps, daily-spend used, ERC-8004 id). Drives Mode C. |
 | `q402_recurring_list` | api key | List scheduled rules. |
 | `q402_recurring_create` | api key | Author a recurring rule. Paid Multichain on EVERY chain (BNB included). |

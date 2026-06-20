@@ -15,9 +15,10 @@
  *                    is the path that lets a server-managed wallet switch off
  *                    the q402 rail (e.g. to use x402) without the dashboard.
  *
- * Q402 sponsors the on-chain type-0x04 TX in every mode (the user pays zero
- * gas). After clearing, eth_getCode for that wallet on that chain returns
- * 0x again; the next q402_pay on the same chain re-creates the delegation.
+ * Q402 sponsors the on-chain type-0x04 TX on every chain EXCEPT Ethereum,
+ * where the gas is billed to the user's Gas Tank. Requires confirm: true to
+ * broadcast (omit first for a preview). After clearing, eth_getCode for that
+ * wallet on that chain returns 0x again; the next q402_pay re-creates it.
  *
  * Mode resolution: an explicit `walletMode` wins. Otherwise, when exactly one
  * mode is configured it's used; when several are, the tool refuses and asks
@@ -69,6 +70,15 @@ export const ClearDelegationInputSchema = z.object({
         "use your single/default wallet (the server refuses with AMBIGUOUS_WALLET " +
         "if you have several and don't specify).",
     ),
+  confirm: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Must be true to actually broadcast the clear. A clear sends a real " +
+        "on-chain transaction and, on Ethereum, bills your Gas Tank — so omit " +
+        "this first to get a preview, confirm with the user, then re-call with " +
+        "confirm: true.",
+    ),
 });
 
 export type ClearDelegationInput = z.infer<typeof ClearDelegationInputSchema>;
@@ -92,6 +102,11 @@ interface ClearDelegationResult {
   alreadyCleared?: boolean;
   /** When ok=false and the mode was ambiguous, the modes the env can drive. */
   availableModes?: string[];
+  /** Set when confirm was not passed — the clear was NOT broadcast. The agent
+   *  must surface `preview` to the user, get a yes, then re-call with
+   *  confirm: true. */
+  needsConfirm?: boolean;
+  preview?:     string;
   /** When ok=false, machine-readable code. */
   error?:       string;
   /** When ok=false, human-readable next step. */
@@ -145,6 +160,29 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
       };
     }
     mode = modes.primary === "A" ? "eoa" : modes.primary === "B" ? "agentic-local" : "agentic-server";
+  }
+
+  // ── Confirm gate ──────────────────────────────────────────────────────
+  // A clear broadcasts a real on-chain tx and, on Ethereum, bills the user's
+  // Gas Tank. Require an explicit confirm so the agent surfaces it to the
+  // user before any state change (mirrors q402_pay's consent posture). No
+  // signing, no broadcast happens on the preview path.
+  if (input.confirm !== true) {
+    const gasNote =
+      input.chain === "eth"
+        ? "Gas is billed to your Gas Tank on Ethereum."
+        : "Q402 sponsors the gas, so you pay $0.";
+    return {
+      ok:          false,
+      mode,
+      chain:       input.chain,
+      needsConfirm: true,
+      preview:
+        `Clear the EIP-7702 delegation for your ${mode} wallet on ${input.chain}. ` +
+        `This sends a real on-chain transaction. ${gasNote} ` +
+        "The next q402_pay on this chain re-creates the delegation.",
+      hint: "Confirm with the user, then re-call q402_clear_delegation with the same args plus confirm: true.",
+    };
   }
 
   if (mode === "agentic-server") {
@@ -429,7 +467,9 @@ export const CLEAR_DELEGATION_TOOL = {
     "Works in all three wallet modes: eoa (Q402_PRIVATE_KEY) and agentic-local " +
     "(Q402_AGENTIC_PRIVATE_KEY) sign LOCALLY; agentic-server (Mode C) holds only " +
     "a live apiKey and the server signs with the encrypted Agent Wallet key. " +
-    "Q402 sponsors the on-chain TX in every mode (the user pays zero gas).",
+    "Q402 sponsors the on-chain TX on every chain EXCEPT Ethereum, where the " +
+    "gas is billed to your Gas Tank. Requires confirm: true to broadcast — " +
+    "call once without it to get a preview, then re-call with confirm: true.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -437,6 +477,14 @@ export const CLEAR_DELEGATION_TOOL = {
         type: "string",
         enum: CHAIN_KEYS as readonly string[],
         description: "Which Q402 chain to clear the delegation on.",
+      },
+      confirm: {
+        type: "boolean",
+        enum: [true],
+        description:
+          "Must be true to broadcast. A clear sends a real on-chain tx and " +
+          "(on Ethereum) bills your Gas Tank; omit first for a preview, then " +
+          "re-call with confirm: true.",
       },
       walletMode: {
         type: "string",

@@ -656,7 +656,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           tokenAmount: input.amount,
           token: input.token,
           chain: chain.key,
-          method: "eip7702",
+          method: input.rail === "x402" ? "x402" : "q402",
           split: true,
           legs,
           settledLegs: settledCount,
@@ -714,7 +714,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           tokenAmount: input.amount,
           token: input.token,
           chain: chain.key,
-          method: "eip7702",
+          method: input.rail === "x402" ? "x402" : "q402",
           pending: true,
           retryAfterSec: retryAfter,
         } satisfies PayResult,
@@ -755,7 +755,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         tokenAmount: input.amount,
         token: input.token,
         chain: chain.key,
-        method: "eip7702",
+        method: input.rail === "x402" ? "x402" : "q402",
         explorerUrl: txHash ? undefined : null,
       } satisfies PayResult,
       guardsApplied: [
@@ -834,14 +834,17 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   // optional thereafter) — we always include it so the AI has the context
   // without us needing to track per-chain "did the user already see this".
   return {
-    result,
+    // Mode A/B always settles on the q402 rail (x402 is agentic-server only),
+    // so report the rail name rather than the relay's mechanism string.
+    result: { ...result, method: "q402" },
     guardsApplied,
     senderWallet,
     postPaymentTip: result.success
       ? "After this payment your EOA is EIP-7702-delegated to Q402's impl on " +
         `${chain.name} — MetaMask / OKX will show it as a 'Smart account'. ` +
         "That's normal and reversible: q402_clear_delegation removes the " +
-        `delegation on a specific chain (Q402 sponsors the gas, so you pay $0). ` +
+        "delegation on a specific chain (Q402 sponsors the gas on every chain " +
+        "except Ethereum, where it's billed to your Gas Tank). " +
         "If you ever try to receive native gas tokens directly to this EOA " +
         "and the transfer reverts, the delegation is the cause — clear it for " +
         "that chain first."
