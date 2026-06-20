@@ -33,9 +33,9 @@ export const YieldPositionsInputSchema = z.object({
         "API key); Q402_AGENT_WALLET_ADDRESS env fills it in when set.",
     ),
   chain: z
-    .enum(["bnb"])
+    .enum(["bnb", "base"])
     .optional()
-    .describe("Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit for all supported chains."),
+    .describe("Optional chain filter. Aave positions on 'bnb', Morpho positions on 'base'. Omit for all supported chains."),
 });
 
 export const YIELD_POSITIONS_TOOL = {
@@ -65,8 +65,8 @@ export const YIELD_POSITIONS_TOOL = {
       },
       chain: {
         type: "string" as const,
-        enum: ["bnb"],
-        description: "Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit for all supported chains.",
+        enum: ["bnb", "base"],
+        description: "Optional chain filter. Aave positions on 'bnb', Morpho positions on 'base'. Omit for all supported chains.",
       },
     },
     additionalProperties: false,

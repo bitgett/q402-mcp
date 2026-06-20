@@ -14,9 +14,9 @@ import { CONFIG } from "../config.js";
 
 export const YieldReservesInputSchema = z.object({
   chain: z
-    .enum(["bnb"])
+    .enum(["bnb", "base"])
     .optional()
-    .describe("Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit to list all supported chains."),
+    .describe("Optional chain filter. Aave markets on 'bnb', Morpho (MetaMorpho) markets on 'base'. Omit to list all supported chains."),
 });
 
 export const YIELD_RESERVES_TOOL = {
@@ -34,8 +34,8 @@ export const YIELD_RESERVES_TOOL = {
     properties: {
       chain: {
         type: "string" as const,
-        enum: ["bnb"],
-        description: "Optional chain filter. Q402 Yield is BNB-only today — only 'bnb' is accepted. Omit for all supported chains.",
+        enum: ["bnb", "base"],
+        description: "Optional chain filter. Aave markets on 'bnb', Morpho markets on 'base'. Omit for all supported chains.",
       },
     },
     additionalProperties: false,
