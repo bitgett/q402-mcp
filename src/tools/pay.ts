@@ -402,6 +402,12 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     to: input.to.toLowerCase(),
     amount: input.amount,
     token: input.token,
+    // Bind the settlement RAIL. On Base the same (to, amount, token) settles
+    // very differently under q402 (EIP-7702) vs x402 (EIP-3009) — different
+    // signature scheme, gas path, and wallet-state constraints. Consenting to a
+    // Q402-rail preview must NOT authorise an x402 execution on the same token,
+    // so a rail change invalidates the consent and forces a fresh preview.
+    rail: input.rail ?? "q402",
     // Bind the funding source too — the user is consenting to spend from THIS
     // wallet, so a different walletMode/walletId needs a fresh preview.
     wm: effectiveMode,
@@ -425,6 +431,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       ? ` — split ${input.hookParams.splits.length} ways; funds go to the split recipients, not ${input.to}`
       : "";
     const fromNote = senderWallet ? ` from ${senderWallet.addressShort}` : "";
+    const railNote = input.rail === "x402" ? " via the x402 (EIP-3009) rail" : "";
     return {
       result: failureResult("consent"),
       guardsApplied: [...guardsApplied, "two_phase_consent"],
@@ -432,7 +439,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       needsConsent: {
         status: "needs_confirmation",
         preview:
-          `Send ${input.amount} ${input.token} to ${input.to} on ${chain.key}${fromNote}${splitNote}. ` +
+          `Send ${input.amount} ${input.token} to ${input.to} on ${chain.key}${railNote}${fromNote}${splitNote}. ` +
           `Confirm with the user, then re-call q402_pay with the same args plus ` +
           `consentToken="${consent.expected}".`,
         consentToken: consent.expected,
