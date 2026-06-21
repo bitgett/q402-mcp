@@ -26,7 +26,8 @@ export const YIELD_RESERVES_TOOL = {
     "Returns each market's protocol, chain, asset, asset address, position token, market address, " +
     "and current supply APY (shown as a %). No auth required and no funds move — this is purely a " +
     "preview of available yield. " +
-    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today. " +
+    "Reads BNB Chain (Aave V3) markets, plus Base (Morpho) when a curated vault is configured. " +
+    "Deposit/withdraw (q402_yield_deposit / q402_yield_withdraw) are BNB-only today. " +
     "Pass an optional `chain` to filter; omit it to see every supported chain. Use this whenever " +
     "the user asks 'where can I earn yield?' or 'what's the lending APY on <asset>?' before supplying.",
   inputSchema: {

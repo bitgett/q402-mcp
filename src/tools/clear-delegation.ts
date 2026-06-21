@@ -16,9 +16,10 @@
  *                    the q402 rail (e.g. to use x402) without the dashboard.
  *
  * Q402 sponsors the on-chain type-0x04 TX on every chain EXCEPT Ethereum,
- * where the gas is billed to the user's Gas Tank. Requires confirm: true to
- * broadcast (omit first for a preview). After clearing, eth_getCode for that
- * wallet on that chain returns 0x again; the next q402_pay re-creates it.
+ * where the gas is billed to the user's Gas Tank. Requires a matching
+ * consentToken to broadcast (omit it first for a preview, then re-call with
+ * the token). After clearing, eth_getCode for that wallet on that chain
+ * returns 0x again; the next q402_pay re-creates it.
  *
  * Mode resolution: an explicit `walletMode` wins. Otherwise, when exactly one
  * mode is configured it's used; when several are, the tool refuses and asks
@@ -218,7 +219,13 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
         status:  "needs_confirmation",
         preview:
           `Clear the EIP-7702 delegation for your ${mode} wallet on ${input.chain}` +
-          `${resolvedWalletId ? ` (${resolvedWalletId})` : ""}. ` +
+          `${
+            resolvedWalletId
+              ? ` (${resolvedWalletId})`
+              : mode === "agentic-server"
+                ? " (your DEFAULT Agent Wallet, resolved server-side — pass walletId to target a specific one)"
+                : ""
+          }. ` +
           `This sends a real on-chain transaction. ${gasNote} ` +
           "The next q402_pay on this chain re-creates the delegation. " +
           "Confirm with the user, then re-call with the same args plus this consentToken.",

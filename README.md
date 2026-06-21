@@ -186,7 +186,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_batch_pay` | live mode | Up to 20 recipients per call (trial: 5). Same auto-routing as `q402_pay`. 6+ BNB batches with Trial set return `status="ambiguous"` so the agent asks how to split. xlayer + stable not batchable — use `q402_pay` in a loop. |
 | `q402_receipt` | none | Fetch + locally verify a Trust Receipt (`rct_…` id, ECDSA against the relayer EOA). |
 | `q402_wallet_status` | private key | Per-chain EIP-7702 state for the EOA derived from `Q402_PRIVATE_KEY`. |
-| `q402_clear_delegation` | private key / api key | Clear EIP-7702 delegation (Mode A/B local key OR Mode C api key, server-signed). Sponsored on every chain except Ethereum (billed to your Gas Tank). Needs `confirm: true`. |
+| `q402_clear_delegation` | private key / api key | Clear EIP-7702 delegation (Mode A/B local key OR Mode C api key, server-signed). Sponsored on every chain except Ethereum (billed to your Gas Tank). Two-phase consent (`consentToken`). |
 | `q402_agentic_info` | api key | Agent Wallet info (addresses, per-wallet caps, daily-spend used, ERC-8004 id). Drives Mode C. |
 | `q402_recurring_list` | api key | List scheduled rules. |
 | `q402_recurring_create` | api key | Author a recurring rule. Paid Multichain on EVERY chain (BNB included). |
@@ -260,7 +260,7 @@ Anything missing for the resolved scope → automatic sandbox fallback with a hi
 | `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject calls with `amount > N` USD. |
 | `Q402_ALLOWED_RECIPIENTS` | off | Comma-separated address allowlist. |
 
-Combined with `confirm: true` + live-mode env, a payment needs: chat OK + amount ≤ cap + recipient allowed + all 3 live envs.
+Combined with the two-phase `consentToken` + live-mode env, a payment needs: a preview the user approved + amount ≤ cap + recipient allowed + all 3 live envs.
 
 ---
 
