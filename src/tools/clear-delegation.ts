@@ -28,6 +28,7 @@
 import { z } from "zod";
 import { Wallet, JsonRpcProvider } from "ethers";
 import { CONFIG, detectAgenticModes, resolveApiKey } from "../config.js";
+import { checkConsent } from "../consent.js";
 import { CHAIN_CONFIG, CHAIN_KEYS, type ChainConfig, type ChainKey } from "../chains.js";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -70,14 +71,17 @@ export const ClearDelegationInputSchema = z.object({
         "use your single/default wallet (the server refuses with AMBIGUOUS_WALLET " +
         "if you have several and don't specify).",
     ),
-  confirm: z
-    .literal(true)
+  consentToken: z
+    .string()
     .optional()
     .describe(
-      "Must be true to actually broadcast the clear. A clear sends a real " +
-        "on-chain transaction and, on Ethereum, bills your Gas Tank — so omit " +
-        "this first to get a preview, confirm with the user, then re-call with " +
-        "confirm: true.",
+      "Two-phase consent. LEAVE THIS UNSET on the first call: the tool does " +
+        "NOT broadcast — it returns status=\"needs_confirmation\" with a " +
+        "human-readable `preview` (including whether Ethereum bills your Gas " +
+        "Tank) and a `consentToken`. Relay the preview to the user; only after " +
+        "they approve, re-call with the SAME args plus this token. The token is " +
+        "re-derived from the resolved chain + wallet, so a previewed clear can't " +
+        "be swapped for a different one.",
     ),
 });
 
@@ -102,11 +106,14 @@ interface ClearDelegationResult {
   alreadyCleared?: boolean;
   /** When ok=false and the mode was ambiguous, the modes the env can drive. */
   availableModes?: string[];
-  /** Set when confirm was not passed — the clear was NOT broadcast. The agent
-   *  must surface `preview` to the user, get a yes, then re-call with
-   *  confirm: true. */
-  needsConfirm?: boolean;
-  preview?:     string;
+  /** Set when no matching consentToken was supplied — the clear was NOT
+   *  broadcast. The agent must relay `preview` to the user, get a yes, then
+   *  re-call with the same args plus `needsConsent.consentToken`. */
+  needsConsent?: {
+    status: "needs_confirmation";
+    preview: string;
+    consentToken: string;
+  };
   /** When ok=false, machine-readable code. */
   error?:       string;
   /** When ok=false, human-readable next step. */
@@ -162,26 +169,61 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
     mode = modes.primary === "A" ? "eoa" : modes.primary === "B" ? "agentic-local" : "agentic-server";
   }
 
-  // ── Confirm gate ──────────────────────────────────────────────────────
-  // A clear broadcasts a real on-chain tx and, on Ethereum, bills the user's
-  // Gas Tank. Require an explicit confirm so the agent surfaces it to the
-  // user before any state change (mirrors q402_pay's consent posture). No
-  // signing, no broadcast happens on the preview path.
-  if (input.confirm !== true) {
+  // ── Mode B (agentic-local) + Ethereum guard ───────────────────────────
+  // eth undelegate is billed to the Agent Wallet OWNER's Gas Tank, but the
+  // local signature-auth endpoint can only see the agent address — it can't
+  // resolve (or bill) the owner. So route eth+Mode-B to the Mode C apiKey path
+  // (which bills the owner correctly) instead of letting the user hit an
+  // unactionable 402.
+  if (mode === "agentic-local" && input.chain === "eth") {
+    return {
+      ok:    false,
+      mode,
+      chain: "eth",
+      error: "ETH_CLEAR_NEEDS_OWNER_TANK",
+      hint:
+        "Ethereum undelegate is billed to the Agent Wallet OWNER's Gas Tank, " +
+        'which local (Mode B) signing can\'t reach. Use walletMode: "agentic-server" ' +
+        "(set a live Q402_MULTICHAIN_API_KEY) or clear eth from the dashboard.",
+    };
+  }
+
+  // ── Two-phase consent (token-bound, mirrors q402_pay) ─────────────────
+  // Bind the RESOLVED mode + the walletId the tool will actually send, so a
+  // preview for one wallet can't execute against another (preview→execute
+  // bait-and-switch). The token is a hash of these fields (not secret) — the
+  // security is the forced human-visible preview round-trip that a one-shot
+  // prompt injection can't skip. No signing/broadcast on the preview path.
+  const resolvedWalletId =
+    (typeof input.walletId === "string" && input.walletId.length > 0
+      ? input.walletId
+      : CONFIG.walletId ?? "").toLowerCase();
+  const consentIntent = {
+    action:   "clear_delegation",
+    chain:    input.chain,
+    mode,
+    walletId: resolvedWalletId,
+  };
+  const consent = checkConsent(consentIntent, input.consentToken);
+  if (!consent.ok) {
     const gasNote =
       input.chain === "eth"
         ? "Gas is billed to your Gas Tank on Ethereum."
         : "Q402 sponsors the gas, so you pay $0.";
     return {
-      ok:          false,
+      ok:    false,
       mode,
-      chain:       input.chain,
-      needsConfirm: true,
-      preview:
-        `Clear the EIP-7702 delegation for your ${mode} wallet on ${input.chain}. ` +
-        `This sends a real on-chain transaction. ${gasNote} ` +
-        "The next q402_pay on this chain re-creates the delegation.",
-      hint: "Confirm with the user, then re-call q402_clear_delegation with the same args plus confirm: true.",
+      chain: input.chain,
+      needsConsent: {
+        status:  "needs_confirmation",
+        preview:
+          `Clear the EIP-7702 delegation for your ${mode} wallet on ${input.chain}` +
+          `${resolvedWalletId ? ` (${resolvedWalletId})` : ""}. ` +
+          `This sends a real on-chain transaction. ${gasNote} ` +
+          "The next q402_pay on this chain re-creates the delegation. " +
+          "Confirm with the user, then re-call with the same args plus this consentToken.",
+        consentToken: consent.expected,
+      },
     };
   }
 
@@ -468,8 +510,9 @@ export const CLEAR_DELEGATION_TOOL = {
     "(Q402_AGENTIC_PRIVATE_KEY) sign LOCALLY; agentic-server (Mode C) holds only " +
     "a live apiKey and the server signs with the encrypted Agent Wallet key. " +
     "Q402 sponsors the on-chain TX on every chain EXCEPT Ethereum, where the " +
-    "gas is billed to your Gas Tank. Requires confirm: true to broadcast — " +
-    "call once without it to get a preview, then re-call with confirm: true.",
+    "gas is billed to your Gas Tank. Two-phase consent: call once WITHOUT " +
+    "consentToken to get a preview + token (no broadcast), then re-call with " +
+    "the same args plus that consentToken to execute.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -478,13 +521,12 @@ export const CLEAR_DELEGATION_TOOL = {
         enum: CHAIN_KEYS as readonly string[],
         description: "Which Q402 chain to clear the delegation on.",
       },
-      confirm: {
-        type: "boolean",
-        enum: [true],
+      consentToken: {
+        type: "string",
         description:
-          "Must be true to broadcast. A clear sends a real on-chain tx and " +
-          "(on Ethereum) bills your Gas Tank; omit first for a preview, then " +
-          "re-call with confirm: true.",
+          "Two-phase consent. Omit on the first call to get a needs_confirmation " +
+          "preview + consentToken (no broadcast); re-call with the SAME args plus " +
+          "this token to execute. Re-derived from the resolved chain + wallet.",
       },
       walletMode: {
         type: "string",

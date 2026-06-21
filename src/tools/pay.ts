@@ -959,9 +959,10 @@ export const PAY_TOOL = {
     "etc.) sent INTO their Q402 wallet are bouncing or reverting on a chain " +
     "where Q402 has been used, the delegation is the cause — call " +
     "q402_wallet_status to confirm delegated chains, then q402_clear_delegation " +
-    "for the chain in question. Q402 sponsors the gas for the clear, so the " +
-    "user pays $0. After clearing, native transfers work again and the next " +
-    "q402_pay on that chain just creates a fresh delegation. " +
+    "for the chain in question. Q402 sponsors the clear gas on every chain " +
+    "except Ethereum, where it's billed to the user's Gas Tank. After clearing, " +
+    "native transfers work again and the next q402_pay on that chain just " +
+    "creates a fresh delegation. " +
     "\n\n" +
     "ALWAYS get explicit user confirmation of the exact recipient address, " +
     "amount, chain, and token in conversation immediately before calling " +
