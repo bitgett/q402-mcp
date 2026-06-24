@@ -117,6 +117,7 @@ import { YIELD_RESERVES_TOOL,  YieldReservesInputSchema,  runYieldReserves }  fr
 import { YIELD_POSITIONS_TOOL, YieldPositionsInputSchema, runYieldPositions } from "./tools/yield-positions.js";
 import { YIELD_DEPOSIT_TOOL,   YieldDepositInputSchema,   runYieldDeposit }   from "./tools/yield-deposit.js";
 import { YIELD_WITHDRAW_TOOL,  YieldWithdrawInputSchema,  runYieldWithdraw }  from "./tools/yield-withdraw.js";
+import { STAKE_TOOL, StakeInputSchema, runStake, UNSTAKE_TOOL, UnstakeInputSchema, runUnstake } from "./tools/stake.js";
 import {
   RECURRING_LIST_TOOL,
   RecurringListInputSchema,
@@ -207,6 +208,9 @@ async function main(): Promise<void> {
       // / withdraw with the encrypted key.
       YIELD_DEPOSIT_TOOL,
       YIELD_WITHDRAW_TOOL,
+      // Gasless Q (QuackAI) staking into QuackAiStake on BNB (server-signed).
+      STAKE_TOOL,
+      UNSTAKE_TOOL,
       // Payment Requests — the receive side. create publishes an invoice
       // (no funds move, apiKey only), status is a public id lookup, pay
       // settles a request gaslessly from the payer's own Agent Wallet
@@ -320,6 +324,14 @@ async function main(): Promise<void> {
         case "q402_yield_withdraw": {
           const parsed = YieldWithdrawInputSchema.parse(args ?? {});
           return await runYieldWithdraw(parsed);
+        }
+        case "q402_stake": {
+          const parsed = StakeInputSchema.parse(args ?? {});
+          return await runStake(parsed);
+        }
+        case "q402_unstake": {
+          const parsed = UnstakeInputSchema.parse(args ?? {});
+          return await runUnstake(parsed);
         }
         case "q402_request_create": {
           const parsed = RequestCreateInputSchema.parse(args ?? {});
