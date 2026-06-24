@@ -351,7 +351,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     available.push({
       id: "agentic-server",
       label: "Agent Wallet (server-managed)",
-      note: "Q402 holds the encrypted key; batch fires through /api/wallet/agentic/batch. Caps you set in the dashboard bound the spend.",
+      note: "Q402 holds the encrypted key; batch fires through /api/wallet/agentic/batch. Dashboard caps bound USDC/USDT/RLUSD spend; Q is exempt by design (your own token), but the recipient allowlist + confirmation still apply.",
     });
   }
 

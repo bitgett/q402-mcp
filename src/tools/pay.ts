@@ -297,7 +297,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     available.push({
       id: "agentic-server",
       label: "Agent Wallet (server-managed)",
-      note: "Q402 holds the encrypted key; payment fires through /api/wallet/agentic/send. Caps you set in the dashboard bound the spend.",
+      note: "Q402 holds the encrypted key; payment fires through /api/wallet/agentic/send. Dashboard caps bound USDC/USDT/RLUSD spend; Q is exempt by design (your own token), but the recipient allowlist + confirmation still apply.",
     });
   }
 

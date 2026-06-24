@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp — MCP server entry point (stdio transport).
  *
- * Exposes twenty-seven tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes thirty tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key — first-install onboarding +
@@ -118,6 +118,7 @@ import { YIELD_POSITIONS_TOOL, YieldPositionsInputSchema, runYieldPositions } fr
 import { YIELD_DEPOSIT_TOOL,   YieldDepositInputSchema,   runYieldDeposit }   from "./tools/yield-deposit.js";
 import { YIELD_WITHDRAW_TOOL,  YieldWithdrawInputSchema,  runYieldWithdraw }  from "./tools/yield-withdraw.js";
 import { STAKE_TOOL, StakeInputSchema, runStake, UNSTAKE_TOOL, UnstakeInputSchema, runUnstake } from "./tools/stake.js";
+import { STAKE_POSITIONS_TOOL, StakePositionsInputSchema, runStakePositions } from "./tools/stake-positions.js";
 import {
   RECURRING_LIST_TOOL,
   RecurringListInputSchema,
@@ -209,8 +210,11 @@ async function main(): Promise<void> {
       YIELD_DEPOSIT_TOOL,
       YIELD_WITHDRAW_TOOL,
       // Gasless Q (QuackAI) staking into QuackAiStake on BNB (server-signed).
+      // stake (incl. "max"), per-record unstake (exit by index / all matured),
+      // and a read-only positions snapshot (indices + exitable flags).
       STAKE_TOOL,
       UNSTAKE_TOOL,
+      STAKE_POSITIONS_TOOL,
       // Payment Requests — the receive side. create publishes an invoice
       // (no funds move, apiKey only), status is a public id lookup, pay
       // settles a request gaslessly from the payer's own Agent Wallet
@@ -332,6 +336,10 @@ async function main(): Promise<void> {
         case "q402_unstake": {
           const parsed = UnstakeInputSchema.parse(args ?? {});
           return await runUnstake(parsed);
+        }
+        case "q402_stake_positions": {
+          const parsed = StakePositionsInputSchema.parse(args ?? {});
+          return await runStakePositions(parsed);
         }
         case "q402_request_create": {
           const parsed = RequestCreateInputSchema.parse(args ?? {});
