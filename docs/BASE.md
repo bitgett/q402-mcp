@@ -43,7 +43,7 @@ Per-client setup is in the main [README](../README.md).
 |------------|--------|
 | Payments (send, batch, scheduled, invoices), USDC + USDT, gasless | Live |
 | x402 (pay any x402 API with no gas, Coinbase standard, Base-native) | Live |
-| Morpho yield (deposit / withdraw idle stablecoins into a Base Morpho vault, agent-driven) | Shipping |
+| Morpho yield (deposit / withdraw idle USDC into a Base Morpho MetaMorpho ERC-4626 vault, agent-driven). Off-chain path, MCP tools, and dashboard Earn selector are built; Base impl contract pending audit + owner approval before deploy. | Implemented (deploy pending) |
 
 ## Traction
 

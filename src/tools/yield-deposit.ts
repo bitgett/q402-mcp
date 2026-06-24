@@ -22,12 +22,12 @@ import { checkConsent } from "../consent.js";
 
 export const YieldDepositInputSchema = z.object({
   chain: z
-    .enum(["bnb"])
+    .enum(["bnb", "base"])
     .default("bnb")
-    .describe("Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted."),
+    .describe("Chain to supply on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only)."),
   token: z
     .enum(["USDC", "USDT"])
-    .describe("Stablecoin to supply into Aave. USDC or USDT."),
+    .describe("Stablecoin to supply. USDC or USDT on bnb; USDC only on base."),
   amount: z
     .string()
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string")
@@ -82,8 +82,8 @@ export const YIELD_DEPOSIT_TOOL = {
     "Aave V3 (Q402 Yield) so it starts earning supply APY. Server-managed Agent Wallet " +
     "path (Mode C): authenticated by the configured live Multichain API key — the server " +
     "holds the encrypted key, signs the Aave supply, and sponsors gas. " +
-    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today; ETH / AVAX and other chains " +
-    "are not yet available. " +
+    "CHAINS: 'bnb' supplies into Aave V3 (USDC or USDT); 'base' supplies into Morpho (USDC only). " +
+    "Other chains are not yet available. " +
     "\n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
     "`confirm: true` is set. Call it FIRST without confirm to get a one-line preview of " +
@@ -109,13 +109,13 @@ export const YIELD_DEPOSIT_TOOL = {
     properties: {
       chain: {
         type: "string" as const,
-        enum: ["bnb"],
-        description: "Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted.",
+        enum: ["bnb", "base"],
+        description: "Chain to supply on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only).",
       },
       token: {
         type: "string" as const,
         enum: ["USDC", "USDT"],
-        description: "Stablecoin to supply into Aave. USDC or USDT.",
+        description: "Stablecoin to supply. USDC or USDT on bnb; USDC only on base.",
       },
       amount: {
         type: "string" as const,
@@ -183,6 +183,18 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
     };
   }
 
+  // Base yield routes to the curated Morpho USDC vault (USDC only). Reject
+  // USDT on base before any network call so the user gets a clear hint.
+  if (input.chain === "base" && input.token !== "USDC") {
+    return {
+      content: [{
+        type: "text" as const,
+        text: `Base yield (Morpho) supports USDC only, not ${input.token}. Use chain "bnb" for USDT yield.`,
+      }],
+      isError: true,
+    };
+  }
+
   // Resolution order: tool input → Q402_AGENT_WALLET_ADDRESS env → server
   // default (omit walletId so the route resolves the apiKey owner's default).
   const walletId =
@@ -222,7 +234,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
       content: [{
         type: "text" as const,
         text:
-          `Will supply ${input.amount} ${input.token} into Aave on ${input.chain} from ` +
+          `Will supply ${input.amount} ${input.token} into ${input.chain === "base" ? "Morpho" : "Aave"} on ${input.chain} from ` +
           `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
           `confirm:true AND consentToken="${consent.expected}".`,
       }],

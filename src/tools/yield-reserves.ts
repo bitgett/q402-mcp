@@ -22,12 +22,12 @@ export const YieldReservesInputSchema = z.object({
 export const YIELD_RESERVES_TOOL = {
   name: "q402_yield_reserves",
   description:
-    "READ-ONLY — list the Q402 Yield (Aave) lending markets the Agent Wallet can supply into. " +
+    "READ-ONLY — list the Q402 Yield lending markets the Agent Wallet can supply into. " +
     "Returns each market's protocol, chain, asset, asset address, position token, market address, " +
     "and current supply APY (shown as a %). No auth required and no funds move — this is purely a " +
     "preview of available yield. " +
     "Reads BNB Chain (Aave V3) markets, plus Base (Morpho) when a curated vault is configured. " +
-    "Deposit/withdraw (q402_yield_deposit / q402_yield_withdraw) are BNB-only today. " +
+    "Deposit/withdraw (q402_yield_deposit / q402_yield_withdraw) cover both: Aave on 'bnb' (USDC/USDT) and Morpho on 'base' (USDC only). " +
     "Pass an optional `chain` to filter; omit it to see every supported chain. Use this whenever " +
     "the user asks 'where can I earn yield?' or 'what's the lending APY on <asset>?' before supplying.",
   inputSchema: {

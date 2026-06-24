@@ -199,10 +199,10 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_bridge_send` | live mode | Execute a CCIP bridge from the user's Agent Wallet. Mode C only (server-managed). Sandbox-by-default; `sandbox: false` + live Multichain key + `Q402_ENABLE_REAL_PAYMENTS=1` fires a real on-chain bridge. |
 | `q402_bridge_history` | not yet wired | Pointer to the dashboard. Returns `{ implemented: false, dashboardUrl, dashboardPath }` — read-only guidance until owner-sig auth lands in MCP. |
 | `q402_bridge_gas_tank` | not yet wired | Static guidance + dashboard pointer for the Bridge Gas Tank top-up flow. Live balance lookup needs owner-sig auth (dashboard for now). |
-| `q402_yield_reserves` | none | List Q402 Yield (Aave V3) lending markets — protocol, chain, asset, market address, supply APY. BNB Chain only today. |
+| `q402_yield_reserves` | none | List Q402 Yield lending markets — protocol, chain, asset, market address, supply APY. Aave V3 on BNB, Morpho on Base. |
 | `q402_yield_positions` | api key | Show the Agent Wallet's open Q402 Yield positions (balance, principal, accrued interest, APY) + total supplied in USD. Mode C. |
-| `q402_yield_deposit` | live mode | Supply the Agent Wallet's USDC/USDT into Aave V3 (Q402 Yield) to earn supply APY. Mode C, BNB-only. Requires `confirm: true`; sandbox-by-default. |
-| `q402_yield_withdraw` | live mode | Withdraw supplied USDC/USDT out of Aave V3 back to the Agent Wallet (`amount: "max"` = full position). Mode C, BNB-only. Requires `confirm: true`; sandbox-by-default. |
+| `q402_yield_deposit` | live mode | Supply the Agent Wallet's stablecoins into Q402 Yield: Aave V3 on BNB (USDC/USDT) or Morpho on Base (USDC only). Mode C. Requires `confirm: true`; sandbox-by-default. |
+| `q402_yield_withdraw` | live mode | Withdraw supplied stablecoins out of Q402 Yield (Aave V3 on BNB, Morpho on Base) back to the Agent Wallet (`amount: "max"` = full position). Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_request_create` | api key | Publish a payment request (invoice). No funds move; returns a shareable `/pay` link + `req_…` id. Recipient defaults to the Agent Wallet. |
 | `q402_request_status` | none | Look up a payment request by `req_…` id (amount, token, chain, recipient, status). Read-only; `notFound` instead of throwing. |
 | `q402_request_pay` | live mode | Pay a request gaslessly from the payer's own Agent Wallet (Mode C). Terms come from the stored request, so they can't be redirected. Two-phase consent (same as `q402_pay`). |

@@ -24,12 +24,12 @@ import { checkConsent } from "../consent.js";
 
 export const YieldWithdrawInputSchema = z.object({
   chain: z
-    .enum(["bnb"])
+    .enum(["bnb", "base"])
     .default("bnb")
-    .describe("Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted."),
+    .describe("Chain to withdraw on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only)."),
   token: z
     .enum(["USDC", "USDT"])
-    .describe("Stablecoin to withdraw from Aave. USDC or USDT."),
+    .describe("Stablecoin to withdraw. USDC or USDT on bnb; USDC only on base."),
   amount: z
     .string()
     .regex(/^(\d+(\.\d+)?|max)$/, 'amount must be a positive decimal string or "max"')
@@ -83,8 +83,8 @@ export const YIELD_WITHDRAW_TOOL = {
     "the FULL position. Server-managed Agent Wallet path (Mode C): authenticated by the " +
     "configured live Multichain API key — the server holds the encrypted key, signs the " +
     "Aave withdraw, and sponsors gas. " +
-    "BNB CHAIN ONLY — Q402 Yield supports BNB Chain today; ETH / AVAX and other chains " +
-    "are not yet available. " +
+    "CHAINS: 'bnb' withdraws from Aave V3 (USDC or USDT); 'base' withdraws from Morpho (USDC only). " +
+    "Other chains are not yet available. " +
     "\n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
     "`confirm: true` is set. Call it FIRST without confirm to get a one-line preview of " +
@@ -110,13 +110,13 @@ export const YIELD_WITHDRAW_TOOL = {
     properties: {
       chain: {
         type: "string" as const,
-        enum: ["bnb"],
-        description: "Chain the Aave market lives on. Q402 Yield is BNB-only today — only 'bnb' is accepted.",
+        enum: ["bnb", "base"],
+        description: "Chain to withdraw on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only).",
       },
       token: {
         type: "string" as const,
         enum: ["USDC", "USDT"],
-        description: "Stablecoin to withdraw from Aave. USDC or USDT.",
+        description: "Stablecoin to withdraw. USDC or USDT on bnb; USDC only on base.",
       },
       amount: {
         type: "string" as const,
@@ -186,6 +186,18 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
     };
   }
 
+  // Base yield routes to the curated Morpho USDC vault (USDC only). Reject
+  // USDT on base before any network call so the user gets a clear hint.
+  if (input.chain === "base" && input.token !== "USDC") {
+    return {
+      content: [{
+        type: "text" as const,
+        text: `Base yield (Morpho) supports USDC only, not ${input.token}. Use chain "bnb" for USDT yield.`,
+      }],
+      isError: true,
+    };
+  }
+
   // Resolution order: tool input → Q402_AGENT_WALLET_ADDRESS env → server
   // default (omit walletId so the route resolves the apiKey owner's default).
   const walletId =
@@ -227,7 +239,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       content: [{
         type: "text" as const,
         text:
-          `Will withdraw ${amountDesc} from Aave on ${input.chain} back to ` +
+          `Will withdraw ${amountDesc} from ${input.chain === "base" ? "Morpho" : "Aave"} on ${input.chain} back to ` +
           `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
           `confirm:true AND consentToken="${consent.expected}".`,
       }],

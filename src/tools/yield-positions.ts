@@ -45,7 +45,7 @@ export const YIELD_POSITIONS_TOOL = {
     "position's protocol, chain, asset, market address, CURRENT supplied position value (the live " +
     "aToken balance, in token units), and live supply APY, plus the aggregate current value in USD. " +
     "Authenticated by the configured live Multichain API key — no private key required and no funds move. " +
-    "Reads BNB Chain (Aave V3), plus Base (Morpho) when a curated vault is configured; deposit/withdraw are BNB-only today. " +
+    "Reads BNB Chain (Aave V3) and Base (Morpho) markets; deposit/withdraw cover both: Aave on bnb (USDC/USDT) and Morpho on base (USDC only). " +
     "DOES NOT report principal or accrued earnings as separate numbers — the aToken balance already " +
     "includes accrued interest but is not broken out, so do NOT claim a specific 'earnings/profit/" +
     "interest earned' figure from this tool; report only the current position value and the APY. " +
