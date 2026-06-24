@@ -44,7 +44,12 @@ interface ChainQuote {
 }
 
 function quoteForChain(cfg: ChainConfig): ChainQuote {
-  const supported: ReadonlyArray<"USDC" | "USDT" | "RLUSD"> = cfg.supportedTokens ?? ["USDC", "USDT"];
+  // Q (QuackAI) is not USD-quotable (it floats on a TWAP, not a $1 peg), so it
+  // never appears in a gas/cost quote — filter it out, narrowing back to the
+  // stablecoin union the quote reports.
+  const supported: ReadonlyArray<"USDC" | "USDT" | "RLUSD"> = (cfg.supportedTokens ?? ["USDC", "USDT"]).filter(
+    (t): t is "USDC" | "USDT" | "RLUSD" => t !== "Q",
+  );
   return {
     chain: cfg.key,
     name: cfg.name,

@@ -175,7 +175,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**27 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**29 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -203,11 +203,13 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_yield_positions` | api key | Show the Agent Wallet's open Q402 Yield positions (balance, principal, accrued interest, APY) + total supplied in USD. Mode C. |
 | `q402_yield_deposit` | live mode | Supply the Agent Wallet's stablecoins into Q402 Yield: Aave V3 on BNB (USDC/USDT) or Morpho on Base (USDC only). Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_yield_withdraw` | live mode | Withdraw supplied stablecoins out of Q402 Yield (Aave V3 on BNB, Morpho on Base) back to the Agent Wallet (`amount: "max"` = full position). Mode C. Requires `confirm: true`; sandbox-by-default. |
+| `q402_stake` | live mode | Gasless Q (QuackAI) staking into QuackAiStake on BNB Chain. Lock tiers 0-3 (30d/10%, 60d/15%, 120d/32%, 180d/40% APR). Mode C. Requires `confirm: true`; sandbox-by-default. |
+| `q402_unstake` | live mode | Gasless unstake (withdraw) of Q from QuackAiStake on BNB back to the Agent Wallet. Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_request_create` | api key | Publish a payment request (invoice). No funds move; returns a shareable `/pay` link + `req_…` id. Recipient defaults to the Agent Wallet. |
 | `q402_request_status` | none | Look up a payment request by `req_…` id (amount, token, chain, recipient, status). Read-only; `notFound` instead of throwing. |
 | `q402_request_pay` | live mode | Pay a request gaslessly from the payer's own Agent Wallet (Mode C). Terms come from the stored request, so they can't be redirected. Two-phase consent (same as `q402_pay`). |
 
-`q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` + `q402_request_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
+`q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` + `q402_stake` + `q402_unstake` + `q402_request_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
 > ℹ️ `q402_pay` expects a 0x address — ENS isn't resolved server-side. Resolve client-side first.
 > Per-chain Gas Tank balances + full TX history live in the [dashboard](https://q402.quackai.ai/dashboard) (wallet-signature only).

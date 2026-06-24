@@ -61,8 +61,10 @@ export interface ChainConfig {
   usdt: TokenInfo;
   /** Optional third token slot — currently only used by Ethereum (RLUSD). */
   rlusd?: TokenInfo;
+  /** Optional fourth token slot — currently only used by BNB Chain (Q / QuackAI). */
+  q?: TokenInfo;
   /** When defined, payments are restricted to this whitelist. */
-  supportedTokens?: ReadonlyArray<"USDC" | "USDT" | "RLUSD">;
+  supportedTokens?: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "Q">;
   /** Approximate per-tx gas cost in USD — order-of-magnitude only, used by quote tool. */
   approxGasCostUsd: number;
   /** Optional human note surfaced by the quote tool. */
@@ -93,7 +95,10 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     explorer: "https://bscscan.com",
     usdc: { address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", decimals: 18 },
     usdt: { address: "0x55d398326f99059fF775485246999027B3197955", decimals: 18 },
-    supportedTokens: ["USDC", "USDT"],
+    // Q (QuackAI) — BNB-only, 18 dec. Gasless agentic send via the standard
+    // bnb TransferAuthorization; the relay allowlists Q on bnb.
+    q: { address: "0xc07e1300dc138601FA6B0b59f8D0FA477e690589", decimals: 18 },
+    supportedTokens: ["USDC", "USDT", "Q"],
     approxGasCostUsd: 0.001,
   },
   eth: {
@@ -249,7 +254,7 @@ export const BNB_FOCUS_REJECTION_MESSAGE =
 if (BNB_FOCUS_MODE) {
   for (const key of CHAIN_KEYS) {
     if (key !== "bnb") {
-      (CHAIN_CONFIG[key] as { supportedTokens: ReadonlyArray<"USDC" | "USDT" | "RLUSD"> }).supportedTokens = [];
+      (CHAIN_CONFIG[key] as { supportedTokens: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "Q"> }).supportedTokens = [];
     }
   }
 }
@@ -260,7 +265,7 @@ export function getChain(key: ChainKey): ChainConfig {
   return cfg;
 }
 
-export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD"): TokenInfo {
+export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD" | "Q"): TokenInfo {
   if (BNB_FOCUS_MODE && !(cfg.supportedTokens?.includes(token) ?? false)) {
     throw new Error(BNB_FOCUS_REJECTION_MESSAGE);
   }
@@ -272,6 +277,15 @@ export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD"): To
       );
     }
     return cfg.rlusd;
+  }
+  if (token === "Q") {
+    if (!cfg.q) {
+      throw new Error(
+        `Q (QuackAI) is not supported on ${cfg.name} (key=${cfg.key}). ` +
+          `Q is currently BNB-only.`,
+      );
+    }
+    return cfg.q;
   }
   return token === "USDC" ? cfg.usdc : cfg.usdt;
 }

@@ -72,10 +72,11 @@ const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 // the error in front of the agent instead of after a round-trip.
 export const BatchPayInputSchema = z.object({
   chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum", "base"]),
-  token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
-    "Stablecoin symbol. USDC / USDT supported on most chains. " +
-      "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is " +
-      "Ethereum-only. The same token applies to every recipient in the batch.",
+  token: z.enum(["USDC", "USDT", "RLUSD", "Q"]).describe(
+    "Token symbol. USDC / USDT supported on most chains. " +
+      "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only. " +
+      "Q (QuackAI, decimals 18) is BNB-only. " +
+      "The same token applies to every recipient in the batch.",
   ),
   recipients: z
     .array(
@@ -903,10 +904,10 @@ export const BATCH_PAY_TOOL = {
       },
       token: {
         type: "string",
-        enum: ["USDC", "USDT", "RLUSD"],
+        enum: ["USDC", "USDT", "RLUSD", "Q"],
         description:
-          "Stablecoin for the entire batch. USDC / USDT supported on most chains; " +
-          "RLUSD (decimals 18) is Ethereum-only.",
+          "Token for the entire batch. USDC / USDT supported on most chains; " +
+          "RLUSD (decimals 18) is Ethereum-only; Q (QuackAI, decimals 18) is BNB-only.",
       },
       recipients: {
         type: "array",

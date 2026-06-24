@@ -52,9 +52,10 @@ export const PayInputSchema = z.object({
     .string()
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string")
     .describe('Human-readable decimal amount, e.g. "5.00".'),
-  token: z.enum(["USDC", "USDT", "RLUSD"]).describe(
-    'Stablecoin symbol. USDC / USDT supported on most chains. ' +
-      'RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.',
+  token: z.enum(["USDC", "USDT", "RLUSD", "Q"]).describe(
+    'Token symbol. USDC / USDT supported on most chains. ' +
+      'RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only. ' +
+      'Q (QuackAI, decimals 18) is BNB-only.',
   ),
   keyScope: z
     .enum(["auto", "trial", "multichain"])
@@ -1001,10 +1002,11 @@ export const PAY_TOOL = {
       },
       token: {
         type: "string",
-        enum: ["USDC", "USDT", "RLUSD"],
+        enum: ["USDC", "USDT", "RLUSD", "Q"],
         description:
-          "Stablecoin to send. USDC / USDT supported on most chains. " +
-          "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only.",
+          "Token to send. USDC / USDT supported on most chains. " +
+          "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only. " +
+          "Q (QuackAI, decimals 18) is BNB-only.",
       },
       keyScope: {
         type: "string",
