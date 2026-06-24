@@ -262,7 +262,14 @@ export async function runUnstake(input: z.infer<typeof UnstakeInputSchema>) {
   }
   const totalQ = targets.reduce((acc, t) => acc + Number(t.amount), 0);
 
-  const consentIntent = { t: all ? "q-unstake-all" : "q-unstake", walletId: walletId ?? null, ith: all ? null : ith };
+  // Bind the EXACT target index set into the consent so the executed set can't
+  // drift from what the user approved. For "all", a record that matures between
+  // preview and confirm changes targetIths → the preview token no longer matches
+  // → the user must re-approve the new set (instead of it being swept silently).
+  const targetIths = targets.map((t) => t.ith).sort((a, b) => a - b);
+  const consentIntent = all
+    ? { t: "q-unstake-all", walletId: walletId ?? null, iths: targetIths }
+    : { t: "q-unstake", walletId: walletId ?? null, ith };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (input.confirm !== true || !consent.ok) {
     const what = all

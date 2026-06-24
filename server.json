@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.8.50",
+  "version": "0.8.51",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.8.50",
+      "version": "0.8.51",
       "transport": {
         "type": "stdio"
       },
