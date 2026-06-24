@@ -268,8 +268,14 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
 
   const guardsApplied: string[] = [];
 
-  maxAmountGuardBatch(input.recipients, CONFIG.maxAmountPerCallUsd);
-  guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd} (per row AND batch total)`);
+  // Q (QuackAI) is exempt from USD limits (not USD-valued) — skip the USD cap,
+  // matching the server's amountUsd=0 treatment for Q.
+  if (input.token !== "Q") {
+    maxAmountGuardBatch(input.recipients, CONFIG.maxAmountPerCallUsd);
+    guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd} (per row AND batch total)`);
+  } else {
+    guardsApplied.push("max_amount=exempt(Q)");
+  }
 
   recipientAllowlistGuardBatch(input.recipients, CONFIG.allowedRecipients);
   if (CONFIG.allowedRecipients.length > 0) {

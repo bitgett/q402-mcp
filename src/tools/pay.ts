@@ -384,8 +384,14 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     } catch { /* unreachable given the regex check, but defensive */ }
   }
 
-  maxAmountGuard(input.amount, CONFIG.maxAmountPerCallUsd);
-  guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd}`);
+  // Q (QuackAI) is exempt from USD limits (not USD-valued, owner's own token) —
+  // the server treats Q's amountUsd as 0, so the MCP must skip the USD cap too.
+  if (input.token !== "Q") {
+    maxAmountGuard(input.amount, CONFIG.maxAmountPerCallUsd);
+    guardsApplied.push(`max_amount<=${CONFIG.maxAmountPerCallUsd}`);
+  } else {
+    guardsApplied.push("max_amount=exempt(Q)");
+  }
 
   recipientGuard(input.to, CONFIG.allowedRecipients);
   // A MultiPayeeSplit fans funds out to addresses OTHER than `to`, so the
