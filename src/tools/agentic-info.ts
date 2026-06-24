@@ -37,12 +37,14 @@ export const AGENTIC_INFO_TOOL = {
   name: "q402_agentic_info",
   description:
     "Read-only Agent Wallet introspection. Returns the wallet address, " +
-    "per-tx and daily caps, archive state, and an aggregate USD balance " +
-    "across the 11 supported EVM chains. Authenticated by the configured " +
-    "Multichain API key — no private key required. Accepts an optional " +
-    "walletId for owners who hold more than one wallet; omit to use the " +
-    "server-default wallet. Use this whenever the user asks 'what's in my " +
-    "agent wallet?' or 'what's the spending limit?'",
+    "per-tx and daily caps, archive state, an aggregate USD balance, AND a " +
+    "per-chain breakdown (`byChain`) of which chains actually hold USDC/USDT " +
+    "across the 11 supported EVM chains — so you can see WHERE funds are " +
+    "before routing a payment. Authenticated by the configured Multichain " +
+    "API key — no private key required. Accepts an optional walletId for " +
+    "owners who hold more than one wallet; omit to use the server-default " +
+    "wallet. Use this whenever the user asks 'what's in my agent wallet?', " +
+    "'how much do I have on Base / on each chain?', or 'what's the spending limit?'",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -90,6 +92,15 @@ export interface AgenticInfoSummary {
   archivedAt: number | null;
   /** Aggregate USD balance across the 11 EVM chains (rounded to cents). */
   totalUsd: number | null;
+  /** Per-chain stablecoin breakdown for the chains that actually hold funds
+   *  (USDC + USDT; USD-pegged, so each number also reads as the token amount).
+   *  Lets an agent see WHERE its money is before routing a payment instead of
+   *  guessing from the aggregate. Empty array when empty everywhere; null when
+   *  the balance read failed. */
+  byChain: Array<{ chain: string; usdc: number; usdt: number; totalUsd: number }> | null;
+  /** Chains whose USDC+USDT read failed this snapshot (RPC down) — a funded
+   *  chain here means "unknown", NOT "$0". */
+  unreachableChains: string[];
   /** When balance was last read. */
   asOf: string | null;
   /** ERC-8004 public agent identity if registered. `{network}:{agentId}`. */
@@ -144,9 +155,18 @@ function scan8004UrlFor(tag: string | null): string | null {
   return `https://8004scan.io/agents/${slug}/${agentId}`;
 }
 
+interface ChainBalanceJson {
+  chain: string;
+  usdc: { usd: number } | null;
+  usdt: { usd: number } | null;
+  totalUsd: number | null;
+}
+
 interface BalanceJson {
   asOf: number;
   totalUsd: number;
+  perChain?: ChainBalanceJson[];
+  unreachableChains?: string[];
 }
 
 /**
@@ -174,6 +194,8 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
       limits: null,
       archivedAt: null,
       totalUsd: null,
+      byChain: null,
+      unreachableChains: [],
       asOf: null,
       erc8004AgentId: null,
       scan8004Url: null,
@@ -227,6 +249,8 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
       limits: null,
       archivedAt: null,
       totalUsd: null,
+      byChain: null,
+      unreachableChains: [],
       asOf: null,
       erc8004AgentId: null,
       scan8004Url: null,
@@ -251,6 +275,24 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
   const resolvedWalletId =
     typeof wallet.walletId === "string" ? wallet.walletId : wallet.address.toLowerCase();
 
+  // Per-chain breakdown: keep only chains that hold funds (totalUsd > 0),
+  // richest first, so the agent sees WHERE the money is. USD-pegged, so the
+  // usd figure doubles as the token amount. unreachableChains stays separate —
+  // a funded-but-unread chain must not look like a real $0.
+  const byChain = balance?.perChain
+    ? balance.perChain
+        .filter((c) => typeof c.totalUsd === "number" && (c.totalUsd ?? 0) > 0)
+        .map((c) => ({
+          chain: c.chain,
+          usdc: Math.round((c.usdc?.usd ?? 0) * 100) / 100,
+          usdt: Math.round((c.usdt?.usd ?? 0) * 100) / 100,
+          totalUsd: Math.round((c.totalUsd ?? 0) * 100) / 100,
+        }))
+        .sort((a, b) => b.totalUsd - a.totalUsd)
+    : balance
+      ? []
+      : null;
+
   return {
     configured: true,
     address: wallet.address,
@@ -261,6 +303,8 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
     },
     archivedAt: wallet.deletedAt,
     totalUsd: balance ? Math.round(balance.totalUsd * 100) / 100 : null,
+    byChain,
+    unreachableChains: balance?.unreachableChains ?? [],
     asOf: balance ? new Date(balance.asOf).toISOString() : null,
     erc8004AgentId: wallet.erc8004AgentId,
     scan8004Url: scan8004UrlFor(wallet.erc8004AgentId),
