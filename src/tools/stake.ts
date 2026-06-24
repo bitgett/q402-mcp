@@ -18,12 +18,10 @@ import { checkConsent } from "../consent.js";
 
 /** Lock tiers (display only — the staking contract validates + reverts on an unknown tier). */
 const STAKE_TIERS = [
-  { stakeType: 0, lockDays: 14, aprPct: 10 },
-  { stakeType: 1, lockDays: 30, aprPct: 20 },
-  { stakeType: 2, lockDays: 90, aprPct: 30 },
-  { stakeType: 3, lockDays: 140, aprPct: 40 },
-  { stakeType: 4, lockDays: 120, aprPct: 50 },
-  { stakeType: 5, lockDays: 180, aprPct: 30 },
+  { stakeType: 0, lockDays: 30, aprPct: 10 },
+  { stakeType: 1, lockDays: 60, aprPct: 15 },
+  { stakeType: 2, lockDays: 120, aprPct: 32 },
+  { stakeType: 3, lockDays: 180, aprPct: 40 },
 ] as const;
 const TIER_VALUES = STAKE_TIERS.map((t) => t.stakeType);
 
@@ -39,7 +37,7 @@ export const StakeInputSchema = z.object({
     .int()
     .refine((v) => TIER_VALUES.includes(v as (typeof TIER_VALUES)[number]), "unknown stakeType")
     .describe(
-      "Lock tier: 0=14d/10% 1=30d/20% 2=90d/30% 3=140d/40% 4=120d/50% 5=180d/30% APR. " +
+      "Lock tier: 0=30d/10% 1=60d/15% 2=120d/32% 3=180d/40% APR. " +
         "Longer lock = higher APR. Confirm the tier with the user.",
     ),
   walletId: z.string().optional().describe("Optional Agent Wallet address to stake from. Omit for the default."),
@@ -52,8 +50,8 @@ export const STAKE_TOOL = {
   description:
     "WRITE — MOVES FUNDS. Stakes the Agent Wallet's Q (QuackAI) token into QuackAiStake " +
     "on BNB Chain, gaslessly. Server-managed Agent Wallet path (Mode C): the server holds " +
-    "the encrypted key, signs the stake, and sponsors gas. Pick a lock tier (stakeType 0-5): " +
-    "0=14d/10%, 1=30d/20%, 2=90d/30%, 3=140d/40%, 4=120d/50%, 5=180d/30% APR — longer lock, " +
+    "the encrypted key, signs the stake, and sponsors gas. Pick a lock tier (stakeType 0-3): " +
+    "0=30d/10%, 1=60d/15%, 2=120d/32%, 3=180d/40% APR — longer lock, " +
     "higher APR. Q is BNB-only. \n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, refuses to execute unless confirm:true. Call FIRST " +
     "without confirm to preview (amount, tier, lock, wallet); show the user, get approval, THEN " +
@@ -67,7 +65,7 @@ export const STAKE_TOOL = {
     type: "object" as const,
     properties: {
       amount: { type: "string" as const, description: 'Human-readable Q amount to stake, e.g. "1000".' },
-      stakeType: { type: "number" as const, enum: TIER_VALUES as unknown as number[], description: "Lock tier 0-5 (0=14d/10% … 5=180d/30% APR). Longer lock = higher APR." },
+      stakeType: { type: "number" as const, enum: TIER_VALUES as unknown as number[], description: "Lock tier 0-3 (0=30d/10% … 3=180d/40% APR). Longer lock = higher APR." },
       walletId: { type: "string" as const, description: "Optional Agent Wallet address to stake from. Defaults to the owner's default wallet." },
       confirm: { type: "boolean" as const, description: "MUST be true to actually stake — only after the user approved this exact stake. Omit to preview." },
       consentToken: { type: "string" as const, description: "Two-phase consent token. Leave unset on the first call to preview + get a token; re-call with confirm:true + this token." },
