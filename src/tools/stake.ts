@@ -175,6 +175,10 @@ export async function runStake(input: z.infer<typeof StakeInputSchema>) {
   if (isMax) {
     const live = requireLiveKey();
     if ("error" in live) return live.error;
+    // "max" MUST resolve a concrete cap = the wallet's current Q balance, and that
+    // cap is BOUND into the consent below. If the balance grows between preview and
+    // confirm the cap changes, the preview token no longer matches, and the user is
+    // forced to re-approve — so "approve 100 Q max" can never settle as 1,000.
     try {
       const { ok, data } = await fetchStakePositions(live.apiKey, walletId);
       if (ok && data.qBalance && Number(data.qBalance) > 0) {
@@ -183,14 +187,17 @@ export async function runStake(input: z.infer<typeof StakeInputSchema>) {
       } else {
         return { content: [{ type: "text" as const, text: "No Q balance to stake." }], isError: true };
       }
-    } catch {
-      // fall through — preview without a concrete number; server still resolves max+cap
+    } catch (e) {
+      return { content: [{ type: "text" as const, text: `Could not read the Q balance to resolve "max": ${e instanceof Error ? e.message : String(e)}. Retry.` }], isError: true };
     }
   } else if (!(Number(input.amount) > 0)) {
     return { content: [{ type: "text" as const, text: `amount must be greater than zero (got "${input.amount}").` }], isError: true };
   }
 
-  const consentIntent = { t: "q-stake", amount: isMax ? "max" : input.amount, stakeType, walletId: walletId ?? null };
+  // For "max", bind the resolved cap (current Q balance) so the approved ceiling
+  // can't silently grow between preview and confirm. For a fixed amount the amount
+  // itself is the binding.
+  const consentIntent = { t: "q-stake", amount: isMax ? "max" : input.amount, stakeType, walletId: walletId ?? null, ...(isMax && cap ? { cap } : {}) };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (input.confirm !== true || !consent.ok) {
     const walletDesc = walletId ? `wallet ${walletId}` : "your default Agent Wallet";
@@ -305,13 +312,21 @@ export async function runUnstake(input: z.infer<typeof UnstakeInputSchema>) {
   }
 
   const settled = results.filter((r) => r.status === "settled").length;
+  const failed = results.filter((r) => r.status === "failed").length;
   const uncertain = results.some((r) => r.status === "uncertain");
-  const summary = `Unstaked ${settled}/${targets.length} matured position(s) on BNB${uncertain ? " — one result is UNCERTAIN (broadcast unconfirmed); verify on-chain before retrying." : "."}`;
+  // Anything short of "every target settled" is an error the model must NOT read
+  // as success: a failed row, an uncertain broadcast, or a target never attempted
+  // (loop broke early). Only a clean full sweep returns success.
+  const complete = settled === targets.length;
+  const status = complete ? "settled" : uncertain ? "partial_uncertain" : "partial_failure";
+  const summary = `Unstaked ${settled}/${targets.length} matured position(s) on BNB${
+    uncertain ? " — one result is UNCERTAIN (broadcast unconfirmed); verify on-chain before retrying." : failed > 0 ? ` — ${failed} failed.` : "."
+  }`;
   return {
     content: [
       { type: "text" as const, text: summary },
-      { type: "text" as const, text: JSON.stringify({ action: "unstake", results }, null, 2) },
+      { type: "text" as const, text: JSON.stringify({ action: "unstake", status, settled, failed, total: targets.length, results }, null, 2) },
     ],
-    ...(uncertain ? { isError: true } : {}),
+    ...(complete ? {} : { isError: true }),
   };
 }

@@ -260,7 +260,7 @@ Anything missing for the resolved scope → automatic sandbox fallback with a hi
 
 | Env var | Default | Effect |
 |---|---|---|
-| `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject calls with `amount > N` USD. |
+| `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject USDC/USDT/RLUSD calls with `amount > N` USD. Q (QuackAI) is exempt by design (your own token); the recipient allowlist + confirmation still apply to it. |
 | `Q402_ALLOWED_RECIPIENTS` | off | Comma-separated address allowlist. |
 
 Combined with the two-phase `consentToken` + live-mode env, a payment needs: a preview the user approved + amount ≤ cap + recipient allowed + all 3 live envs.
@@ -277,7 +277,7 @@ Combined with the two-phase `consentToken` + live-mode env, a payment needs: a p
 | `Q402_AGENTIC_PRIVATE_KEY` | Mode B | Exported Agent Wallet hex private key from the dashboard (Agent tab → Export). Signs locally, but the signer is your dedicated Agent Wallet — MetaMask is never touched. **Never share. Never paste in chat.** |
 | `Q402_AGENT_WALLET_ADDRESS` | Mode C (optional) | When you have multiple server-managed Agent Wallets (max 10 per owner), set this to the lowercased 0x… address of the one Q402 should spend from. Omit to use the default wallet. Ignored in Modes A/B. |
 | `Q402_ENABLE_REAL_PAYMENTS` | live-pay | Set to `1` to opt in. Any other value (or unset) → sandbox. |
-| `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap. Defaults to `200`. Lower for tighter agent blast-radius. |
+| `Q402_MAX_AMOUNT_PER_CALL` | optional | USD-equivalent cap for USDC/USDT/RLUSD. Defaults to `200`. Lower for tighter agent blast-radius. Q (QuackAI) is exempt by design (your own token). |
 | `Q402_ALLOWED_RECIPIENTS` | optional | Comma-separated lowercase addresses. Defaults to no allowlist. |
 | `Q402_RELAY_BASE_URL` | optional | Defaults to `https://q402.quackai.ai/api`. Override for self-hosted Q402. |
 

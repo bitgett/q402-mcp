@@ -6,12 +6,12 @@
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.8.51",
+  "version": "0.8.52",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.8.51",
+      "version": "0.8.52",
       "transport": {
         "type": "stdio"
       },
@@ -54,7 +54,7 @@
         },
         {
           "name": "Q402_MAX_AMOUNT_PER_CALL",
-          "description": "Per-call USD-equivalent cap. Any q402_pay request with amount above this is rejected before signing. Lower this if you want a tighter agent blast-radius; raise for treasury-grade transfers.",
+          "description": "Per-call USD-equivalent cap for USDC/USDT/RLUSD. Any such q402_pay request with amount above this is rejected before signing. Q (QuackAI) is exempt by design (your own token; recipient allowlist + confirmation still apply). Lower this for a tighter agent blast-radius; raise for treasury-grade transfers.",
           "isRequired": false,
           "isSecret": false,
           "format": "string",
