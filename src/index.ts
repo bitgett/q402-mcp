@@ -53,15 +53,15 @@
  *   q402_bridge_gas_tank    read-only, requires key — per-chain Gas Tank
  *                           native balance + auto-fund debit window so AI
  *                           can decide whether to top up before bridging.
- *   q402_yield_reserves     read-only, no key — list Q402 Yield (Aave V3)
- *                           lending markets + supply APY. BNB Chain only.
+ *   q402_yield_reserves     read-only, no key — list Q402 Yield lending
+ *                           markets + supply APY. Aave V3 on BNB + Morpho on Base.
  *   q402_yield_positions    read-only, requires key — Agent Wallet's open
  *                           Q402 Yield positions + total supplied (USD)
- *   q402_yield_deposit      write, requires key — supply USDC/USDT into
- *                           Aave V3 (Q402 Yield). Mode C, BNB-only,
- *                           confirm-gated, sandbox-default
- *   q402_yield_withdraw     write, requires key — withdraw USDC/USDT out of
- *                           Aave V3 (amount "max" = full). Mode C, BNB-only,
+ *   q402_yield_deposit      write, requires key — supply stablecoins into
+ *                           Q402 Yield: Aave V3 on BNB (USDC/USDT) or Morpho on
+ *                           Base (USDC). Mode C, confirm-gated, sandbox-default
+ *   q402_yield_withdraw     write, requires key — withdraw out of Q402 Yield
+ *                           (Aave BNB / Morpho Base, amount "max" = full). Mode C,
  *                           confirm-gated, sandbox-default
  *   q402_request_create     write, requires key — publish a payment request
  *                           (invoice). No funds move; returns a /pay link +

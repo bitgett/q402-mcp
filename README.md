@@ -263,7 +263,7 @@ Anything missing for the resolved scope → automatic sandbox fallback with a hi
 | `Q402_MAX_AMOUNT_PER_CALL` | `200` | Reject USDC/USDT/RLUSD calls with `amount > N` USD. Q (QuackAI) is exempt by design (your own token); the recipient allowlist + confirmation still apply to it. |
 | `Q402_ALLOWED_RECIPIENTS` | off | Comma-separated address allowlist. |
 
-Combined with the two-phase `consentToken` + live-mode env, a payment needs: a preview the user approved + amount ≤ cap + recipient allowed + all 3 live envs.
+Combined with the two-phase `consentToken` + live-mode env, a **stablecoin** payment needs: a preview the user approved + amount ≤ cap + recipient allowed + all 3 live envs. **Q (QuackAI) is exempt from the cap** (your own token); the preview, recipient allowlist, and live-mode env still apply to it.
 
 ---
 
