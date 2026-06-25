@@ -254,8 +254,8 @@ export async function runUnstake(input: z.infer<typeof UnstakeInputSchema>) {
   // Resolve which records will be exited (matured + exitable) for the preview + loop.
   let exitable: StakePositionRecord[];
   try {
-    const { ok, data } = await fetchStakePositions(live.apiKey, walletId);
-    if (!ok) return { content: [{ type: "text" as const, text: `Could not read stake positions (HTTP ${data.error ?? "?"}). Retry.` }], isError: true };
+    const { ok, status, data } = await fetchStakePositions(live.apiKey, walletId);
+    if (!ok) return { content: [{ type: "text" as const, text: `Could not read stake positions (HTTP ${status}${data.error ? `: ${data.error}` : ""}). Retry.` }], isError: true };
     exitable = (data.positions ?? []).filter((p) => p.exitable);
   } catch (e) {
     return { content: [{ type: "text" as const, text: `Stake positions read failed: ${e instanceof Error ? e.message : String(e)}. Retry.` }], isError: true };
