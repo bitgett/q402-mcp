@@ -183,7 +183,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_quote` | none | Compare gas + supported tokens across chains. |
 | `q402_balance` | api key | Verify key + remaining quota. |
 | `q402_pay` | live mode | Single-recipient gasless transfer. Sandbox by default. |
-| `q402_batch_pay` | live mode | Up to 20 recipients per call (trial: 5). Same auto-routing as `q402_pay`. 6+ BNB batches with Trial set return `status="ambiguous"` so the agent asks how to split. xlayer + stable not batchable — use `q402_pay` in a loop. |
+| `q402_batch_pay` | live mode | Up to 20 recipients per call. Trial: 5 — applies when paying with your own key (Mode A/B); server-managed Agent Wallet (Mode C) batch is paid Multichain-only. Same auto-routing as `q402_pay`. 6+ BNB batches with Trial set return `status="ambiguous"` so the agent asks how to split. xlayer + stable not batchable — use `q402_pay` in a loop. |
 | `q402_receipt` | none | Fetch + locally verify a Trust Receipt (`rct_…` id, ECDSA against the relayer EOA). |
 | `q402_wallet_status` | private key | Per-chain EIP-7702 state for the EOA derived from `Q402_PRIVATE_KEY`. |
 | `q402_clear_delegation` | private key / api key | Clear EIP-7702 delegation (Mode A/B local key OR Mode C api key, server-signed). Sponsored on every chain except Ethereum (billed to your Gas Tank). Two-phase consent (`consentToken`). |
