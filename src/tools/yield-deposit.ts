@@ -234,7 +234,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
       content: [{
         type: "text" as const,
         text:
-          `Will supply ${input.amount} ${input.token} into ${input.chain === "base" ? "Morpho" : "Aave"} on ${input.chain} from ` +
+          `Will supply ${input.amount} ${input.token} into a vetted lending vault on ${input.chain} from ` +
           `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
           `confirm:true AND consentToken="${consent.expected}".`,
       }],
@@ -381,7 +381,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
 
   const summary = data.txHash
     ? `Supplied ${data.amount ?? input.amount} ${data.asset ?? input.token} into ` +
-      `${data.protocol ?? "Aave"} on ${data.chain ?? input.chain}. txHash ${data.txHash}.`
+      `${data.protocol ?? "the lending vault"} on ${data.chain ?? input.chain}. txHash ${data.txHash}.`
     : `Yield deposit submitted on ${data.chain ?? input.chain}.`;
 
   return {

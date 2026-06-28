@@ -239,7 +239,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       content: [{
         type: "text" as const,
         text:
-          `Will withdraw ${amountDesc} from ${input.chain === "base" ? "Morpho" : "Aave"} on ${input.chain} back to ` +
+          `Will withdraw ${amountDesc} from your lending position on ${input.chain} back to ` +
           `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
           `confirm:true AND consentToken="${consent.expected}".`,
       }],
@@ -387,7 +387,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
 
   const summary = data.txHash
     ? `Withdrew ${data.amount ?? amountDesc} ${data.asset ?? ""}`.trimEnd() +
-      ` from ${data.protocol ?? "Aave"} on ${data.chain ?? input.chain}. txHash ${data.txHash}.`
+      ` from ${data.protocol ?? "the lending vault"} on ${data.chain ?? input.chain}. txHash ${data.txHash}.`
     : `Yield withdraw submitted on ${data.chain ?? input.chain}.`;
 
   return {
