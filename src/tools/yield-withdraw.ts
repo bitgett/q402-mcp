@@ -251,6 +251,10 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
     chain: input.chain,
     token: input.token,
     amount: input.amount,
+    // Bind the venue into the consent token so an approved "withdraw from <venue>"
+    // can't be re-called against a different venue (the token is re-derived from
+    // these fields and refused on mismatch). null when unspecified (single-venue).
+    protocol: input.protocol ?? null,
     walletId: walletId ?? null,
   };
   const consent = checkConsent(consentIntent, input.consentToken);
