@@ -26,7 +26,7 @@ export const YieldWithdrawInputSchema = z.object({
   chain: z
     .enum(["bnb", "base"])
     .default("bnb")
-    .describe("Chain to withdraw on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only)."),
+    .describe("Chain to withdraw on. 'bnb' (USDC or USDT) or 'base' (USDC only). The venue is the chain's curated lending market; the actual venue is reported in the receipt."),
   token: z
     .enum(["USDC", "USDT"])
     .describe("Stablecoin to withdraw. USDC or USDT on bnb; USDC only on base."),
@@ -34,6 +34,15 @@ export const YieldWithdrawInputSchema = z.object({
     .string()
     .regex(/^(\d+(\.\d+)?|max)$/, 'amount must be a positive decimal string or "max"')
     .describe('Human-readable decimal amount to withdraw, e.g. "100.00", or the literal "max" to withdraw the full position.'),
+  protocol: z
+    .enum(["aave", "morpho", "lista"])
+    .optional()
+    .describe(
+      "Venue to withdraw from when the wallet holds the SAME token in more than one lending " +
+        "venue on a chain (e.g. a legacy Aave position AND a Lista position on bnb). Omit when " +
+        'unambiguous. If the server replies error="AMBIGUOUS_POSITION" it lists the venues in ' +
+        "`protocols` — re-call with one of those values here.",
+    ),
   walletId: z
     .string()
     .optional()
@@ -79,11 +88,12 @@ export const YIELD_WITHDRAW_TOOL = {
   name: "q402_yield_withdraw",
   description:
     "WRITE — MOVES FUNDS. Withdraws the Agent Wallet's supplied stablecoin (USDC / USDT) " +
-    "out of Aave V3 (Q402 Yield) back to the Agent Wallet. Pass amount=\"max\" to withdraw " +
-    "the FULL position. Server-managed Agent Wallet path (Mode C): authenticated by the " +
+    "out of its Q402 Yield lending position back to the Agent Wallet. Pass amount=\"max\" to " +
+    "withdraw the FULL position. Server-managed Agent Wallet path (Mode C): authenticated by the " +
     "configured live Multichain API key — the server holds the encrypted key, signs the " +
-    "Aave withdraw, and sponsors gas. " +
-    "CHAINS: 'bnb' withdraws from Aave V3 (USDC or USDT); 'base' withdraws from Morpho (USDC only). " +
+    "withdraw, and sponsors gas. " +
+    "CHAINS: 'bnb' (USDC or USDT); 'base' (USDC only). The venue is the chain's curated lending " +
+    "market and is reported in the receipt. " +
     "Other chains are not yet available. " +
     "\n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
@@ -111,7 +121,7 @@ export const YIELD_WITHDRAW_TOOL = {
       chain: {
         type: "string" as const,
         enum: ["bnb", "base"],
-        description: "Chain to withdraw on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only).",
+        description: "Chain to withdraw on. 'bnb' (USDC or USDT) or 'base' (USDC only). The actual venue is reported in the receipt.",
       },
       token: {
         type: "string" as const,
@@ -123,6 +133,14 @@ export const YIELD_WITHDRAW_TOOL = {
         description:
           'Human-readable decimal amount to withdraw, e.g. "100.00", or the literal "max" ' +
           "to withdraw the full position.",
+      },
+      protocol: {
+        type: "string" as const,
+        enum: ["aave", "morpho", "lista"],
+        description:
+          "Venue to withdraw from when the wallet holds the same token in more than one lending " +
+          'venue on a chain. Omit when unambiguous; on an "AMBIGUOUS_POSITION" error re-call with ' +
+          "one of the `protocols` the server lists.",
       },
       walletId: {
         type: "string" as const,
@@ -171,6 +189,9 @@ interface WithdrawData {
   txHash?: string;
   error?: string;
   message?: string;
+  /** Set on a 409 AMBIGUOUS_POSITION — the venues holding this token on the chain;
+   *  re-call with `protocol` set to one of them. */
+  protocols?: string[];
 }
 
 export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputSchema>) {
@@ -307,6 +328,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
         token: input.token,
         amount: input.amount,
         idempotencyKey,
+        ...(input.protocol ? { protocol: input.protocol } : {}),
         ...(walletId ? { walletId } : {}),
       }),
       signal: AbortSignal.timeout(60_000),

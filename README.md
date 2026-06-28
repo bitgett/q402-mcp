@@ -199,10 +199,10 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_bridge_send` | live mode | Execute a CCIP bridge from the user's Agent Wallet. Mode C only (server-managed). Sandbox-by-default; `sandbox: false` + live Multichain key + `Q402_ENABLE_REAL_PAYMENTS=1` fires a real on-chain bridge. |
 | `q402_bridge_history` | not yet wired | Pointer to the dashboard. Returns `{ implemented: false, dashboardUrl, dashboardPath }` — read-only guidance until owner-sig auth lands in MCP. |
 | `q402_bridge_gas_tank` | not yet wired | Static guidance + dashboard pointer for the Bridge Gas Tank top-up flow. Live balance lookup needs owner-sig auth (dashboard for now). |
-| `q402_yield_reserves` | none | List Q402 Yield lending markets — protocol, chain, asset, market address, supply APY. Aave V3 on BNB, Morpho on Base. |
+| `q402_yield_reserves` | none | List Q402 Yield lending markets — protocol, chain, asset, market address, supply APY. Curated lending markets per chain (Aave/Lista on BNB, Morpho on Base); each market reports its own venue. |
 | `q402_yield_positions` | api key | Show the Agent Wallet's open Q402 Yield positions (balance, principal, accrued interest, APY) + total supplied in USD. Mode C. |
-| `q402_yield_deposit` | live mode | Supply the Agent Wallet's stablecoins into Q402 Yield: Aave V3 on BNB (USDC/USDT) or Morpho on Base (USDC only). Mode C. Requires `confirm: true`; sandbox-by-default. |
-| `q402_yield_withdraw` | live mode | Withdraw supplied stablecoins out of Q402 Yield (Aave V3 on BNB, Morpho on Base) back to the Agent Wallet (`amount: "max"` = full position). Mode C. Requires `confirm: true`; sandbox-by-default. |
+| `q402_yield_deposit` | live mode | Supply the Agent Wallet's stablecoins into Q402 Yield's curated lending market per chain: BNB (USDC/USDT) or Base (USDC only). Mode C. Requires `confirm: true`; sandbox-by-default. |
+| `q402_yield_withdraw` | live mode | Withdraw supplied stablecoins out of Q402 Yield (curated lending markets on BNB and Base) back to the Agent Wallet (`amount: "max"` = full position). Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_stake` | live mode | Gasless Q (QuackAI) staking into QuackAiStake on BNB Chain. Lock tiers 0-3 (30d/10%, 60d/15%, 120d/32%, 180d/40% APR). `amount: "max"` stakes the whole Q balance. Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_unstake` | live mode | Gasless unstake of matured Q on BNB. Per-record: exit one stake by index (`ith`) or `all: true` for every matured stake. Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_stake_positions` | live mode | The Agent Wallet's open Q stakes (indices, maturity, exitable) + liquid Q balance. Read-only; Mode C. |

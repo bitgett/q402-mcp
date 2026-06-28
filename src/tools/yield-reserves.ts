@@ -1,5 +1,5 @@
 /**
- * q402_yield_reserves — read-only Q402 Yield (Aave lending) market list.
+ * q402_yield_reserves — read-only Q402 Yield lending-market list.
  *
  * Returns the supply markets the Agent Wallet can lend into: protocol,
  * chain, asset, the position (a)token, the market/pool address, and the
@@ -16,7 +16,7 @@ export const YieldReservesInputSchema = z.object({
   chain: z
     .enum(["bnb", "base"])
     .optional()
-    .describe("Optional chain filter. Aave markets on 'bnb', Morpho (MetaMorpho) markets on 'base'. Omit to list all supported chains."),
+    .describe("Optional chain filter. Curated lending markets on 'bnb' and 'base'. Omit to list all supported chains."),
 });
 
 export const YIELD_RESERVES_TOOL = {
@@ -26,8 +26,9 @@ export const YIELD_RESERVES_TOOL = {
     "Returns each market's protocol, chain, asset, asset address, position token, market address, " +
     "and current supply APY (shown as a %). No auth required and no funds move — this is purely a " +
     "preview of available yield. " +
-    "Reads BNB Chain (Aave V3) markets, plus Base (Morpho) when a curated vault is configured. " +
-    "Deposit/withdraw (q402_yield_deposit / q402_yield_withdraw) cover both: Aave on 'bnb' (USDC/USDT) and Morpho on 'base' (USDC only). " +
+    "Reads the curated lending markets on BNB Chain, plus Base when a curated vault is configured; " +
+    "each market reports its own protocol/venue. " +
+    "Deposit/withdraw (q402_yield_deposit / q402_yield_withdraw) cover both: 'bnb' (USDC/USDT) and 'base' (USDC only). " +
     "Pass an optional `chain` to filter; omit it to see every supported chain. Use this whenever " +
     "the user asks 'where can I earn yield?' or 'what's the lending APY on <asset>?' before supplying.",
   inputSchema: {
@@ -36,7 +37,7 @@ export const YIELD_RESERVES_TOOL = {
       chain: {
         type: "string" as const,
         enum: ["bnb", "base"],
-        description: "Optional chain filter. Aave markets on 'bnb', Morpho markets on 'base'. Omit for all supported chains.",
+        description: "Optional chain filter. Curated lending markets on 'bnb' and 'base'. Omit for all supported chains.",
       },
     },
     additionalProperties: false,

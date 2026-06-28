@@ -1,5 +1,5 @@
 /**
- * q402_yield_positions — read-only Q402 Yield (Aave) position snapshot.
+ * q402_yield_positions — read-only Q402 Yield lending-position snapshot.
  *
  * Returns the Agent Wallet's current lending positions: per-market the
  * CURRENT supplied position value (the live aToken balance, which already
@@ -35,18 +35,19 @@ export const YieldPositionsInputSchema = z.object({
   chain: z
     .enum(["bnb", "base"])
     .optional()
-    .describe("Optional chain filter. Aave positions on 'bnb', Morpho positions on 'base'. Omit for all supported chains."),
+    .describe("Optional chain filter. Lending positions on 'bnb' and 'base'. Omit for all supported chains."),
 });
 
 export const YIELD_POSITIONS_TOOL = {
   name: "q402_yield_positions",
   description:
-    "READ-ONLY — show the Agent Wallet's current Q402 Yield (Aave) lending positions. Returns each " +
+    "READ-ONLY — show the Agent Wallet's current Q402 Yield lending positions. Returns each " +
     "position's protocol, chain, asset, market address, CURRENT supplied position value (the live " +
-    "aToken balance, in token units), and live supply APY, plus the aggregate current value in USD. " +
+    "position-token balance, in token units), and live supply APY, plus the aggregate current value in USD. " +
     "Authenticated by the configured live Multichain API key — no private key required and no funds move. " +
-    "Reads BNB Chain (Aave V3) and Base (Morpho) markets; deposit/withdraw cover both: Aave on bnb (USDC/USDT) and Morpho on base (USDC only). " +
-    "DOES NOT report principal or accrued earnings as separate numbers — the aToken balance already " +
+    "Reads the curated lending markets on BNB Chain and Base; each position reports its own protocol/venue. " +
+    "Deposit/withdraw cover both: 'bnb' (USDC/USDT) and 'base' (USDC only). " +
+    "DOES NOT report principal or accrued earnings as separate numbers — the position-token balance already " +
     "includes accrued interest but is not broken out, so do NOT claim a specific 'earnings/profit/" +
     "interest earned' figure from this tool; report only the current position value and the APY. " +
     "walletId is OPTIONAL: omit it and the server reads the owner's default Agent Wallet " +
@@ -66,7 +67,7 @@ export const YIELD_POSITIONS_TOOL = {
       chain: {
         type: "string" as const,
         enum: ["bnb", "base"],
-        description: "Optional chain filter. Aave positions on 'bnb', Morpho positions on 'base'. Omit for all supported chains.",
+        description: "Optional chain filter. Lending positions on 'bnb' and 'base'. Omit for all supported chains.",
       },
     },
     additionalProperties: false,

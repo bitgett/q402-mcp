@@ -1,12 +1,13 @@
 /**
  * q402_yield_deposit — WRITE / MOVES FUNDS. Supplies the Agent Wallet's
- * stablecoin into Aave V3 (Q402 Yield) so it starts earning supply APY.
+ * stablecoin into Q402 Yield's curated lending market for the chosen chain
+ * so it starts earning supply APY.
  *
  * Server-mediated (Mode C): authenticated by the live Multichain API key
  * sent in the JSON BODY, matching how the agentic pay/send path
  * authenticates. The server holds the Agent Wallet's encrypted key, signs
- * the Aave `supply`, and auto-funds source-chain gas — the MCP never holds
- * a private key for this path.
+ * the lending-market `supply`, and auto-funds source-chain gas — the MCP
+ * never holds a private key for this path.
  *
  * SAFETY GATE — mirrors q402_pay: this tool MOVES FUNDS, so it refuses to
  * execute unless `confirm === true`. When `confirm` is missing/false the
@@ -24,7 +25,7 @@ export const YieldDepositInputSchema = z.object({
   chain: z
     .enum(["bnb", "base"])
     .default("bnb")
-    .describe("Chain to supply on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only)."),
+    .describe("Chain to supply on. 'bnb' (USDC or USDT) or 'base' (USDC only); the venue is the chain's curated lending market, reported in the receipt."),
   token: z
     .enum(["USDC", "USDT"])
     .describe("Stablecoin to supply. USDC or USDT on bnb; USDC only on base."),
@@ -79,10 +80,11 @@ export const YIELD_DEPOSIT_TOOL = {
   name: "q402_yield_deposit",
   description:
     "WRITE — MOVES FUNDS. Supplies the Agent Wallet's stablecoin (USDC / USDT) into " +
-    "Aave V3 (Q402 Yield) so it starts earning supply APY. Server-managed Agent Wallet " +
-    "path (Mode C): authenticated by the configured live Multichain API key — the server " +
-    "holds the encrypted key, signs the Aave supply, and sponsors gas. " +
-    "CHAINS: 'bnb' supplies into Aave V3 (USDC or USDT); 'base' supplies into Morpho (USDC only). " +
+    "Q402 Yield's curated lending market for the chosen chain so it starts earning supply APY. " +
+    "Server-managed Agent Wallet path (Mode C): authenticated by the configured live Multichain " +
+    "API key — the server holds the encrypted key, signs the supply, and sponsors gas. " +
+    "CHAINS: 'bnb' supports USDC or USDT; 'base' supports USDC only. The actual lending venue is " +
+    "the chain's curated market and is reported in the markets feed and the receipt. " +
     "Other chains are not yet available. " +
     "\n\n" +
     "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
@@ -110,7 +112,7 @@ export const YIELD_DEPOSIT_TOOL = {
       chain: {
         type: "string" as const,
         enum: ["bnb", "base"],
-        description: "Chain to supply on. 'bnb' = Aave V3 (USDC or USDT). 'base' = Morpho (USDC only).",
+        description: "Chain to supply on. 'bnb' (USDC or USDT) or 'base' (USDC only); the venue is the chain's curated lending market, reported in the receipt.",
       },
       token: {
         type: "string" as const,
