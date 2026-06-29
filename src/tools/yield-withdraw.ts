@@ -1,11 +1,11 @@
 /**
  * q402_yield_withdraw — WRITE / MOVES FUNDS. Withdraws the Agent Wallet's
- * supplied stablecoin out of Aave V3 (Q402 Yield) back to the Agent Wallet.
+ * supplied stablecoin out of a curated lending venue (Q402 Yield) back to the Agent Wallet.
  *
  * Server-mediated (Mode C): authenticated by the live Multichain API key
  * sent in the JSON BODY, matching how the agentic pay/send path
  * authenticates. The server holds the Agent Wallet's encrypted key, signs
- * the Aave `withdraw`, and sponsors gas — the MCP never holds a private
+ * the venue `withdraw`, and sponsors gas — the MCP never holds a private
  * key for this path.
  *
  * `amount` may be the literal string "max" to withdraw the FULL position.
@@ -239,7 +239,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       : hexlify(randomBytes(32));
 
   // "max" withdraws the full position — phrase the preview accordingly so the
-  // user understands the whole balance is leaving Aave.
+  // user understands the whole balance is leaving the lending venue.
   const amountDesc = input.amount === "max" ? "the FULL position" : `${input.amount} ${input.token}`;
 
   // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────

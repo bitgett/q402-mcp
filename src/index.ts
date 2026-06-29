@@ -54,14 +54,14 @@
  *                           native balance + auto-fund debit window so AI
  *                           can decide whether to top up before bridging.
  *   q402_yield_reserves     read-only, no key — list Q402 Yield lending
- *                           markets + supply APY. Aave V3 on BNB + Morpho on Base.
+ *                           markets + supply APY. Aave V3 + Lista on BNB, Morpho on Base.
  *   q402_yield_positions    read-only, requires key — Agent Wallet's open
  *                           Q402 Yield positions + total supplied (USD)
  *   q402_yield_deposit      write, requires key — supply stablecoins into
- *                           Q402 Yield: Aave V3 on BNB (USDC/USDT) or Morpho on
+ *                           Q402 Yield: Aave V3 or Lista on BNB (USDC/USDT), or Morpho on
  *                           Base (USDC). Mode C, confirm-gated, sandbox-default
  *   q402_yield_withdraw     write, requires key — withdraw out of Q402 Yield
- *                           (Aave BNB / Morpho Base, amount "max" = full). Mode C,
+ *                           (BNB Aave/Lista, Base Morpho; amount "max" = full). Mode C,
  *                           confirm-gated, sandbox-default
  *   q402_request_create     write, requires key — publish a payment request
  *                           (invoice). No funds move; returns a /pay link +
@@ -198,13 +198,13 @@ async function main(): Promise<void> {
       BRIDGE_SEND_TOOL,
       BRIDGE_HISTORY_TOOL,
       BRIDGE_GAS_TANK_TOOL,
-      // Q402 Yield surface — read-only Aave lending market list + the
+      // Q402 Yield surface — read-only curated lending market list + the
       // Agent Wallet's own positions. No funds move; positions auths via
       // the live Multichain apiKey (x-api-key header), reserves is public.
       YIELD_RESERVES_TOOL,
       YIELD_POSITIONS_TOOL,
       // Q402 Yield WRITE surface — supply / withdraw the Agent Wallet's
-      // stablecoin to/from Aave V3. MOVES FUNDS, so both gate on confirm:true
+      // stablecoin to/from a curated lending venue. MOVES FUNDS, so both gate on confirm:true
       // (like q402_pay). Mode C: apiKey in the body, server signs the supply
       // / withdraw with the encrypted key.
       YIELD_DEPOSIT_TOOL,
