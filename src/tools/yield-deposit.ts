@@ -29,6 +29,16 @@ export const YieldDepositInputSchema = z.object({
   token: z
     .enum(["USDC", "USDT"])
     .describe("Stablecoin to supply. USDC or USDT on bnb; USDC only on base."),
+  protocol: z
+    .enum(["aave", "lista", "morpho"])
+    .optional()
+    .describe(
+      "Optional deposit venue (which lending market to supply into). On 'bnb' choose " +
+        "'aave' or 'lista'; on 'base' only 'morpho'. Omit to use the chain's default venue. " +
+        "Mirrors the dashboard's per-market venue choice and is bound into the consent token, " +
+        "so a previewed venue can't be swapped on the confirm call. Use q402_yield_reserves to " +
+        "see each market's venue + APY first.",
+    ),
   amount: z
     .string()
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string")
@@ -71,7 +81,7 @@ export const YieldDepositInputSchema = z.object({
       "Two-phase consent. LEAVE UNSET on the first call: the tool previews the " +
         "deposit (no funds move) and returns a consentToken. Relay the preview to " +
         "the user, get an explicit yes, then re-call with confirm:true AND this " +
-        "consentToken. The token is re-derived from (chain, token, amount, wallet) " +
+        "consentToken. The token is re-derived from (chain, token, amount, protocol, wallet) " +
         "and refused on mismatch, so a previewed deposit can't be swapped.",
     ),
 });
@@ -119,6 +129,14 @@ export const YIELD_DEPOSIT_TOOL = {
         enum: ["USDC", "USDT"],
         description: "Stablecoin to supply. USDC or USDT on bnb; USDC only on base.",
       },
+      protocol: {
+        type: "string" as const,
+        enum: ["aave", "lista", "morpho"],
+        description:
+          "Optional deposit venue. 'aave' or 'lista' on bnb; 'morpho' on base. Omit for the " +
+          "chain's default venue. Bound into the consent token so a previewed venue can't be " +
+          "swapped. See q402_yield_reserves for each market's venue + APY.",
+      },
       amount: {
         type: "string" as const,
         description: 'Human-readable decimal amount to supply, e.g. "100.00".',
@@ -151,7 +169,7 @@ export const YIELD_DEPOSIT_TOOL = {
         description:
           "Two-phase consent token. Leave unset on the first call to get a preview + token; " +
           "re-call with confirm:true AND this token after the user approves. Bound to " +
-          "(chain, token, amount, wallet) and refused on mismatch.",
+          "(chain, token, amount, protocol, wallet) and refused on mismatch.",
       },
     },
     required: ["token", "amount"],
@@ -227,16 +245,18 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
     chain: input.chain,
     token: input.token,
     amount: input.amount,
+    protocol: input.protocol ?? null,
     walletId: walletId ?? null,
   };
   const consent = checkConsent(consentIntent, input.consentToken);
   if (input.confirm !== true || !consent.ok) {
     const walletDesc = walletId ? `wallet ${walletId}` : "your default Agent Wallet";
+    const venueDesc = input.protocol ? `the ${input.protocol} market` : "a vetted lending vault";
     return {
       content: [{
         type: "text" as const,
         text:
-          `Will supply ${input.amount} ${input.token} into a vetted lending vault on ${input.chain} from ` +
+          `Will supply ${input.amount} ${input.token} into ${venueDesc} on ${input.chain} from ` +
           `${walletDesc}. This MOVES FUNDS. Confirm with the user, then re-call with ` +
           `confirm:true AND consentToken="${consent.expected}".`,
       }],
@@ -304,6 +324,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
         token: input.token,
         amount: input.amount,
         idempotencyKey,
+        ...(input.protocol ? { protocol: input.protocol } : {}),
         ...(walletId ? { walletId } : {}),
       }),
       signal: AbortSignal.timeout(60_000),
