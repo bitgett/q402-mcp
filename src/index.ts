@@ -1,75 +1,75 @@
 /**
- * @quackai/q402-mcp — MCP server entry point (stdio transport).
+ * @quackai/q402-mcp - MCP server entry point (stdio transport).
  *
  * Exposes thirty tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
- *   q402_doctor             read-only, no key — first-install onboarding +
+ *   q402_doctor             read-only, no key - first-install onboarding +
  *                           ongoing health check. AI calls this BEFORE pay /
  *                           balance whenever the user mentions setup or "is
  *                           Q402 working". Returns recommendedActions[] for
  *                           creating ~/.q402/mcp.env on first install.
- *   q402_quote              read-only, no key, no funds — gas comparison
- *   q402_balance            read-only, requires key — verify + remaining quota
- *   q402_pay                single-recipient settlement. Sandbox-default — real
+ *   q402_quote              read-only, no key, no funds - gas comparison
+ *   q402_balance            read-only, requires key - verify + remaining quota
+ *   q402_pay                single-recipient settlement. Sandbox-default - real
  *                           TX only when API key (live tier), private key, and
  *                           Q402_ENABLE_REAL_PAYMENTS=1 all set
  *   q402_batch_pay          multi-recipient settlement (trial: 5 / paid: 20 per
  *                           call). Same chain + token across all recipients.
  *                           Same sandbox gating as q402_pay
- *   q402_receipt            read-only, no key — fetch + locally verify a Trust
+ *   q402_receipt            read-only, no key - fetch + locally verify a Trust
  *                           Receipt
- *   q402_wallet_status      read-only, requires key — per-chain EIP-7702
- *   q402_agentic_info       read-only, requires key — Agent Wallet info + balance
+ *   q402_wallet_status      read-only, requires key - per-chain EIP-7702
+ *   q402_agentic_info       read-only, requires key - Agent Wallet info + balance
  *                           delegation state across all 11 chains
- *   q402_recurring_list     read-only, requires key — list Agent Wallet's
+ *   q402_recurring_list     read-only, requires key - list Agent Wallet's
  *                           recurring rules + status + next-run time
- *   q402_recurring_create   write, requires key — author a new recurring
+ *   q402_recurring_create   write, requires key - author a new recurring
  *                           rule (single-recipient via MCP path)
- *   q402_recurring_fires    read-only, requires key — past-fire history of
+ *   q402_recurring_fires    read-only, requires key - past-fire history of
  *                           one rule (last 50 with tx hashes + amounts)
- *   q402_recurring_pause    write, requires key — pause an active rule
+ *   q402_recurring_pause    write, requires key - pause an active rule
  *                           (reversible via _resume)
- *   q402_recurring_resume   write, requires key — bring a paused / stopped
+ *   q402_recurring_resume   write, requires key - bring a paused / stopped
  *                           rule back to active
- *   q402_recurring_skip_next write, requires key — skip ONLY the next
+ *   q402_recurring_skip_next write, requires key - skip ONLY the next
  *                           scheduled fire, preserve cadence
- *   q402_recurring_cancel   write, requires key — permanently stop a rule
- *   q402_clear_delegation   write, requires key — clears the EIP-7702
+ *   q402_recurring_cancel   write, requires key - permanently stop a rule
+ *   q402_clear_delegation   write, requires key - clears the EIP-7702
  *                           delegation on a chain (Q402-sponsored gas, local
  *                           signing)
- *   q402_bridge_quote       read-only, no key — CCIP bridge quote across the
+ *   q402_bridge_quote       read-only, no key - CCIP bridge quote across the
  *                           eth/avax/arbitrum triangle. Surfaces fee + ETA +
  *                           token path so AI agents can preview before send.
- *   q402_bridge_send        write, requires live Multichain key — execute a
+ *   q402_bridge_send        write, requires live Multichain key - execute a
  *                           CCIP bridge from the Agent Wallet (Mode C). The
  *                           server signs ccipSend with the AES-GCM-encrypted
  *                           PK and auto-funds source-chain gas from the
  *                           user's Gas Tank. Sandbox-default; sandbox: false
  *                           + Q402_ENABLE_REAL_PAYMENTS=1 fires real bridge.
- *   q402_bridge_history     read-only, requires key — recent bridge attempts
+ *   q402_bridge_history     read-only, requires key - recent bridge attempts
  *                           for the caller's Agent Wallet (src/dst/amount/
  *                           CCIP msgId/status), most-recent first.
- *   q402_bridge_gas_tank    read-only, requires key — per-chain Gas Tank
+ *   q402_bridge_gas_tank    read-only, requires key - per-chain Gas Tank
  *                           native balance + auto-fund debit window so AI
  *                           can decide whether to top up before bridging.
- *   q402_yield_reserves     read-only, no key — list Q402 Yield lending
+ *   q402_yield_reserves     read-only, no key - list Q402 Yield lending
  *                           markets + supply APY. Aave V3 + Lista on BNB, Morpho on Base.
- *   q402_yield_positions    read-only, requires key — Agent Wallet's open
+ *   q402_yield_positions    read-only, requires key - Agent Wallet's open
  *                           Q402 Yield positions + total supplied (USD)
- *   q402_yield_deposit      write, requires key — supply stablecoins into
+ *   q402_yield_deposit      write, requires key - supply stablecoins into
  *                           Q402 Yield: Aave V3 or Lista on BNB (USDC/USDT), or Morpho on
  *                           Base (USDC). Mode C, confirm-gated, sandbox-default
- *   q402_yield_withdraw     write, requires key — withdraw out of Q402 Yield
+ *   q402_yield_withdraw     write, requires key - withdraw out of Q402 Yield
  *                           (BNB Aave/Lista, Base Morpho; amount "max" = full). Mode C,
  *                           confirm-gated, sandbox-default
- *   q402_request_create     write, requires key — publish a payment request
+ *   q402_request_create     write, requires key - publish a payment request
  *                           (invoice). No funds move; returns a /pay link +
  *                           req_ id. Recipient defaults to the Agent Wallet.
- *   q402_request_status     read-only, no key — look up a request by req_ id
+ *   q402_request_status     read-only, no key - look up a request by req_ id
  *                           (amount/token/chain/recipient/status). notFound
  *                           instead of throw.
- *   q402_request_pay        write, requires key — pay a request gaslessly from
+ *   q402_request_pay        write, requires key - pay a request gaslessly from
  *                           the payer's own Agent Wallet (Mode C). terms come
  *                           from the request; confirm-gated like q402_pay.
  *
@@ -157,6 +157,14 @@ import {
 import { REQUEST_CREATE_TOOL, RequestCreateInputSchema, runRequestCreate } from "./tools/request-create.js";
 import { REQUEST_STATUS_TOOL, RequestStatusInputSchema, runRequestStatus } from "./tools/request-status.js";
 import { REQUEST_PAY_TOOL,    RequestPayInputSchema,    runRequestPay }    from "./tools/request-pay.js";
+import {
+  ESCROW_CREATE_TOOL,  EscrowCreateInputSchema,  runEscrowCreate,
+  ESCROW_STATUS_TOOL,  EscrowStatusInputSchema,  runEscrowStatus,
+  ESCROW_LOCK_TOOL,    EscrowLockInputSchema,    runEscrowLock,
+  ESCROW_RELEASE_TOOL, EscrowReleaseInputSchema, runEscrowRelease,
+  ESCROW_REFUND_TOOL,  EscrowRefundInputSchema,  runEscrowRefund,
+  ESCROW_DISPUTE_TOOL, EscrowDisputeInputSchema, runEscrowDispute,
+} from "./tools/escrow.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -170,7 +178,7 @@ async function main(): Promise<void> {
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: [
-      // doctor first — it's the bootstrap tool: any "set up Q402" / "is Q402
+      // doctor first - it's the bootstrap tool: any "set up Q402" / "is Q402
       // working" prompt should land here before quote/balance/pay are tried.
       DOCTOR_TOOL,
       QUOTE_TOOL,
@@ -188,7 +196,7 @@ async function main(): Promise<void> {
       RECURRING_SKIP_NEXT_TOOL,
       RECURRING_CANCEL_TOOL,
       CLEAR_DELEGATION_TOOL,
-      // CCIP bridge surface — USDC routing on the eth/avax/arbitrum
+      // CCIP bridge surface - USDC routing on the eth/avax/arbitrum
       // triangle. Bridge_send goes LIVE on Mode C since 0.8.10 (Mode A/B
       // still fall through to sandbox since the route's API-key auth
       // path only exists for the server-managed Agent Wallet). History
@@ -198,12 +206,12 @@ async function main(): Promise<void> {
       BRIDGE_SEND_TOOL,
       BRIDGE_HISTORY_TOOL,
       BRIDGE_GAS_TANK_TOOL,
-      // Q402 Yield surface — read-only curated lending market list + the
+      // Q402 Yield surface - read-only curated lending market list + the
       // Agent Wallet's own positions. No funds move; positions auths via
       // the live Multichain apiKey (x-api-key header), reserves is public.
       YIELD_RESERVES_TOOL,
       YIELD_POSITIONS_TOOL,
-      // Q402 Yield WRITE surface — supply / withdraw the Agent Wallet's
+      // Q402 Yield WRITE surface - supply / withdraw the Agent Wallet's
       // stablecoin to/from a curated lending venue. MOVES FUNDS, so both gate on confirm:true
       // (like q402_pay). Mode C: apiKey in the body, server signs the supply
       // / withdraw with the encrypted key.
@@ -215,12 +223,18 @@ async function main(): Promise<void> {
       STAKE_TOOL,
       UNSTAKE_TOOL,
       STAKE_POSITIONS_TOOL,
-      // Payment Requests — the receive side. create publishes an invoice
+      // Payment Requests - the receive side. create publishes an invoice
       // (no funds move, apiKey only), status is a public id lookup, pay
       // settles a request gaslessly from the payer's own Agent Wallet
       // (Mode C, confirm-gated like q402_pay). Enables agent-to-agent billing.
       REQUEST_CREATE_TOOL,
       REQUEST_STATUS_TOOL,
+      ESCROW_CREATE_TOOL,
+      ESCROW_STATUS_TOOL,
+      ESCROW_LOCK_TOOL,
+      ESCROW_RELEASE_TOOL,
+      ESCROW_REFUND_TOOL,
+      ESCROW_DISPUTE_TOOL,
       REQUEST_PAY_TOOL,
     ],
   }));
@@ -263,7 +277,7 @@ async function main(): Promise<void> {
         }
         case "q402_agentic_info": {
           // Forward the parsed input so the optional `walletId` override
-          // reaches `runAgenticInfo` — without this multi-wallet owners
+          // reaches `runAgenticInfo` - without this multi-wallet owners
           // always saw the env-default wallet regardless of what they
           // typed into the tool call.
           const parsed = AgenticInfoInputSchema.parse(args ?? {});
@@ -349,6 +363,24 @@ async function main(): Promise<void> {
           const parsed = RequestStatusInputSchema.parse(args ?? {});
           return { content: [jsonText(await runRequestStatus(parsed))] };
         }
+        case "q402_escrow_create": {
+          return { content: [jsonText(await runEscrowCreate(EscrowCreateInputSchema.parse(args ?? {})))] };
+        }
+        case "q402_escrow_status": {
+          return { content: [jsonText(await runEscrowStatus(EscrowStatusInputSchema.parse(args ?? {})))] };
+        }
+        case "q402_escrow_lock": {
+          return { content: [jsonText(await runEscrowLock(EscrowLockInputSchema.parse(args ?? {})))] };
+        }
+        case "q402_escrow_release": {
+          return { content: [jsonText(await runEscrowRelease(EscrowReleaseInputSchema.parse(args ?? {})))] };
+        }
+        case "q402_escrow_refund": {
+          return { content: [jsonText(await runEscrowRefund(EscrowRefundInputSchema.parse(args ?? {})))] };
+        }
+        case "q402_escrow_dispute": {
+          return { content: [jsonText(await runEscrowDispute(EscrowDisputeInputSchema.parse(args ?? {})))] };
+        }
         case "q402_request_pay": {
           const parsed = RequestPayInputSchema.parse(args ?? {});
           return { content: [jsonText(await runRequestPay(parsed))] };
@@ -374,7 +406,7 @@ async function main(): Promise<void> {
   // Stdio MCP servers stay attached to the parent process; the transport keeps
   // the event loop alive until the host (Claude Desktop, Codex CLI, …) closes
   // the pipe.
-  // `$$` is an escape for a literal `$` in a template literal — easy to
+  // `$$` is an escape for a literal `$` in a template literal - easy to
   // misread as a typo. The full token `$${var}` renders as `$<value>`.
   process.stderr.write(
     `${PACKAGE_NAME} v${PACKAGE_VERSION} ready (mode=${CONFIG.mode}, ` +

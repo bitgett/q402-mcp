@@ -175,7 +175,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**30 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**36 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -209,6 +209,12 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_request_create` | api key | Publish a payment request (invoice). No funds move; returns a shareable `/pay` link + `req_…` id. Recipient defaults to the Agent Wallet. |
 | `q402_request_status` | none | Look up a payment request by `req_…` id (amount, token, chain, recipient, status). Read-only; `notFound` instead of throwing. |
 | `q402_request_pay` | live mode | Pay a request gaslessly from the payer's own Agent Wallet (Mode C). Terms come from the stored request, so they can't be redirected. Two-phase consent (same as `q402_pay`). |
+| `q402_escrow_create` | api key | Create a gasless non-custodial escrow (pending record, moves no funds); optional `walletId` funds it from an Agent Wallet. |
+| `q402_escrow_status` | none | Read an escrow's state, parties, amount, and tx hashes. Read-only. |
+| `q402_escrow_lock` | live mode | Fund a pending escrow gaslessly (EIP-7702); the server signs for an Agent-Wallet buyer. Sandbox-by-default. |
+| `q402_escrow_release` | live mode | Buyer releases a locked escrow to the seller (gasless). Sandbox-by-default. |
+| `q402_escrow_refund` | live mode | Permissionless refund to the buyer after the timeout / resolve window. |
+| `q402_escrow_dispute` | live mode | A party disputes an open escrow (requires a named arbiter). |
 
 `q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` + `q402_stake` + `q402_unstake` + `q402_request_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
