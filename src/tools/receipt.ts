@@ -37,7 +37,7 @@ const ReceiptShape = z.object({
   chain:          z.string(),
   payer:          z.string(),
   recipient:      z.string(),
-  token:          z.enum(["USDC", "USDT", "RLUSD"]),
+  token:          z.enum(["USDC", "USDT", "RLUSD", "USDG"]),
   tokenAmount:    z.string(),
   tokenAmountRaw: z.string(),
   method:         z.enum(["eip7702", "eip3009", "eip7702_xlayer", "eip7702_stable"]),

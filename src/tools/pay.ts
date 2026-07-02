@@ -34,7 +34,7 @@ import { checkConsent } from "../consent.js";
 export type WalletModeRequest = "eoa" | "agentic-local" | "agentic-server";
 
 export const PayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"]),
+  chain: z.enum(["avax", "bnb", "eth", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base", "robinhood"]),
   rail: z
     .enum(["q402", "x402"])
     .optional()
@@ -52,10 +52,11 @@ export const PayInputSchema = z.object({
     .string()
     .regex(/^\d+(\.\d+)?$/, "amount must be a positive decimal string")
     .describe('Human-readable decimal amount, e.g. "5.00".'),
-  token: z.enum(["USDC", "USDT", "RLUSD", "Q"]).describe(
+  token: z.enum(["USDC", "USDT", "RLUSD", "Q", "USDG"]).describe(
     'Token symbol. USDC / USDT supported on most chains. ' +
       'RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only. ' +
-      'Q (QuackAI, decimals 18) is BNB-only.',
+      'Q (QuackAI, decimals 18) is BNB-only. ' +
+      'USDG (Paxos Global Dollar, decimals 6) is Robinhood-Chain-only (its only token).',
   ),
   keyScope: z
     .enum(["auto", "trial", "multichain"])
@@ -64,7 +65,7 @@ export const PayInputSchema = z.object({
       'Which API key to use. "auto" (default): chain="bnb" + ' +
         'Q402_TRIAL_API_KEY set → Trial (free sponsored); else Multichain. ' +
         '"trial" forces the BNB-only sponsored key. "multichain" forces ' +
-        'the paid 11-chain key. Same rule applies to q402_batch_pay.',
+        'the paid 12-chain key. Same rule applies to q402_batch_pay.',
     ),
   walletMode: z
     .enum(["eoa", "agentic-local", "agentic-server"])
@@ -893,7 +894,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   if (noEnable) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route the user to the right tier: trial scope → /event (free 2k TX,
-  // BNB only), multichain scope → /payment (paid plan, all 11 chains).
+  // BNB only), multichain scope → /payment (paid plan, all 12 chains).
   // Earlier copy always pointed at /dashboard which under-served Trial
   // users by sending them toward the paid funnel.
   const tier = scope === "trial" ? "Free Trial" : "Multichain";
@@ -923,7 +924,7 @@ export const PAY_TOOL = {
     "refusing. " +
     "\n\n" +
     "Auto-routing: chain='bnb' + Q402_TRIAL_API_KEY set → Trial (free sponsored); " +
-    "anything else → Multichain (paid 11-chain). Same rule for q402_batch_pay. " +
+    "anything else → Multichain (paid 12-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
     "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum, base — " +
@@ -1020,7 +1021,7 @@ export const PAY_TOOL = {
         description:
           'Which API key to use. "auto" (default) picks Trial for BNB when ' +
           'Q402_TRIAL_API_KEY is set, Multichain otherwise. "trial" forces the ' +
-          'BNB-only sponsored key. "multichain" forces the paid 11-chain key.',
+          'BNB-only sponsored key. "multichain" forces the paid 12-chain key.',
       },
       walletMode: {
         type: "string",

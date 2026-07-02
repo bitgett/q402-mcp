@@ -70,7 +70,7 @@ export const RecurringCreateInputSchema = z.object({
         "Counted in the same unit as `token` (USDC or USDT, both 1:1 USD).",
     ),
   chain: z
-    .enum(["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum", "base"])
+    .enum(["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum", "base", "robinhood"])
     .default("bnb")
     .describe(
       "Chain to fire the recurring TX on. Defaults to bnb. " +
@@ -79,9 +79,9 @@ export const RecurringCreateInputSchema = z.object({
         "MULTICHAIN_REQUIRED. Trial keys can still pay one-shot via q402_pay on BNB.",
     ),
   token: z
-    .enum(["USDC", "USDT"])
+    .enum(["USDC", "USDT", "USDG"])
     .default("USDT")
-    .describe("Stablecoin to send. USDC or USDT. Both peg to USD-1."),
+    .describe("Stablecoin to send. USDC / USDT on most chains; USDG (Paxos Global Dollar) is Robinhood-Chain-only. All peg to USD-1."),
   label: z
     .string()
     .max(64)
@@ -154,13 +154,13 @@ export const RECURRING_CREATE_TOOL = {
       },
       chain: {
         type: "string" as const,
-        enum: ["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum", "base"],
+        enum: ["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum", "base", "robinhood"],
         description: "Default 'bnb'. Recurring requires the paid Multichain subscription on EVERY chain (BNB included) — trial keys are rejected with MULTICHAIN_REQUIRED.",
       },
       token: {
         type: "string" as const,
-        enum: ["USDC", "USDT"],
-        description: "Default 'USDT'. Both peg USD-1.",
+        enum: ["USDC", "USDT", "USDG"],
+        description: "Default 'USDT'. USDG (Paxos Global Dollar) is Robinhood-Chain-only. All peg USD-1.",
       },
       label: {
         type: "string" as const,

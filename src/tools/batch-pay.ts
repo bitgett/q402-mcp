@@ -65,17 +65,18 @@ const RECIPIENT_LIMIT_PAID  = 20;
 // reject them.
 const CLIENT_RECIPIENT_CAP = RECIPIENT_LIMIT_PAID;
 
-// Batch-supported chains: 9 of 11. xlayer + stable use chain-specific nonce
+// Batch-supported chains: 10 of 12. xlayer + stable use chain-specific nonce
 // field shapes (xlayerNonce / stableNonce / eip3009Nonce) that don't compose
 // cleanly with sequential first-fail-abort batching. The server's
 // /api/relay/batch rejects those chains regardless, but failing here gets
 // the error in front of the agent instead of after a round-trip.
 export const BatchPayInputSchema = z.object({
-  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum", "base"]),
-  token: z.enum(["USDC", "USDT", "RLUSD", "Q"]).describe(
+  chain: z.enum(["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum", "base", "robinhood"]),
+  token: z.enum(["USDC", "USDT", "RLUSD", "Q", "USDG"]).describe(
     "Token symbol. USDC / USDT supported on most chains. " +
       "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only. " +
       "Q (QuackAI, decimals 18) is BNB-only. " +
+      "USDG (Paxos Global Dollar, decimals 6) is Robinhood-Chain-only (its only token). " +
       "The same token applies to every recipient in the batch.",
   ),
   recipients: z
@@ -107,7 +108,7 @@ export const BatchPayInputSchema = z.object({
         'the tool returns status="ambiguous" WITHOUT executing so the agent ' +
         'can ask the user which path to take. Use keyScope="trial" to force ' +
         'the BNB-only sponsored key (≤5 recipients). keyScope="multichain" ' +
-        'forces the paid 11-chain key (≤20 recipients).',
+        'forces the paid 12-chain key (≤20 recipients).',
     ),
   walletMode: z
     .enum(["eoa", "agentic-local", "agentic-server"])
@@ -836,7 +837,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   if (noEnable) missing.push("Q402_ENABLE_REAL_PAYMENTS=1");
   if (missing.length === 0) return "Sandbox mode active (no env state change needed).";
   // Route to the right tier: trial scope → /event (free 2k TX, BNB only),
-  // multichain scope → /payment (paid plan, all 11 chains).
+  // multichain scope → /payment (paid plan, all 12 chains).
   const tier = scope === "trial" ? "Free Trial" : "Multichain";
   const url  =
     scope === "trial"
@@ -905,15 +906,16 @@ export const BATCH_PAY_TOOL = {
         // Narrower than the full chain set — xlayer and stable are NOT batchable
         // (chain-specific nonce field shapes). Use q402_pay in a loop for
         // those chains.
-        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum", "base"],
+        enum: ["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum", "base", "robinhood"],
         description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here — use q402_pay in a loop.",
       },
       token: {
         type: "string",
-        enum: ["USDC", "USDT", "RLUSD", "Q"],
+        enum: ["USDC", "USDT", "RLUSD", "Q", "USDG"],
         description:
           "Token for the entire batch. USDC / USDT supported on most chains; " +
-          "RLUSD (decimals 18) is Ethereum-only; Q (QuackAI, decimals 18) is BNB-only.",
+          "RLUSD (decimals 18) is Ethereum-only; Q (QuackAI, decimals 18) is BNB-only; " +
+          "USDG (Paxos Global Dollar, decimals 6) is Robinhood-Chain-only.",
       },
       recipients: {
         type: "array",

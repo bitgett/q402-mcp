@@ -9,7 +9,7 @@
  * this file *and* the @quackai/q402-mcp version in lock-step.
  *
  * Emergency BNB-only narrowing: `BNB_FOCUS_MODE` (defined below) is currently
- * false — the full 11-chain matrix is live. The flag stays in the module as a
+ * false — the full 12-chain matrix is live. The flag stays in the module as a
  * one-line revert path in case we ever need to temporarily collapse the
  * supported set to BNB. Trial-key restrictions are enforced server-side
  * via TRIAL_BNB_ONLY (separate code path) and don't depend on this flag.
@@ -26,7 +26,8 @@ export type ChainKey =
   | "monad"
   | "scroll"
   | "arbitrum"
-  | "base";
+  | "base"
+  | "robinhood";
 
 export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "avax",
@@ -40,6 +41,7 @@ export const CHAIN_KEYS: ReadonlyArray<ChainKey> = [
   "scroll",
   "arbitrum",
   "base",
+  "robinhood",
 ];
 
 export interface TokenInfo {
@@ -57,14 +59,18 @@ export interface ChainConfig {
   gasToken: string;
   /** Block explorer base URL for tx links. */
   explorer: string;
-  usdc: TokenInfo;
-  usdt: TokenInfo;
+  /** Optional on USDG-only chains (Robinhood Chain has neither Circle USDC nor
+   *  Tether USDT — the on-chain tokens with those symbols are mock/scam). */
+  usdc?: TokenInfo;
+  usdt?: TokenInfo;
   /** Optional third token slot — currently only used by Ethereum (RLUSD). */
   rlusd?: TokenInfo;
   /** Optional fourth token slot — currently only used by BNB Chain (Q / QuackAI). */
   q?: TokenInfo;
+  /** Optional token slot — currently only used by Robinhood Chain (USDG / Paxos Global Dollar). */
+  usdg?: TokenInfo;
   /** When defined, payments are restricted to this whitelist. */
-  supportedTokens?: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "Q">;
+  supportedTokens?: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "Q" | "USDG">;
   /** Approximate per-tx gas cost in USD — order-of-magnitude only, used by quote tool. */
   approxGasCostUsd: number;
   /** Optional human note surfaced by the quote tool. */
@@ -236,10 +242,26 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     approxGasCostUsd: 0.001,
     note: "OP Stack L2 — EIP-7702 live on Base mainnet via the Isthmus upgrade. Native Circle USDC; USDT is bridged. Data-availability cost dominates per-tx gas.",
   },
+  robinhood: {
+    key: "robinhood",
+    name: "Robinhood Chain",
+    chainId: 4663,
+    domainName: "Q402 Robinhood Chain",
+    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    gasToken: "ETH",
+    explorer: "https://robinhoodchain.blockscout.com",
+    // USDG (Paxos Global Dollar) is the ONLY token on Robinhood Chain, 6 dec.
+    // There is NO Circle USDC and NO Tether USDT here — the on-chain tokens with
+    // those symbols are mock/scam and are intentionally not supported.
+    usdg: { address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", decimals: 6 },
+    supportedTokens: ["USDG"],
+    approxGasCostUsd: 0.001,
+    note: "L2 — USDG (Paxos Global Dollar) is the only supported token; no Circle USDC or Tether USDT on this chain.",
+  },
 };
 
 // ─── BNB-only emergency flag (mirrors q402-landing app/lib/feature-flags.ts) ──
-// Currently false: the full 11-chain matrix is live. The flag exists as a
+// Currently false: the full 12-chain matrix is live. The flag exists as a
 // one-line revert path — flipping to true rewrites `supportedTokens` for
 // every non-BNB chain to [] at module load, which makes every non-BNB
 // quote/pay call produce a single deterministic rejection message. The
@@ -254,7 +276,7 @@ export const BNB_FOCUS_REJECTION_MESSAGE =
 if (BNB_FOCUS_MODE) {
   for (const key of CHAIN_KEYS) {
     if (key !== "bnb") {
-      (CHAIN_CONFIG[key] as { supportedTokens: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "Q"> }).supportedTokens = [];
+      (CHAIN_CONFIG[key] as { supportedTokens: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "Q" | "USDG"> }).supportedTokens = [];
     }
   }
 }
@@ -265,7 +287,7 @@ export function getChain(key: ChainKey): ChainConfig {
   return cfg;
 }
 
-export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD" | "Q"): TokenInfo {
+export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD" | "Q" | "USDG"): TokenInfo {
   if (BNB_FOCUS_MODE && !(cfg.supportedTokens?.includes(token) ?? false)) {
     throw new Error(BNB_FOCUS_REJECTION_MESSAGE);
   }
@@ -287,5 +309,21 @@ export function tokenFor(cfg: ChainConfig, token: "USDC" | "USDT" | "RLUSD" | "Q
     }
     return cfg.q;
   }
-  return token === "USDC" ? cfg.usdc : cfg.usdt;
+  if (token === "USDG") {
+    if (!cfg.usdg) {
+      throw new Error(
+        `USDG (Paxos Global Dollar) is not supported on ${cfg.name} (key=${cfg.key}). ` +
+          `USDG is currently Robinhood-Chain-only.`,
+      );
+    }
+    return cfg.usdg;
+  }
+  const t = token === "USDC" ? cfg.usdc : cfg.usdt;
+  if (!t) {
+    throw new Error(
+      `${token} is not supported on ${cfg.name} (key=${cfg.key}). ` +
+        `Supported tokens: ${cfg.supportedTokens?.join(", ") ?? "none"}.`,
+    );
+  }
+  return t;
 }

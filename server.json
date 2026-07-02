@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 - gasless payments on 11 EVM chains + CCIP bridge (eth/avax/arbitrum). Sandbox-default.",
+  "description": "Q402 - gasless payments on 12 EVM chains + CCIP bridge (eth/avax/arbitrum). Sandbox-default.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.10.0",
+  "version": "0.10.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "transport": {
         "type": "stdio"
       },
@@ -25,7 +25,7 @@
         },
         {
           "name": "Q402_MULTICHAIN_API_KEY",
-          "description": "Recommended path: skip this UI and run `q402_doctor` after install - it stores secrets in ~/.q402/mcp.env, which the server auto-loads. Fill this field directly ONLY if your MCP client manages secrets for you. Value is a Paid Multichain API key from https://q402.quackai.ai/payment - full 11-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments and whenever keyScope='multichain' is chosen.",
+          "description": "Recommended path: skip this UI and run `q402_doctor` after install - it stores secrets in ~/.q402/mcp.env, which the server auto-loads. Fill this field directly ONLY if your MCP client manages secrets for you. Value is a Paid Multichain API key from https://q402.quackai.ai/payment - full 12-chain support with per-chain Gas Tank. Auto-routed for non-BNB payments and whenever keyScope='multichain' is chosen.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"
@@ -84,7 +84,7 @@
         },
         {
           "name": "Q402_API_KEY",
-          "description": "DEPRECATED legacy single-key env from pre-v0.5.0 installs. The server still reads it as a silent fallback so existing setups keep working, but new users should pick a scoped variant instead. Q402_TRIAL_API_KEY (Free Trial, BNB only) and Q402_MULTICHAIN_API_KEY (full 11-chain surface) are designed to coexist - BNB payments auto-route to the trial key, other chains use multichain. Only set Q402_API_KEY if you are migrating an existing pre-v0.5.0 install; do NOT set it alongside the scoped variants on a fresh install.",
+          "description": "DEPRECATED legacy single-key env from pre-v0.5.0 installs. The server still reads it as a silent fallback so existing setups keep working, but new users should pick a scoped variant instead. Q402_TRIAL_API_KEY (Free Trial, BNB only) and Q402_MULTICHAIN_API_KEY (full 12-chain surface) are designed to coexist - BNB payments auto-route to the trial key, other chains use multichain. Only set Q402_API_KEY if you are migrating an existing pre-v0.5.0 install; do NOT set it alongside the scoped variants on a fresh install.",
           "isRequired": false,
           "isSecret": true,
           "format": "string"

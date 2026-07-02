@@ -3,7 +3,7 @@
  *
  * Two-key model:
  *   Q402_TRIAL_API_KEY       BNB-only sponsored Trial key (free 2k TX).
- *   Q402_MULTICHAIN_API_KEY  Paid 11-chain key backed by per-chain Gas Tank.
+ *   Q402_MULTICHAIN_API_KEY  Paid 12-chain key backed by per-chain Gas Tank.
  *   Q402_API_KEY             Legacy single-key fallback. Used for both
  *                            scopes when the two scoped envs are unset.
  *
@@ -212,7 +212,7 @@ export type KeyScopeRequest = "auto" | KeyScope;
 export interface Config {
   /** Trial-scope key (BNB-only). Null if Q402_TRIAL_API_KEY unset. */
   trialApiKey: string | null;
-  /** Multichain-scope key (11 chains). Null if Q402_MULTICHAIN_API_KEY unset. */
+  /** Multichain-scope key (12 chains). Null if Q402_MULTICHAIN_API_KEY unset. */
   multichainApiKey: string | null;
   /** Legacy single-env fallback. Null if Q402_API_KEY unset. */
   legacyApiKey: string | null;

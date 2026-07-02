@@ -23,11 +23,11 @@ export const RequestCreateInputSchema = z.object({
     .regex(AMOUNT_RE)
     .describe('Amount to request, as a decimal string (e.g. "5", "1.50"). Counted in `token` (USDC or USDT, both USD-1).'),
   token: z
-    .enum(["USDC", "USDT"])
+    .enum(["USDC", "USDT", "USDG"])
     .default("USDT")
-    .describe("Stablecoin to be paid. USDC or USDT. Both peg USD-1."),
+    .describe("Stablecoin to be paid. USDC / USDT on most chains; USDG (Paxos Global Dollar) is Robinhood-Chain-only. All peg USD-1."),
   chain: z
-    .enum(["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"])
+    .enum(["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base", "robinhood"])
     .default("bnb")
     .describe("Chain the request settles on. Defaults to bnb."),
   recipient: z
@@ -54,7 +54,7 @@ interface PublicRequest {
   id: string;
   recipient: string;
   chain: string;
-  token: "USDC" | "USDT";
+  token: "USDC" | "USDT" | "USDG";
   amount: string;
   memo?: string;
   status: string;
@@ -167,12 +167,12 @@ export const REQUEST_CREATE_TOOL = {
       },
       token: {
         type: "string" as const,
-        enum: ["USDC", "USDT"],
-        description: "Default 'USDT'. Both peg USD-1.",
+        enum: ["USDC", "USDT", "USDG"],
+        description: "Default 'USDT'. USDG (Paxos Global Dollar) is Robinhood-Chain-only. All peg USD-1.",
       },
       chain: {
         type: "string" as const,
-        enum: ["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base"],
+        enum: ["bnb", "eth", "avax", "xlayer", "stable", "mantle", "injective", "monad", "scroll", "arbitrum", "base", "robinhood"],
         description: "Default 'bnb'. Chain the request settles on.",
       },
       recipient: {

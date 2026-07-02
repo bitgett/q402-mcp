@@ -3,7 +3,7 @@
  *
  * Surfaces the Agent Wallet that the configured Multichain API key
  * unlocks: the wallet address, the per-tx and daily spending caps, the
- * archive state, and an aggregate USD balance across the 11 EVM chains.
+ * archive state, and an aggregate USD balance across the 12 EVM chains.
  *
  * Multi-wallet aware (Phase 3): each owner can hold up to 10 Agent
  * Wallets. Picks a wallet by:
@@ -39,7 +39,7 @@ export const AGENTIC_INFO_TOOL = {
     "Read-only Agent Wallet introspection. Returns the wallet address, " +
     "per-tx and daily caps, archive state, an aggregate USD balance, AND a " +
     "per-chain breakdown (`byChain`) of which chains actually hold USDC/USDT " +
-    "across the 11 supported EVM chains — so you can see WHERE funds are " +
+    "across the 12 supported EVM chains — so you can see WHERE funds are " +
     "before routing a payment. Authenticated by the configured Multichain " +
     "API key — no private key required. Accepts an optional walletId for " +
     "owners who hold more than one wallet; omit to use the server-default " +
@@ -90,7 +90,7 @@ export interface AgenticInfoSummary {
   } | null;
   /** Soft-delete timestamp (ms epoch) if archived; null when active. */
   archivedAt: number | null;
-  /** Aggregate USD balance across the 11 EVM chains (rounded to cents). */
+  /** Aggregate USD balance across the 12 EVM chains (rounded to cents). */
   totalUsd: number | null;
   /** Per-chain stablecoin breakdown for the chains that actually hold funds
    *  (USDC + USDT; USD-pegged, so each number also reads as the token amount).
