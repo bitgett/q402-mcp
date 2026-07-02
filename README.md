@@ -1,6 +1,6 @@
 # @quackai/q402-mcp
 
-> MCP server for Q402 — gasless USDC, USDT, and RLUSD payments across 12 EVM chains, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
+> MCP server for Q402 — gasless USDC, USDT, RLUSD, and USDG payments across 12 EVM chains (USDG on Robinhood Chain), callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.
 
 [![npm](https://img.shields.io/npm/v/@quackai/q402-mcp.svg)](https://www.npmjs.com/package/@quackai/q402-mcp)
 [![license](https://img.shields.io/npm/l/@quackai/q402-mcp.svg)](./LICENSE)
