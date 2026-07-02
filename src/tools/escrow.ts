@@ -46,6 +46,12 @@ interface EscrowRecord {
   fundedBy?: "owner" | "agent";
 }
 
+/** Fields the escrow API endpoints return (all optional; endpoint-specific). */
+interface ApiResp {
+  error?: string; escrowId?: string; onchainEscrowId?: string; escrow?: unknown;
+  txHash?: string; explorer?: string; status?: string;
+}
+
 function base(): string { return CONFIG.relayBaseUrl.replace(/\/$/, ""); }
 const HEX_PK = /^0x[0-9a-fA-F]{64}$/;
 /**
@@ -70,15 +76,15 @@ function signer(expectedBuyer?: string): Wallet {
 }
 async function getInfo(chain: string): Promise<EscrowInfo> {
   const r = await fetch(`${base()}/escrow/info?chain=${encodeURIComponent(chain)}`, { signal: AbortSignal.timeout(15_000) });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as EscrowInfo & { error?: string };
   if (!r.ok) throw new Error(j?.error ?? `escrow not live on ${chain}`);
-  return j as EscrowInfo;
+  return j;
 }
 async function getEscrow(id: string): Promise<EscrowRecord> {
   const r = await fetch(`${base()}/escrow/${encodeURIComponent(id)}`, { signal: AbortSignal.timeout(15_000) });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as EscrowRecord & { escrow?: EscrowRecord; error?: string };
   if (!r.ok) throw new Error(j?.error ?? "escrow not found");
-  return (j.escrow ?? j) as EscrowRecord;
+  return j.escrow ?? j;
 }
 const nowSec = () => Math.floor(Date.now() / 1000);
 const randNonce = () => BigInt("0x" + randomBytes(8).toString("hex")).toString();
@@ -104,7 +110,7 @@ export async function runEscrowCreate(input: EscrowCreateInput) {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ apiKey: CONFIG.apiKey, ...input }), signal: AbortSignal.timeout(20_000),
   });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as ApiResp;
   if (!r.ok) throw new Error(j?.error ?? "escrow create failed");
   return { escrowId: j.escrowId, onchainEscrowId: j.onchainEscrowId, escrow: j.escrow, note: "Record created (no funds moved). Fund it with escrow_lock." };
 }
@@ -132,7 +138,7 @@ export async function runEscrowLock(input: EscrowLockInput) {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ apiKey: CONFIG.apiKey }), signal: AbortSignal.timeout(60_000),
     });
-    const j = (await r.json()) as Record<string, any>;
+    const j = (await r.json()) as ApiResp;
     if (!r.ok) throw new Error(j?.error ?? "lock failed");
     return { status: "open", txHash: j.txHash, explorer: j.explorer, escrow: j.escrow };
   }
@@ -156,7 +162,7 @@ export async function runEscrowLock(input: EscrowLockInput) {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ witnessSig, authorization, nonce, deadline }), signal: AbortSignal.timeout(60_000),
   });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as ApiResp;
   if (!r.ok) throw new Error(j?.error ?? "lock failed");
   return { status: "open", txHash: j.txHash, explorer: j.explorer, escrow: j.escrow };
 }
@@ -189,7 +195,7 @@ export async function runEscrowRelease(input: EscrowReleaseInput) {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ sig, nonce, deadline }), signal: AbortSignal.timeout(60_000),
   });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as ApiResp;
   if (!r.ok) throw new Error(j?.error ?? "release failed");
   return { status: j.status, txHash: j.txHash, explorer: j.explorer };
 }
@@ -204,7 +210,7 @@ export async function runEscrowDispute(input: EscrowDisputeInput) {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ sig, nonce, deadline }), signal: AbortSignal.timeout(60_000),
   });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as ApiResp;
   if (!r.ok) throw new Error(j?.error ?? "dispute failed");
   return { status: j.status, txHash: j.txHash, explorer: j.explorer };
 }
@@ -216,7 +222,7 @@ export async function runEscrowRefund(input: EscrowRefundInput) {
   const r = await fetch(`${base()}/escrow/${encodeURIComponent(input.escrowId)}/refund`, {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}), signal: AbortSignal.timeout(60_000),
   });
-  const j = (await r.json()) as Record<string, any>;
+  const j = (await r.json()) as ApiResp;
   if (!r.ok) throw new Error(j?.error ?? "refund failed (only after the release deadline / resolve window)");
   return { status: j.status, txHash: j.txHash, explorer: j.explorer };
 }
