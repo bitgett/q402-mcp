@@ -175,7 +175,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**36 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**40 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -215,6 +215,10 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_escrow_release` | live mode | Buyer releases a locked escrow to the seller (gasless). Sandbox-by-default. |
 | `q402_escrow_refund` | live mode | Permissionless refund to the buyer after the timeout / resolve window. |
 | `q402_escrow_dispute` | live mode | A party disputes an open escrow (requires a named arbiter). |
+| `q402_redstone_feeds` | none | Which RedStone feeds this deployment can drive triggers off (NAV / price / RWA). Read-only. |
+| `q402_redstone_trigger_create` | live mode | Arm a gasless payout that fires once when a RedStone feed crosses a threshold (edge-latched). |
+| `q402_redstone_trigger_list` | live mode | List the Agent Wallet's RedStone triggers + their state. |
+| `q402_redstone_trigger_cancel` | live mode | Permanently stop a RedStone trigger. |
 
 `q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` + `q402_stake` + `q402_unstake` + `q402_request_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 

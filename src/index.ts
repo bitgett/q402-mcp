@@ -165,6 +165,12 @@ import {
   ESCROW_REFUND_TOOL,  EscrowRefundInputSchema,  runEscrowRefund,
   ESCROW_DISPUTE_TOOL, EscrowDisputeInputSchema, runEscrowDispute,
 } from "./tools/escrow.js";
+import {
+  REDSTONE_FEEDS_TOOL,          RedstoneFeedsInputSchema,          runRedstoneFeeds,
+  REDSTONE_TRIGGER_CREATE_TOOL, RedstoneTriggerCreateInputSchema, runRedstoneTriggerCreate,
+  REDSTONE_TRIGGER_LIST_TOOL,   RedstoneTriggerListInputSchema,   runRedstoneTriggerList,
+  REDSTONE_TRIGGER_CANCEL_TOOL, RedstoneTriggerCancelInputSchema, runRedstoneTriggerCancel,
+} from "./tools/redstone-trigger.js";
 
 function jsonText(value: unknown): { type: "text"; text: string } {
   return { type: "text", text: JSON.stringify(value, null, 2) };
@@ -236,6 +242,14 @@ async function main(): Promise<void> {
       ESCROW_REFUND_TOOL,
       ESCROW_DISPUTE_TOOL,
       REQUEST_PAY_TOOL,
+      // RedStone data-event triggers — arm a gasless payout on a NAV / price
+      // feed crossing (edge-latched, fires once per crossing). feeds is no-key
+      // discovery; create/list/cancel are Mode C. OFF by default server-side
+      // (REDSTONE_ENABLED) — writes return REDSTONE_DISABLED until enabled.
+      REDSTONE_FEEDS_TOOL,
+      REDSTONE_TRIGGER_CREATE_TOOL,
+      REDSTONE_TRIGGER_LIST_TOOL,
+      REDSTONE_TRIGGER_CANCEL_TOOL,
     ],
   }));
 
@@ -384,6 +398,22 @@ async function main(): Promise<void> {
         case "q402_request_pay": {
           const parsed = RequestPayInputSchema.parse(args ?? {});
           return { content: [jsonText(await runRequestPay(parsed))] };
+        }
+        case "q402_redstone_feeds": {
+          RedstoneFeedsInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRedstoneFeeds())] };
+        }
+        case "q402_redstone_trigger_create": {
+          const parsed = RedstoneTriggerCreateInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRedstoneTriggerCreate(parsed))] };
+        }
+        case "q402_redstone_trigger_list": {
+          const parsed = RedstoneTriggerListInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRedstoneTriggerList(parsed))] };
+        }
+        case "q402_redstone_trigger_cancel": {
+          const parsed = RedstoneTriggerCancelInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runRedstoneTriggerCancel(parsed))] };
         }
         default:
           return {
