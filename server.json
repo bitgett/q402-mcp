@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bitgett/q402-mcp",
-  "description": "Q402 - gasless payments on 12 EVM chains, CCIP bridge, RedStone NAV triggers. Sandbox-default.",
+  "description": "Q402 - gasless payments, yield, escrow, bridge & NAV triggers on 12 EVM chains. Sandbox-default.",
   "repository": {
     "url": "https://github.com/bitgett/q402-mcp",
     "source": "github"
   },
-  "version": "0.11.0",
+  "version": "0.11.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@quackai/q402-mcp",
-      "version": "0.11.0",
+      "version": "0.11.1",
       "transport": {
         "type": "stdio"
       },
