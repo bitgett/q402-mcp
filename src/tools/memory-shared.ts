@@ -1,7 +1,9 @@
 /**
  * Shared caller for the Q402 Memory tools (summary / vendor / agent).
- * Mode-C-only: the configured Multichain API key authenticates the read.
- * Hits POST /api/wallet/agentic/memory-by-key. Read-only, no private key.
+ * Read-only + free: ANY live Q402 API key (Trial or Multichain) authenticates
+ * the read — Memory is not a paid-only feature. It only ever returns the key
+ * owner's own treasury data. Hits POST /api/wallet/agentic/memory-by-key. No
+ * private key, no gas, no money moved.
  */
 import { CONFIG } from "../config.js";
 
@@ -15,15 +17,9 @@ export async function callMemory(
 ): Promise<Record<string, unknown>> {
   const url = dashboardUrl();
 
+  // Any live key works (Trial or Multichain) — Memory is free + read-only.
   if (!CONFIG.apiKey || !CONFIG.apiKey.startsWith("q402_live_")) {
-    return { configured: false, dashboardUrl: url, setupHint: "No live Q402 API key configured. Run q402_doctor to set one up." };
-  }
-  if (!CONFIG.multichainApiKey || !CONFIG.multichainApiKey.startsWith("q402_live_")) {
-    return {
-      configured: false,
-      dashboardUrl: url,
-      setupHint: "Treasury memory needs a paid Multichain API key (Q402_MULTICHAIN_API_KEY). Activate a plan at https://q402.quackai.ai/payment.",
-    };
+    return { configured: false, dashboardUrl: url, setupHint: "No live Q402 API key configured. Run q402_doctor to set one up (a free Trial key works)." };
   }
 
   try {

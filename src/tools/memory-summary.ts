@@ -1,6 +1,6 @@
 /**
  * q402_memory_summary — summarize the agent treasury's activity over a window.
- * Read-only; Mode-C (Multichain API key). Hits memory-by-key { action:"summary" }.
+ * Read-only; Mode-C, any live API key (free). Hits memory-by-key { action:"summary" }.
  */
 import { z } from "zod";
 import { callMemory, resolveWalletId } from "./memory-shared.js";
@@ -19,7 +19,7 @@ export const MEMORY_SUMMARY_TOOL = {
     "vendors paid, active scheduled payouts and the next fire time, open vs paid payment requests, open vs disputed " +
     "escrow, and the observable failures/holds (recurring rules that hit their cap or errored, disputed escrows). Use " +
     "for 'summarize my treasury', 'why did my balance drop yesterday' (window:24h), or 'what did we spend this week'. " +
-    "Read-only; authenticated by the Multichain API key.",
+    "Read-only and free: any live API key (Trial or Multichain).",
   inputSchema: {
     type: "object" as const,
     properties: {

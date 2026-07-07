@@ -19,7 +19,7 @@ export const VENDOR_HISTORY_TOOL = {
     "cadence if the vendor is on a schedule (answers 'how much have we paid Alice so far?'). Without `vendor`: a " +
     "leaderboard of all vendors by total paid, each flagged whether it is paid on a monthly schedule (answers 'which " +
     "vendors get paid every month?'). Vendors are address-based; a human name only appears if it was saved as a rule " +
-    "label. Read-only; Multichain API key.",
+    "label. Read-only and free: any live API key (Trial or Multichain).",
   inputSchema: {
     type: "object" as const,
     properties: {
