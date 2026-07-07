@@ -175,7 +175,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**40 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**43 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
 
 | Tool | Auth | Purpose |
 |---|---|---|
@@ -188,6 +188,9 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_wallet_status` | private key | Per-chain EIP-7702 state for the EOA derived from `Q402_PRIVATE_KEY`. |
 | `q402_clear_delegation` | private key / api key | Clear EIP-7702 delegation (Mode A/B local key OR Mode C api key, server-signed). Sponsored on every chain except Ethereum (billed to your Gas Tank). Two-phase consent (`consentToken`). |
 | `q402_agentic_info` | api key | Agent Wallet info (addresses, per-wallet caps, daily-spend used, ERC-8004 id). Drives Mode C. |
+| `q402_memory_summary` | api key | Treasury overview over a window: USD-stablecoin spend by chain/source, top vendors, schedules, open requests/escrow, failures. Read-only. |
+| `q402_vendor_history` | api key | Total paid to one vendor (or a vendor leaderboard) with recurring cadence. Read-only. |
+| `q402_agent_spend_report` | api key | Per-Agent-Wallet spend with each wallet's caps. Read-only. |
 | `q402_recurring_list` | api key | List scheduled rules. |
 | `q402_recurring_create` | api key | Author a recurring rule. Paid Multichain on EVERY chain (BNB included). |
 | `q402_recurring_fires` | api key | Last 50 fires per rule (timestamp + txHashes + amount). |

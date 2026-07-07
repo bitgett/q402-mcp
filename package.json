@@ -1,7 +1,7 @@
 {
   "name": "@quackai/q402-mcp",
-  "version": "0.11.1",
-  "description": "MCP server for Q402. Gasless USDC/USDT/RLUSD/Q payments on 12 EVM chains (USDG on Robinhood Chain), Q402 Yield (gasless supply and withdraw into Aave, Lista, and Morpho lending vaults), gasless non-custodial escrow (create, fund, release, refund, dispute), Q staking, a Chainlink CCIP USDC bridge on the eth/avax/arbitrum triangle, and RedStone NAV/price triggers (autonomous gasless payout on a feed crossing). 40 tools, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.",
+  "version": "0.11.2",
+  "description": "MCP server for Q402. Gasless USDC/USDT/RLUSD/Q payments on 12 EVM chains (USDG on Robinhood Chain), Q402 Yield (gasless supply and withdraw into Aave, Lista, and Morpho lending vaults), gasless non-custodial escrow (create, fund, release, refund, dispute), Q staking, a Chainlink CCIP USDC bridge on the eth/avax/arbitrum triangle, and RedStone NAV/price triggers (autonomous gasless payout on a feed crossing), and read-only treasury Memory (spend summaries, vendor history, per-agent spend reports). 43 tools, callable from Claude (Desktop / Code), OpenAI Codex CLI, and any other Model Context Protocol client.",
   "mcpName": "io.github.bitgett/q402-mcp",
   "keywords": [
     "mcp",

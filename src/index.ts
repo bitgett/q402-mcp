@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp - MCP server entry point (stdio transport).
  *
- * Exposes thirty tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes 43 tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key - first-install onboarding +
@@ -124,6 +124,9 @@ import {
   RecurringListInputSchema,
   runRecurringList,
 } from "./tools/recurring-list.js";
+import { MEMORY_SUMMARY_TOOL, MemorySummaryInputSchema, runMemorySummary } from "./tools/memory-summary.js";
+import { VENDOR_HISTORY_TOOL, VendorHistoryInputSchema, runVendorHistory } from "./tools/vendor-history.js";
+import { AGENT_SPEND_REPORT_TOOL, AgentSpendReportInputSchema, runAgentSpendReport } from "./tools/agent-spend-report.js";
 import {
   RECURRING_CREATE_TOOL,
   RecurringCreateInputSchema,
@@ -194,6 +197,9 @@ async function main(): Promise<void> {
       RECEIPT_TOOL,
       WALLET_STATUS_TOOL,
       AGENTIC_INFO_TOOL,
+      MEMORY_SUMMARY_TOOL,
+      VENDOR_HISTORY_TOOL,
+      AGENT_SPEND_REPORT_TOOL,
       RECURRING_LIST_TOOL,
       RECURRING_CREATE_TOOL,
       RECURRING_FIRES_TOOL,
@@ -296,6 +302,18 @@ async function main(): Promise<void> {
           // typed into the tool call.
           const parsed = AgenticInfoInputSchema.parse(args ?? {});
           return { content: [jsonText(await runAgenticInfo(parsed))] };
+        }
+        case "q402_memory_summary": {
+          const parsed = MemorySummaryInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runMemorySummary(parsed))] };
+        }
+        case "q402_vendor_history": {
+          const parsed = VendorHistoryInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runVendorHistory(parsed))] };
+        }
+        case "q402_agent_spend_report": {
+          const parsed = AgentSpendReportInputSchema.parse(args ?? {});
+          return { content: [jsonText(await runAgentSpendReport(parsed))] };
         }
         case "q402_recurring_list": {
           const parsed = RecurringListInputSchema.parse(args ?? {});
