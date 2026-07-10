@@ -111,6 +111,8 @@ import {
 } from "./tools/agentic-info.js";
 import { BRIDGE_QUOTE_TOOL,    BridgeQuoteInputSchema,    runBridgeQuote }    from "./tools/bridge-quote.js";
 import { BRIDGE_SEND_TOOL,     BridgeSendInputSchema,     runBridgeSend }     from "./tools/bridge-send.js";
+import { OFT_QUOTE_TOOL,       OftQuoteInputSchema,       runOftQuote }       from "./tools/oft-quote.js";
+import { OFT_SEND_TOOL,        OftSendInputSchema,        runOftSend }        from "./tools/oft-send.js";
 import { BRIDGE_HISTORY_TOOL,  BridgeHistoryInputSchema,  runBridgeHistory }  from "./tools/bridge-history.js";
 import { BRIDGE_GAS_TANK_TOOL, BridgeGasTankInputSchema, runBridgeGasTank } from "./tools/bridge-gas-tank.js";
 import { YIELD_RESERVES_TOOL,  YieldReservesInputSchema,  runYieldReserves }  from "./tools/yield-reserves.js";
@@ -218,6 +220,8 @@ async function main(): Promise<void> {
       BRIDGE_SEND_TOOL,
       BRIDGE_HISTORY_TOOL,
       BRIDGE_GAS_TANK_TOOL,
+      OFT_QUOTE_TOOL,
+      OFT_SEND_TOOL,
       // Q402 Yield surface - read-only curated lending market list + the
       // Agent Wallet's own positions. No funds move; positions auths via
       // the live Multichain apiKey (x-api-key header), reserves is public.
@@ -350,6 +354,14 @@ async function main(): Promise<void> {
         case "q402_bridge_send": {
           const parsed = BridgeSendInputSchema.parse(args ?? {});
           return await runBridgeSend(parsed);
+        }
+        case "q402_oft_quote": {
+          const parsed = OftQuoteInputSchema.parse(args ?? {});
+          return await runOftQuote(parsed);
+        }
+        case "q402_oft_send": {
+          const parsed = OftSendInputSchema.parse(args ?? {});
+          return await runOftSend(parsed);
         }
         case "q402_bridge_history": {
           const parsed = BridgeHistoryInputSchema.parse(args ?? {});
