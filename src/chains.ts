@@ -247,7 +247,7 @@ export const CHAIN_CONFIG: Record<ChainKey, ChainConfig> = {
     name: "Robinhood Chain",
     chainId: 4663,
     domainName: "Q402 Robinhood Chain",
-    implContract: "0x2fb2B2D110b6c5664e701666B3741240242bf350",
+    implContract: "0xa9a7dcE76DEF2AC36057FeF0d8103dF10581d61e",
     gasToken: "ETH",
     explorer: "https://robinhoodchain.blockscout.com",
     // USDG (Paxos Global Dollar) is the ONLY token on Robinhood Chain, 6 dec.
