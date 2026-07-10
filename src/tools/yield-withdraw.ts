@@ -238,8 +238,8 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       ? input.idempotencyKey
       : hexlify(randomBytes(32));
 
-  // "max" withdraws the full position — phrase the preview accordingly so the
-  // user understands the whole balance is leaving the lending venue.
+  // "max" withdraws the max currently redeemable (maxRedeem), which vault caps or
+  // queues can leave below the full position; phrase the preview accordingly.
   const amountDesc = input.amount === "max" ? "the maximum currently redeemable" : `${input.amount} ${input.token}`;
 
   // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────
