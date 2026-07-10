@@ -298,7 +298,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     available.push({
       id: "agentic-server",
       label: "Agent Wallet (server-managed)",
-      note: "Q402 holds the encrypted key; payment fires through /api/wallet/agentic/send. Dashboard caps bound USDC/USDT/RLUSD spend; Q is exempt by design (your own token), but the recipient allowlist + confirmation still apply.",
+      note: "Q402 holds the encrypted key; payment fires through /api/wallet/agentic/send. Dashboard caps bound USDC/USDT/RLUSD/USDG spend; Q is exempt by design (your own token), but the recipient allowlist + confirmation still apply.",
     });
   }
 
@@ -927,8 +927,8 @@ export const PAY_TOOL = {
     "anything else → Multichain (paid 12-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
-    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum, base — " +
-    "USDC/USDT on most chains, RLUSD on Ethereum only. " +
+    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum, base, robinhood — " +
+    "USDC/USDT on most chains, RLUSD on Ethereum only, USDG on Robinhood Chain only. " +
     "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set as a valid 32-byte hex key, and " +
     "Q402_ENABLE_REAL_PAYMENTS=1. Sandbox responses come back with " +
@@ -1009,11 +1009,12 @@ export const PAY_TOOL = {
       },
       token: {
         type: "string",
-        enum: ["USDC", "USDT", "RLUSD", "Q"],
+        enum: ["USDC", "USDT", "RLUSD", "Q", "USDG"],
         description:
           "Token to send. USDC / USDT supported on most chains. " +
           "RLUSD (Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only. " +
-          "Q (QuackAI, decimals 18) is BNB-only.",
+          "Q (QuackAI, decimals 18) is BNB-only. " +
+          "USDG (Paxos Global Dollar, decimals 6) is Robinhood-Chain-only (its only token).",
       },
       keyScope: {
         type: "string",
