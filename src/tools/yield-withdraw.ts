@@ -8,7 +8,7 @@
  * the venue `withdraw`, and sponsors gas — the MCP never holds a private
  * key for this path.
  *
- * `amount` may be the literal string "max" to withdraw the FULL position.
+ * `amount` may be the literal "max" to withdraw the max currently redeemable (may be < full position under vault caps).
  *
  * SAFETY GATE — mirrors q402_pay: this tool MOVES FUNDS, so it refuses to
  * execute unless `confirm === true`. When `confirm` is missing/false the
@@ -33,7 +33,7 @@ export const YieldWithdrawInputSchema = z.object({
   amount: z
     .string()
     .regex(/^(\d+(\.\d+)?|max)$/, 'amount must be a positive decimal string or "max"')
-    .describe('Human-readable decimal amount to withdraw, e.g. "100.00", or the literal "max" to withdraw the full position.'),
+    .describe('Human-readable decimal amount to withdraw, e.g. "100.00", or "max" to withdraw the maximum currently redeemable (can be less than the full position when the vault caps liquidity).'),
   protocol: z
     .enum(["aave", "morpho", "lista"])
     .optional()
@@ -89,7 +89,7 @@ export const YIELD_WITHDRAW_TOOL = {
   description:
     "WRITE — MOVES FUNDS. Withdraws the Agent Wallet's supplied stablecoin (USDC / USDT) " +
     "out of its Q402 Yield lending position back to the Agent Wallet. Pass amount=\"max\" to " +
-    "withdraw the FULL position. Server-managed Agent Wallet path (Mode C): authenticated by the " +
+    "withdraw the maximum currently redeemable (can be < full position under vault caps). Server-managed Agent Wallet path (Mode C): authenticated by the " +
     "configured live Multichain API key — the server holds the encrypted key, signs the " +
     "withdraw, and sponsors gas. " +
     "CHAINS: 'bnb' (USDC or USDT); 'base' (USDC only). The venue is the chain's curated lending " +
@@ -132,7 +132,7 @@ export const YIELD_WITHDRAW_TOOL = {
         type: "string" as const,
         description:
           'Human-readable decimal amount to withdraw, e.g. "100.00", or the literal "max" ' +
-          "to withdraw the full position.",
+          "to withdraw the maximum currently redeemable (can be < full position under vault liquidity caps).",
       },
       protocol: {
         type: "string" as const,
@@ -240,7 +240,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
 
   // "max" withdraws the full position — phrase the preview accordingly so the
   // user understands the whole balance is leaving the lending venue.
-  const amountDesc = input.amount === "max" ? "the FULL position" : `${input.amount} ${input.token}`;
+  const amountDesc = input.amount === "max" ? "the maximum currently redeemable" : `${input.amount} ${input.token}`;
 
   // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────
   // Requires BOTH confirm:true AND a consentToken bound to the withdrawal
