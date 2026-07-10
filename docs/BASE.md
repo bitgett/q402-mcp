@@ -47,7 +47,7 @@ Per-client setup is in the main [README](../README.md).
 
 ## Traction
 
-About 100,000 settlements and 15,500 MCP downloads across 11 chains in roughly a month. Base is the newest chain.
+About 100,000 settlements and 15,500 MCP downloads across the network in roughly a month. Base was the 11th chain; Q402 now spans 12 (Robinhood Chain is the newest).
 
 ## Links
 - npm: https://www.npmjs.com/package/@quackai/q402-mcp
