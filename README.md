@@ -318,6 +318,7 @@ If you set up Q402 before v0.5.0 you may have a single `Q402_API_KEY` env var. T
 | Scroll | 534352 | USDC, USDT | zkEVM L2 — EIP-7702 live since the Euclid Phase 2 upgrade (2025-04-22). |
 | Arbitrum One | 42161 | USDC, USDT | Optimistic rollup — same EIP-7702 signing path as Ethereum. CCIP bridge endpoint (eth ⇄ avax ⇄ arbitrum). |
 | Base | 8453 | USDC, USDT | OP Stack L2 — same EIP-7702 signing path as Ethereum. Native Circle USDC + bridged Tether USD. |
+| Robinhood Chain | 4663 | **USDG** | Arbitrum Nitro L2 — USDG only (Paxos Global Dollar, 6 decimals). Circle USDC / Tether are not canonical here; gasless USDG payments. |
 
 ---
 
