@@ -1,14 +1,14 @@
 /**
- * q402_clear_delegation — clear an EIP-7702 delegation on a Q402 chain.
+ * q402_clear_delegation - clear an EIP-7702 delegation on a Q402 chain.
  *
  * Three wallet modes, mirroring q402_pay:
  *
- *   - eoa            (Mode A) — sign locally with Q402_PRIVATE_KEY, POST the
+ *   - eoa            (Mode A) - sign locally with Q402_PRIVATE_KEY, POST the
  *                    signed authorization to /api/wallet/clear-delegation
  *                    (the signature IS the auth). Key never leaves the machine.
- *   - agentic-local  (Mode B) — same local-sign path, but with the Agent
+ *   - agentic-local  (Mode B) - same local-sign path, but with the Agent
  *                    Wallet's exported key (Q402_AGENTIC_PRIVATE_KEY).
- *   - agentic-server (Mode C) — NO local key. The MCP only holds a live
+ *   - agentic-server (Mode C) - NO local key. The MCP only holds a live
  *                    apiKey; it POSTs { apiKey, chain, walletId? } to
  *                    /api/wallet/agentic/clear-delegation, where the server
  *                    decrypts the Agent Wallet key and signs the clear. This
@@ -23,7 +23,7 @@
  *
  * Mode resolution: an explicit `walletMode` wins. Otherwise, when exactly one
  * mode is configured it's used; when several are, the tool refuses and asks
- * (AMBIGUOUS_WALLET_MODE) rather than guessing — same contract as q402_pay.
+ * (AMBIGUOUS_WALLET_MODE) rather than guessing - same contract as q402_pay.
  */
 
 import { z } from "zod";
@@ -34,7 +34,7 @@ import { CHAIN_CONFIG, CHAIN_KEYS, type ChainConfig, type ChainKey } from "../ch
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-// Default RPC per chain — mirrors mcp-server/src/client.ts so the
+// Default RPC per chain - mirrors mcp-server/src/client.ts so the
 // nonce lookup uses the same RPC defaults the rest of the package does.
 const DEFAULT_RPC: Record<number, string> = {
   1:      "https://ethereum.publicnode.com",
@@ -77,7 +77,7 @@ export const ClearDelegationInputSchema = z.object({
     .optional()
     .describe(
       "Two-phase consent. LEAVE THIS UNSET on the first call: the tool does " +
-        "NOT broadcast — it returns status=\"needs_confirmation\" with a " +
+        "NOT broadcast - it returns status=\"needs_confirmation\" with a " +
         "human-readable `preview` (including whether Ethereum bills your Gas " +
         "Tank) and a `consentToken`. Relay the preview to the user; only after " +
         "they approve, re-call with the SAME args plus this token. The token is " +
@@ -98,16 +98,16 @@ interface ClearDelegationResult {
   blockNumber?: number;
   gasUsed?:     string;
   explorerUrl?: string;
-  /** True when the post-broadcast eth_getCode returns 0x — confirms the
+  /** True when the post-broadcast eth_getCode returns 0x - confirms the
    *  delegation is actually gone. False (or absent) means the TX confirmed
-   *  but the on-chain state didn't update — likely a stale authorization
+   *  but the on-chain state didn't update - likely a stale authorization
    *  nonce; retry after refreshing the wallet's tx count. */
   cleared?:     boolean;
   /** True when the wallet was already undelegated (no TX needed). */
   alreadyCleared?: boolean;
   /** When ok=false and the mode was ambiguous, the modes the env can drive. */
   availableModes?: string[];
-  /** Set when no matching consentToken was supplied — the clear was NOT
+  /** Set when no matching consentToken was supplied - the clear was NOT
    *  broadcast. The agent must relay `preview` to the user, get a yes, then
    *  re-call with the same args plus `needsConsent.consentToken`. */
   needsConsent?: {
@@ -127,7 +127,7 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
     return { ok: false, error: "INVALID_CHAIN", hint: `Unknown chain: ${input.chain}` };
   }
 
-  // ── Resolve the effective wallet mode (mirror q402_pay's contract) ────
+  // -- Resolve the effective wallet mode (mirror q402_pay's contract) ----
   const modes = detectAgenticModes();
   let mode: "eoa" | "agentic-local" | "agentic-server";
   if (input.walletMode) {
@@ -170,9 +170,9 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
     mode = modes.primary === "A" ? "eoa" : modes.primary === "B" ? "agentic-local" : "agentic-server";
   }
 
-  // ── Mode B (agentic-local) + Ethereum guard ───────────────────────────
+  // -- Mode B (agentic-local) + Ethereum guard ---------------------------
   // eth undelegate is billed to the Agent Wallet OWNER's Gas Tank, but the
-  // local signature-auth endpoint can only see the agent address — it can't
+  // local signature-auth endpoint can only see the agent address - it can't
   // resolve (or bill) the owner. So route eth+Mode-B to the Mode C apiKey path
   // (which bills the owner correctly) instead of letting the user hit an
   // unactionable 402.
@@ -189,10 +189,10 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
     };
   }
 
-  // ── Two-phase consent (token-bound, mirrors q402_pay) ─────────────────
+  // -- Two-phase consent (token-bound, mirrors q402_pay) -----------------
   // Bind the RESOLVED mode + the walletId the tool will actually send, so a
   // preview for one wallet can't execute against another (preview→execute
-  // bait-and-switch). The token is a hash of these fields (not secret) — the
+  // bait-and-switch). The token is a hash of these fields (not secret) - the
   // security is the forced human-visible preview round-trip that a one-shot
   // prompt injection can't skip. No signing/broadcast on the preview path.
   const resolvedWalletId =
@@ -223,7 +223,7 @@ export async function runClearDelegation(input: ClearDelegationInput): Promise<C
             resolvedWalletId
               ? ` (${resolvedWalletId})`
               : mode === "agentic-server"
-                ? " (your DEFAULT Agent Wallet, resolved server-side — pass walletId to target a specific one)"
+                ? " (your DEFAULT Agent Wallet, resolved server-side - pass walletId to target a specific one)"
                 : ""
           }. ` +
           `This sends a real on-chain transaction. ${gasNote} ` +
@@ -250,7 +250,7 @@ function modeUnavailable(mode: string, envHint: string): ClearDelegationResult {
 }
 
 /**
- * Mode A/B — sign the EIP-7702 clear authorization LOCALLY with the given
+ * Mode A/B - sign the EIP-7702 clear authorization LOCALLY with the given
  * private key and POST it to /api/wallet/clear-delegation (signature == auth).
  */
 async function runClearLocal(
@@ -259,7 +259,7 @@ async function runClearLocal(
   mode: "eoa" | "agentic-local",
   signingKey: string,
 ): Promise<ClearDelegationResult> {
-  // ── 1. Derive EOA + read current nonce ────────────────────────────────
+  // -- 1. Derive EOA + read current nonce --------------------------------
   let wallet: Wallet;
   try {
     const provider = new JsonRpcProvider(DEFAULT_RPC[cfg.chainId]);
@@ -285,7 +285,7 @@ async function runClearLocal(
     };
   }
 
-  // ── 2. Sign EIP-7702 authorization (address = 0x0 → clear) ────────────
+  // -- 2. Sign EIP-7702 authorization (address = 0x0 → clear) ------------
   let auth;
   try {
     auth = await wallet.authorize({
@@ -302,7 +302,7 @@ async function runClearLocal(
     };
   }
 
-  // ── 3. POST to Q402 for sponsored broadcast ───────────────────────────
+  // -- 3. POST to Q402 for sponsored broadcast ---------------------------
   const url  = `${CONFIG.relayBaseUrl.replace(/\/$/, "")}/wallet/clear-delegation`;
   const body = {
     chain:   input.chain,
@@ -360,7 +360,7 @@ async function runClearLocal(
       cleared:     payload.cleared ?? false,
       explorerUrl: payload.explorerUrl,
       error:       payload.error ?? `HTTP ${res.status}`,
-      hint:        payload.reason ?? "The sponsored TX did not clear the delegation. If a txHash is present, the broadcast confirmed but the EOA's code is still non-empty (commonly a stale nonce) — refresh and retry.",
+      hint:        payload.reason ?? "The sponsored TX did not clear the delegation. If a txHash is present, the broadcast confirmed but the EOA's code is still non-empty (commonly a stale nonce) - refresh and retry.",
     };
   }
 
@@ -378,7 +378,7 @@ async function runClearLocal(
 }
 
 /**
- * Mode C — server-managed Agent Wallet. No local key: present the live apiKey
+ * Mode C - server-managed Agent Wallet. No local key: present the live apiKey
  * and let the server sign the clear with the encrypted Agent Wallet key.
  */
 async function runClearModeC(
@@ -424,7 +424,7 @@ async function runClearModeC(
   let res: Response;
   let json: unknown;
   try {
-    // 45s — the server signs + mines a sponsored type-0x04 TX; matches the
+    // 45s - the server signs + mines a sponsored type-0x04 TX; matches the
     // route's maxDuration headroom.
     res  = await fetch(url, {
       method:  "POST",
@@ -457,7 +457,7 @@ async function runClearModeC(
     wallets?:       string[];
   };
 
-  // Already undelegated — no TX, treat as success.
+  // Already undelegated - no TX, treat as success.
   if (res.ok && payload.alreadyCleared === true) {
     return {
       ok:             true,
@@ -485,7 +485,7 @@ async function runClearModeC(
         payload.message ??
         (payload.wallets
           ? `You have multiple Agent Wallets (${payload.wallets.join(", ")}). Pass walletId to choose one.`
-          : "The server did not clear the delegation. If a txHash is present, the TX confirmed but the wallet is still delegated (commonly a stale nonce) — retry shortly."),
+          : "The server did not clear the delegation. If a txHash is present, the TX confirmed but the wallet is still delegated (commonly a stale nonce) - retry shortly."),
     };
   }
 

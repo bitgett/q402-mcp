@@ -1,5 +1,5 @@
 /**
- * q402_recurring_resume — resume a paused or stuck recurring-payment rule.
+ * q402_recurring_resume - resume a paused or stuck recurring-payment rule.
  *
  * Mode-C-only (apiKey auth). Brings a rule back to status "active" from
  * paused, paused-by-archive (after the wallet is restored), or
@@ -9,7 +9,7 @@
  * doesn't immediately fire on a stale schedule.
  *
  * Use this when the user says "turn my Friday payout back on", "I
- * upped my per-tx cap, restart the rule", or "I re-subscribed —
+ * upped my per-tx cap, restart the rule", or "I re-subscribed -
  * resume my recurring schedules". List first with q402_recurring_list
  * to find the ruleId.
  *
@@ -24,7 +24,7 @@ export const RecurringResumeInputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      "Rule id to resume. Obtain from q402_recurring_list — each entry's " +
+      "Rule id to resume. Obtain from q402_recurring_list - each entry's " +
         "`ruleId` field. Resume is immediate; nextRunAt advances to the next " +
         "valid slot.",
     ),
@@ -48,7 +48,7 @@ export const RECURRING_RESUME_TOOL = {
     "fired-cap-exceeded → active (after raising the per-tx cap or " +
     "re-subscribing). nextRunAt is advanced to the next valid slot so the " +
     "rule doesn't immediately fire on a stale schedule. Cancelled rules " +
-    "cannot be resumed — re-author via q402_recurring_create. Authenticated " +
+    "cannot be resumed - re-author via q402_recurring_create. Authenticated " +
     "by the paid Multichain API key.",
   inputSchema: {
     type: "object" as const,

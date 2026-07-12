@@ -1,5 +1,5 @@
 /**
- * q402_memory_summary — summarize the agent treasury's activity over a window.
+ * q402_memory_summary - summarize the agent treasury's activity over a window.
  * Read-only; Mode-C, any live API key (free). Hits memory-by-key { action:"summary" }.
  */
 import { z } from "zod";

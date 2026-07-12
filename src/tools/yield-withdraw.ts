@@ -1,16 +1,16 @@
 /**
- * q402_yield_withdraw — WRITE / MOVES FUNDS. Withdraws the Agent Wallet's
+ * q402_yield_withdraw - WRITE / MOVES FUNDS. Withdraws the Agent Wallet's
  * supplied stablecoin out of a curated lending venue (Q402 Yield) back to the Agent Wallet.
  *
  * Server-mediated (Mode C): authenticated by the live Multichain API key
  * sent in the JSON BODY, matching how the agentic pay/send path
  * authenticates. The server holds the Agent Wallet's encrypted key, signs
- * the venue `withdraw`, and sponsors gas — the MCP never holds a private
+ * the venue `withdraw`, and sponsors gas - the MCP never holds a private
  * key for this path.
  *
  * `amount` may be the literal "max" to withdraw the max currently redeemable (may be < full position under vault caps).
  *
- * SAFETY GATE — mirrors q402_pay: this tool MOVES FUNDS, so it refuses to
+ * SAFETY GATE - mirrors q402_pay: this tool MOVES FUNDS, so it refuses to
  * execute unless `confirm === true`. When `confirm` is missing/false the
  * tool does NOT call the endpoint; it returns (NOT an error) a one-line
  * description of exactly what will happen and asks the agent to re-call
@@ -41,7 +41,7 @@ export const YieldWithdrawInputSchema = z.object({
       "Venue to withdraw from when the wallet holds the SAME token in more than one lending " +
         "venue on a chain (e.g. a legacy Aave position AND a Lista position on bnb). Omit when " +
         'unambiguous. If the server replies error="AMBIGUOUS_POSITION" it lists the venues in ' +
-        "`protocols` — re-call with one of those values here.",
+        "`protocols` - re-call with one of those values here.",
     ),
   walletId: z
     .string()
@@ -61,7 +61,7 @@ export const YieldWithdrawInputSchema = z.object({
         "replayed). Pass your own STABLE key only when you want retry-safety: re-calling " +
         "with the same key replays the first result instead of double-withdrawing. " +
         'IMPORTANT: if a call returns status="uncertain" (timeout / unconfirmed ' +
-        "broadcast), it echoes back the idempotencyKey it used — pass THAT exact value " +
+        "broadcast), it echoes back the idempotencyKey it used - pass THAT exact value " +
         "here to safely resume the same withdrawal instead of starting a new one.",
     ),
   confirm: z
@@ -87,29 +87,29 @@ export const YieldWithdrawInputSchema = z.object({
 export const YIELD_WITHDRAW_TOOL = {
   name: "q402_yield_withdraw",
   description:
-    "WRITE — MOVES FUNDS. Withdraws the Agent Wallet's supplied stablecoin (USDC / USDT) " +
+    "WRITE - MOVES FUNDS. Withdraws the Agent Wallet's supplied stablecoin (USDC / USDT) " +
     "out of its Q402 Yield lending position back to the Agent Wallet. Pass amount=\"max\" to " +
     "withdraw the maximum currently redeemable (can be < full position under vault caps). Server-managed Agent Wallet path (Mode C): authenticated by the " +
-    "configured live Multichain API key — the server holds the encrypted key, signs the " +
+    "configured live Multichain API key - the server holds the encrypted key, signs the " +
     "withdraw, and sponsors gas. " +
     "CHAINS: 'bnb' (USDC or USDT); 'base' (USDC only). The venue is the chain's curated lending " +
     "market and is reported in the receipt. " +
     "Other chains are not yet available. " +
     "\n\n" +
-    "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
+    "REQUIRES CONFIRMATION - like q402_pay, this tool refuses to execute unless " +
     "`confirm: true` is set. Call it FIRST without confirm to get a one-line preview of " +
     "exactly what will happen (amount, token, chain, wallet); show that to the user, get " +
     "explicit approval, THEN re-call with confirm:true. Never set confirm:true on the " +
     "user's behalf without that approval. " +
     "\n\n" +
-    "SANDBOX BY DEFAULT — like q402_pay, no funds move unless a live Multichain key " +
+    "SANDBOX BY DEFAULT - like q402_pay, no funds move unless a live Multichain key " +
     "(q402_live_*) is configured AND Q402_ENABLE_REAL_PAYMENTS=1. Without both, " +
-    "confirm:true returns a sandbox preview (no on-chain withdraw) with a setup hint — " +
+    "confirm:true returns a sandbox preview (no on-chain withdraw) with a setup hint - " +
     "confirm:true alone does NOT move real funds. " +
     "\n\n" +
-    "RETRY SAFETY — on a timeout or an unconfirmed broadcast the tool returns " +
+    "RETRY SAFETY - on a timeout or an unconfirmed broadcast the tool returns " +
     'status="uncertain" and echoes back the idempotencyKey it used. The withdrawal MAY ' +
-    "have settled, so do NOT blindly call again — that starts a NEW withdrawal and can " +
+    "have settled, so do NOT blindly call again - that starts a NEW withdrawal and can " +
     "double-withdraw. To resume the SAME operation, re-call with idempotencyKey set to " +
     "the echoed value; the server dedupes on it and replays the original result. " +
     "\n\n" +
@@ -154,15 +154,15 @@ export const YIELD_WITHDRAW_TOOL = {
         description:
           "Optional durable idempotency key. Omit and the tool generates a FRESH random " +
           "key per invocation, so every call executes a distinct withdrawal. Pass your own " +
-          "STABLE key only for opt-in retry-safety — re-calling with the same key replays " +
+          "STABLE key only for opt-in retry-safety - re-calling with the same key replays " +
           "the first result instead of double-withdrawing. If a call returns " +
-          'status="uncertain", it echoes the idempotencyKey it used — pass that exact ' +
+          'status="uncertain", it echoes the idempotencyKey it used - pass that exact ' +
           "value back here to resume the same withdrawal rather than start a new one.",
       },
       confirm: {
         type: "boolean" as const,
         description:
-          "MUST be true to actually withdraw funds — set only after the user explicitly " +
+          "MUST be true to actually withdraw funds - set only after the user explicitly " +
           "approved this exact withdrawal in chat. Omit (or false) to preview without moving funds.",
       },
       consentToken: {
@@ -189,14 +189,14 @@ interface WithdrawData {
   txHash?: string;
   error?: string;
   message?: string;
-  /** Set on a 409 AMBIGUOUS_POSITION — the venues holding this token on the chain;
+  /** Set on a 409 AMBIGUOUS_POSITION - the venues holding this token on the chain;
    *  re-call with `protocol` set to one of them. */
   protocols?: string[];
 }
 
 export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputSchema>) {
   // Strictly-positive amount (unless the literal "max"). The schema regex
-  // accepts "0" / "0.0" — a zero withdraw is a no-op gas burn, so reject it.
+  // accepts "0" / "0.0" - a zero withdraw is a no-op gas burn, so reject it.
   if (input.amount !== "max" && !(Number(input.amount) > 0)) {
     return {
       content: [{
@@ -242,7 +242,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
   // queues can leave below the full position; phrase the preview accordingly.
   const amountDesc = input.amount === "max" ? "the maximum currently redeemable" : `${input.amount} ${input.token}`;
 
-  // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────
+  // -- Two-phase consent gate - MOVES FUNDS --------------------------------
   // Requires BOTH confirm:true AND a consentToken bound to the withdrawal
   // intent, so confirm:true alone can't move funds and the previewed params
   // are the ones that execute.
@@ -292,7 +292,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
     };
   }
 
-  // ── Real-payments gate — mirrors q402_pay's Mode C path ──────────────────
+  // -- Real-payments gate - mirrors q402_pay's Mode C path ------------------
   // A live key + confirm:true is NOT enough to move real funds. Like
   // q402_pay, this server-mediated write also requires Q402_ENABLE_REAL_PAYMENTS=1.
   // Without it we return a sandbox preview (no /api call, no on-chain withdraw)
@@ -311,7 +311,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
           amount: input.amount,
           walletId: walletId ?? null,
           setupHint:
-            "Sandbox mode — set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real Q402 Yield " +
+            "Sandbox mode - set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real Q402 Yield " +
             "withdrawal. No funds moved.",
         }, null, 2),
       }],
@@ -320,7 +320,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
 
   let res: Response;
   try {
-    // 60s timeout — the route signs + withdraws + settles synchronously (same
+    // 60s timeout - the route signs + withdraws + settles synchronously (same
     // posture as the Mode C send path). Fail fast on a stuck Vercel cold-start
     // rather than hang the MCP client.
     res = await fetch(`${CONFIG.relayBaseUrl}/wallet/agentic/yield/withdraw`, {
@@ -338,10 +338,10 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
       signal: AbortSignal.timeout(60_000),
     });
   } catch (e) {
-    // NETWORK-UNCERTAIN — the request may or may not have reached the server
+    // NETWORK-UNCERTAIN - the request may or may not have reached the server
     // (timeout, dropped socket, cold-start). The withdrawal could already be
     // in flight or settled. We MUST NOT let the caller retry with a fresh
-    // random key — that would be a NEW withdrawal (double-withdraw, e.g. two
+    // random key - that would be a NEW withdrawal (double-withdraw, e.g. two
     // `withdraw max`). Surface THIS call's idempotencyKey so a retry passing
     // it back resumes the SAME logical withdrawal (the server dedupes on it)
     // instead of starting another.
@@ -358,7 +358,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
           idempotencyKey,
           error: e instanceof Error ? e.message : String(e),
           message:
-            "Network error before a confirmed response — the withdrawal may or may not " +
+            "Network error before a confirmed response - the withdrawal may or may not " +
             "have been submitted. Do NOT start a new withdrawal. To safely resume THIS " +
             `operation, retry with idempotencyKey="${idempotencyKey}" (the server dedupes ` +
             "on it, so a retry that already landed replays the original result instead of " +
@@ -371,11 +371,11 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
 
   const data = (await res.json().catch(() => ({}))) as WithdrawData;
   if (!res.ok) {
-    // 502 settlement_uncertain — the tx was broadcast but the receipt is
+    // 502 settlement_uncertain - the tx was broadcast but the receipt is
     // unconfirmed; the funds MAY have moved. Same rule as the network-error
     // path: a retry must reuse THIS idempotencyKey, never a fresh one, or it
     // risks a second on-chain withdrawal. Surface the key + the no-blind-retry
-    // guidance. (Other non-2xx codes — 402/403/409/429/503 — are clean
+    // guidance. (Other non-2xx codes - 402/403/409/429/503 - are clean
     // pre-settlement rejections where no funds moved; the server already
     // explains them, so we pass the body through unchanged.)
     if (res.status === 502) {
@@ -393,7 +393,7 @@ export async function runYieldWithdraw(input: z.infer<typeof YieldWithdrawInputS
             txHash: data.txHash ?? null,
             error: data.error ?? "settlement_uncertain",
             message:
-              "Broadcast but unconfirmed — the withdrawal may have settled on-chain. Do NOT " +
+              "Broadcast but unconfirmed - the withdrawal may have settled on-chain. Do NOT " +
               "blindly start a new withdrawal. Verify on-chain first; if you must retry, reuse " +
               `idempotencyKey="${idempotencyKey}" so the server resumes THIS operation ` +
               "(replays the original result) instead of withdrawing again.",

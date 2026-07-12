@@ -1,7 +1,7 @@
 /**
  * Shared caller for the Q402 Memory tools (summary / vendor / agent).
  * Read-only + free: ANY live Q402 API key (Trial or Multichain) authenticates
- * the read — Memory is not a paid-only feature. It only ever returns the key
+ * the read - Memory is not a paid-only feature. It only ever returns the key
  * owner's own treasury data. Hits POST /api/wallet/agentic/memory-by-key. No
  * private key, no gas, no money moved.
  */
@@ -17,7 +17,7 @@ export async function callMemory(
 ): Promise<Record<string, unknown>> {
   const url = dashboardUrl();
 
-  // Any live key works (Trial or Multichain) — Memory is free + read-only.
+  // Any live key works (Trial or Multichain) - Memory is free + read-only.
   if (!CONFIG.apiKey || !CONFIG.apiKey.startsWith("q402_live_")) {
     return { configured: false, dashboardUrl: url, setupHint: "No live Q402 API key configured. Run q402_doctor to set one up (a free Trial key works)." };
   }
@@ -30,7 +30,7 @@ export async function callMemory(
     });
     if (!res.ok) {
       const e = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-      return { configured: true, dashboardUrl: url, setupHint: `memory ${action} failed: ${e.error ?? `HTTP ${res.status}`}${e.message ? ` — ${e.message}` : ""}` };
+      return { configured: true, dashboardUrl: url, setupHint: `memory ${action} failed: ${e.error ?? `HTTP ${res.status}`}${e.message ? ` - ${e.message}` : ""}` };
     }
     return { configured: true, dashboardUrl: url, ...((await res.json()) as Record<string, unknown>) };
   } catch (e) {

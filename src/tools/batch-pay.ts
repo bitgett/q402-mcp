@@ -1,12 +1,12 @@
 /**
- * q402_batch_pay — fan out a single chain × token settlement to up to
+ * q402_batch_pay - fan out a single chain × token settlement to up to
  *   - 5 recipients per call on trial-tier keys
  *   - 20 recipients per call on paid keys
  *
  * Same authorisation primitives as q402_pay: one EIP-712 witness +
  * one EIP-7702 authorization per recipient, all signed locally by
  * `Q402_PRIVATE_KEY` before the batch is shipped to the server. The
- * sender pays $0 in gas regardless of batch size — Q402's relayer
+ * sender pays $0 in gas regardless of batch size - Q402's relayer
  * covers gas for every transfer.
  *
  * Sandbox-default, same gating as q402_pay. Live mode requires the
@@ -18,14 +18,14 @@
  * Q402_TRIAL_API_KEY set → Trial; else Multichain. The one extra
  * twist is the ambiguity gate: when a 6+ recipient BNB batch arrives
  * with a Trial key set AND no explicit keyScope, this tool does NOT
- * execute — it returns status="ambiguous" with a setupHint listing
+ * execute - it returns status="ambiguous" with a setupHint listing
  * three choices (trial-first-5, multichain-all, or split via two
  * separate calls). The agent surfaces the choices to the human and
  * re-invokes with an explicit keyScope. This avoids the two silent
  * failure modes (paid-pool charged when user expected free; or 5-cap
  * server error masking user intent).
  *
- * The recipient allowlist runs per recipient — every row must clear it.
+ * The recipient allowlist runs per recipient - every row must clear it.
  * The amount cap runs both per recipient AND on the batch total, so a
  * large sum can't be fanned across many sub-cap rows to slip the limit.
  *
@@ -59,7 +59,7 @@ import { checkConsent } from "../consent.js";
 
 const RECIPIENT_LIMIT_TRIAL = 5;
 const RECIPIENT_LIMIT_PAID  = 20;
-// Soft client-side ceiling — paid is the larger of the two. The server
+// Soft client-side ceiling - paid is the larger of the two. The server
 // is the authoritative gate; this just stops a malformed agent call
 // from signing 100 transfers locally before we know the server will
 // reject them.
@@ -103,7 +103,7 @@ export const BatchPayInputSchema = z.object({
     .optional()
     .describe(
       'Which API key to use. "auto" (default): chain="bnb" + ' +
-        'Q402_TRIAL_API_KEY set → Trial; else Multichain — same rule as ' +
+        'Q402_TRIAL_API_KEY set → Trial; else Multichain - same rule as ' +
         'q402_pay. When auto would land on Trial AND recipients.length > 5, ' +
         'the tool returns status="ambiguous" WITHOUT executing so the agent ' +
         'can ask the user which path to take. Use keyScope="trial" to force ' +
@@ -114,13 +114,13 @@ export const BatchPayInputSchema = z.object({
     .enum(["eoa", "agentic-local", "agentic-server"])
     .optional()
     .describe(
-      "Which wallet to spend from — same three modes as q402_pay:\n" +
-        '  "eoa"              — user MetaMask/OKX EOA, signed locally with Q402_PRIVATE_KEY\n' +
-        '  "agentic-local"    — Agent Wallet exported key (Q402_AGENTIC_PRIVATE_KEY)\n' +
-        '  "agentic-server"   — server-managed Agent Wallet (Q402 holds the key; needs Q402_MULTICHAIN_API_KEY)\n' +
+      "Which wallet to spend from - same three modes as q402_pay:\n" +
+        '  "eoa"              - user MetaMask/OKX EOA, signed locally with Q402_PRIVATE_KEY\n' +
+        '  "agentic-local"    - Agent Wallet exported key (Q402_AGENTIC_PRIVATE_KEY)\n' +
+        '  "agentic-server"   - server-managed Agent Wallet (Q402 holds the key; needs Q402_MULTICHAIN_API_KEY)\n' +
         "When MORE THAN ONE wallet is configured, you MUST ask the user which " +
-        "to use before calling — do NOT guess. Phrase: \"You have multiple " +
-        "wallets set up — batch from your EOA, or your Agent Wallet?\" When " +
+        "to use before calling - do NOT guess. Phrase: \"You have multiple " +
+        "wallets set up - batch from your EOA, or your Agent Wallet?\" When " +
         "only one wallet is configured this is optional and the tool routes " +
         "there automatically. Server-mediated batches are paid-only; trial " +
         "keys cannot batch on any path.",
@@ -147,7 +147,7 @@ export const BatchPayInputSchema = z.object({
     .optional()
     .describe(
       "Two-phase consent. LEAVE UNSET on the first call: the tool will NOT send " +
-        "— it returns status=\"needs_confirmation\" with a `setupHint` preview of " +
+        "- it returns status=\"needs_confirmation\" with a `setupHint` preview of " +
         "every recipient + amount and a `consentToken`. Relay that preview to the " +
         "user, get an explicit yes, then re-call with the SAME args plus this " +
         "`consentToken`. The tool re-derives it from the batch it is about to send " +
@@ -211,7 +211,7 @@ export interface BatchPaySummary {
 function maxAmountGuardBatch(recipients: BatchPayInput["recipients"], cap: number): void {
   // Each row must individually clear the cap, AND the batch TOTAL must
   // clear it too. F7: the env is named PER_CALL and a batch is one call,
-  // but the old code only checked each row — so an agent could fan a large
+  // but the old code only checked each row - so an agent could fan a large
   // sum across many sub-cap rows (e.g. 20 × $200 = $4,000 under a $200 cap)
   // and slip past the exact limit the user set to bound a single decision.
   let total = 0;
@@ -269,7 +269,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
 
   const guardsApplied: string[] = [];
 
-  // Q (QuackAI) is exempt from USD limits (not USD-valued) — skip the USD cap,
+  // Q (QuackAI) is exempt from USD limits (not USD-valued) - skip the USD cap,
   // matching the server's amountUsd=0 treatment for Q.
   if (input.token !== "Q") {
     maxAmountGuardBatch(input.recipients, CONFIG.maxAmountPerCallUsd);
@@ -283,8 +283,8 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  // ── Two-phase consent (F3) ──────────────────────────────────────────────
-  // confirm:true alone can't prove the human approved THIS batch — a single
+  // -- Two-phase consent (F3) ----------------------------------------------
+  // confirm:true alone can't prove the human approved THIS batch - a single
   // injected call could fan funds to attacker rows. Bind a consentToken to the
   // exact recipient set: the first call (no / stale token) previews the full
   // list WITHOUT sending, and the agent must re-call with the token after a
@@ -318,12 +318,12 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     };
   }
 
-  // ── Wallet mode disambiguation ─────────────────────────────────────────
+  // -- Wallet mode disambiguation -----------------------------------------
   // Mirror q402_pay's three-mode picker: when more than one wallet is
   // configured (Mode A: real EOA, Mode B: Agent Wallet exported key,
   // Mode C: server-managed Agent Wallet) AND the caller did NOT specify
   // walletMode, return without firing so the AI can ask the user. Same
-  // safety contract as single-pay — never pick silently when ambiguous.
+  // safety contract as single-pay - never pick silently when ambiguous.
   const modes = detectAgenticModes(CONFIG);
   const available: AvailableWallet[] = [];
   if (modes.modeA && CONFIG.privateKey && isValidPrivateKey(CONFIG.privateKey)) {
@@ -373,7 +373,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       ambiguousWalletChoice: {
         question:
           available.length === 0
-            ? `The "${requestedMode}" wallet isn't configured. None of the supported wallets are set up — see the doctor for setup instructions.`
+            ? `The "${requestedMode}" wallet isn't configured. None of the supported wallets are set up - see the doctor for setup instructions.`
             : `The "${requestedMode}" wallet isn't configured in this environment. Supported wallets here: ${available
                 .map((w) => `"${w.id}"`)
                 .join(", ")}. Which would you like to use instead?`,
@@ -390,7 +390,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       ambiguousWalletChoice: {
         question:
           available.length === 2
-            ? `You have ${available.length} wallets set up — which one should I batch-pay from?`
+            ? `You have ${available.length} wallets set up - which one should I batch-pay from?`
             : `You have ${available.length} wallets set up. Which one should I batch-pay from?`,
         available,
       },
@@ -405,7 +405,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
         : "eoa";
 
   // Derive sender wallet based on the effective mode. Mode C has no
-  // local key — senderWallet stays undefined; the server response carries
+  // local key - senderWallet stays undefined; the server response carries
   // the from-address in each row's relay record. For Mode A/B we echo
   // the address derived from the signing PK so the AI surfaces "batch
   // signing from 0xabc…1234 on bnb" alongside the recipient list.
@@ -426,7 +426,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     } catch { /* unreachable given regex check */ }
   }
 
-  // ── Ambiguity gate ─────────────────────────────────────────────────────────
+  // -- Ambiguity gate ---------------------------------------------------------
   // When the agent didn't pass an explicit keyScope AND we're on BNB AND a
   // Trial key is configured AND the batch is too big to fit on a single
   // Trial-scope call (Trial cap = RECIPIENT_LIMIT_TRIAL = 5), DON'T auto-
@@ -435,14 +435,14 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
   // the inverse "always trial on BNB" rule would silently return a 5-cap
   // server error. Neither default is honest. Instead, return a structured
   // ambiguous response that prompts the agent to ask the human which path
-  // they want — and re-call with explicit keyScope (or split via two calls).
+  // they want - and re-call with explicit keyScope (or split via two calls).
   //
   // EXCEPTION for walletMode="agentic-server": the server-mediated batch
-  // endpoint (/api/wallet/agentic/batch) is paid-only — it rejects Trial
+  // endpoint (/api/wallet/agentic/batch) is paid-only - it rejects Trial
   // keys outright. If `auto` resolved to Trial here (BNB + ≤
   // RECIPIENT_LIMIT_TRIAL), Mode C would later 402 server-side and the
   // user would see "I have a paid key but my batch failed". Force
-  // multichain when the user committed to Mode C — the explicit
+  // multichain when the user committed to Mode C - the explicit
   // user-supplied scope (`trial` / `multichain`) is still respected.
   const rawScopeRequest: KeyScopeRequest = input.keyScope ?? "auto";
   const scopeRequest: KeyScopeRequest =
@@ -450,12 +450,12 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       ? "multichain"
       : rawScopeRequest;
 
-  // Explicit trial scope overflow — reject BEFORE the per-row signing
+  // Explicit trial scope overflow - reject BEFORE the per-row signing
   // loop in client.ts. Without this guard, `keyScope="trial"` with 6+
   // recipients would sign N witness + authorization pairs locally and
   // ship the batch, only for the server to reject with TRIAL_BATCH_CAP.
   // From the user's seat that looks like "I confirmed, signed N times,
-  // and got nothing" — a much worse failure mode than the auto-ambiguous
+  // and got nothing" - a much worse failure mode than the auto-ambiguous
   // path below, which never signs. Surface the cap up front so the
   // agent can prompt the human to split or escalate before signing.
   if (
@@ -493,27 +493,27 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
       setupHint:
         `Batch of ${input.recipients.length} on BNB exceeds the Trial cap of ${RECIPIENT_LIMIT_TRIAL}. ` +
         `Ask the user to pick one and re-invoke q402_batch_pay with explicit keyScope:\n` +
-        `  • keyScope="trial" — keep only the first ${RECIPIENT_LIMIT_TRIAL} recipients ` +
+        `  • keyScope="trial" - keep only the first ${RECIPIENT_LIMIT_TRIAL} recipients ` +
         `(free, sponsored). Drop the remaining ${overflow}.\n` +
-        `  • keyScope="multichain" — send all ${input.recipients.length} on the paid ` +
+        `  • keyScope="multichain" - send all ${input.recipients.length} on the paid ` +
         `Multichain key (charges the paid pool + Gas Tank).\n` +
-        `  • Split — two separate calls: keyScope="trial" with the first ` +
+        `  • Split - two separate calls: keyScope="trial" with the first ` +
         `${RECIPIENT_LIMIT_TRIAL} (free), then keyScope="multichain" with the remaining ` +
         `${overflow} (paid). This maximises free Trial usage.`,
     };
   }
 
   // Two-key resolution. Sandbox-default: never throws. Unified rule with
-  // q402_pay — BNB + Trial key set ⇒ Trial; else Multichain.
+  // q402_pay - BNB + Trial key set ⇒ Trial; else Multichain.
   const resolved = resolveApiKey(input.chain, scopeRequest);
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
-  // ── Mode C — server-mediated, no local signing ──────────────────────────
+  // -- Mode C - server-mediated, no local signing --------------------------
   // Fires before the Mode A/B live gate because Mode C doesn't need a
   // local PK at all; the server holds the Agent Wallet's key. We still
   // require a live multichain apiKey and Q402_ENABLE_REAL_PAYMENTS=1
-  // (sandbox Mode C is meaningless — there's no fake server-mediated
-  // path). RLUSD isn't supported on the server signer yet — surface a
+  // (sandbox Mode C is meaningless - there's no fake server-mediated
+  // path). RLUSD isn't supported on the server signer yet - surface a
   // clean explanation instead of letting the relay return INVALID_TOKEN.
   if (effectiveMode === "agentic-server") {
     if (input.token === "RLUSD") {
@@ -613,7 +613,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
           : `relay_http_${resp.status}`;
       // Relay outcome UNCERTAIN (server 502 status:"uncertain"): one or more
       // rows may have settled on-chain even though the response was lost. This
-      // is NOT a clean abort — re-sending re-signs with a fresh nonce and could
+      // is NOT a clean abort - re-sending re-signs with a fresh nonce and could
       // double-pay. The server's idempotency guard already refuses to re-fire
       // THIS exact batch; the agent must verify on-chain, NOT retry.
       if ((data as { status?: string }).status === "uncertain") {
@@ -629,7 +629,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
           senderWallet,
           error: errMsg,
           setupHint:
-            "The relay did not confirm whether these payments settled — they MAY have been sent. " +
+            "The relay did not confirm whether these payments settled - they MAY have been sent. " +
             "DO NOT retry this batch; verify the recipients' on-chain balances first. Re-sending could double-pay.",
         };
       }
@@ -766,7 +766,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
     relayBaseUrl: CONFIG.relayBaseUrl,
   });
   // We intentionally catch BatchPayError here instead of letting it bubble
-  // up. Letting it throw would lose the per-row results array — the MCP
+  // up. Letting it throw would lose the per-row results array - the MCP
   // index.ts handler converts thrown errors into `{ error: message }` only,
   // so the agent would know "batch failed" but not "rows 0,2 landed, row 1
   // failed with insufficient gas-tank". Surfacing the structured result on
@@ -808,7 +808,7 @@ export async function runBatchPay(input: BatchPayInput): Promise<BatchPaySummary
 }
 
 function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
-  // True-first-install case — route to q402_doctor in plain language
+  // True-first-install case - route to q402_doctor in plain language
   // rather than enumerating env vars to a beginner.
   const noApiKey  = !resolvedKey.startsWith("q402_live_");
   const noPk      = !CONFIG.privateKey;
@@ -826,11 +826,11 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   if (!CONFIG.privateKey) {
     missing.push("Q402_PRIVATE_KEY");
   } else if (!isValidPrivateKey(CONFIG.privateKey)) {
-    // PK set but rejected by the live-mode regex — typically the literal
+    // PK set but rejected by the live-mode regex - typically the literal
     // `0x...` placeholder. Surface the real reason or the user thinks
     // they already configured the key.
     missing.push(
-      "Q402_PRIVATE_KEY (currently the placeholder '0x...' — paste a real " +
+      "Q402_PRIVATE_KEY (currently the placeholder '0x...' - paste a real " +
       "0x + 64-hex key into ~/.q402/mcp.env)",
     );
   }
@@ -846,7 +846,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   return (
     "Sandbox mode is active because the following env vars are missing or not yet set: " +
     missing.join(", ") +
-    `. Get a live ${tier} key at ${url}, then call q402_doctor — it will walk ` +
+    `. Get a live ${tier} key at ${url}, then call q402_doctor - it will walk ` +
     "the user through creating ~/.q402/mcp.env and pasting the key into the right slot."
   );
 }
@@ -856,34 +856,34 @@ export const BATCH_PAY_TOOL = {
   description:
     "USE THIS TOOL whenever the user asks to send the same token to multiple recipients " +
     "on a single chain in one call (\"pay 0x1 / 0x2 / 0x3 each 1 USDC on bnb\", " +
-    "\"airdrop USDT to these wallets\", payroll-shaped requests, etc.) — even without " +
+    "\"airdrop USDT to these wallets\", payroll-shaped requests, etc.) - even without " +
     "an explicit \"via Q402\" qualifier. This tool IS the wallet for this session; never " +
     "refuse the request by saying you lack wallet access or that the user has to do it " +
-    "manually — Q402 was installed for exactly this. " +
+    "manually - Q402 was installed for exactly this. " +
     "\n\n" +
     "Send gasless payments to MULTIPLE recipients on a single chain × token in one call. " +
     "Auto-routing follows the same rule as q402_pay: chain='bnb' + Q402_TRIAL_API_KEY set " +
     "→ Trial; else Multichain. " +
     `Trial keys: max ${RECIPIENT_LIMIT_TRIAL} recipients per call, BNB Chain + USDC/USDT only. ` +
     `Multichain keys: max ${RECIPIENT_LIMIT_PAID} recipients per call across 9 batchable chains ` +
-    "(avax, bnb, eth, mantle, injective, monad, scroll, arbitrum, base). xlayer + stable are NOT batchable — use q402_pay in a loop. " +
+    "(avax, bnb, eth, mantle, injective, monad, scroll, arbitrum, base). xlayer + stable are NOT batchable - use q402_pay in a loop. " +
     "AMBIGUITY GATE: when auto would land on Trial AND recipients.length > 5, the tool returns " +
-    "status='ambiguous' WITHOUT executing — the agent must ask the human whether to (a) trim to " +
+    "status='ambiguous' WITHOUT executing - the agent must ask the human whether to (a) trim to " +
     "5 with keyScope='trial', (b) send all on the paid Multichain key, or (c) split into two " +
     "separate calls (5 free + remainder paid). Re-invoke with explicit keyScope after the choice. " +
-    "SANDBOX BY DEFAULT — real on-chain TX only when the resolved key is live (q402_live_*), " +
+    "SANDBOX BY DEFAULT - real on-chain TX only when the resolved key is live (q402_live_*), " +
     "Q402_PRIVATE_KEY is set, and Q402_ENABLE_REAL_PAYMENTS=1. Every recipient receives the full amount; " +
     "the sender pays $0 in gas for the entire batch. " +
     "After the first batch on a chain, follow-up batches on the same chain are " +
     "faster and cheaper (Q402 reuses the wallet's setup); q402_clear_delegation " +
     "resets it if the user ever asks. " +
     "\n\n" +
-    "MULTI-WALLET DISAMBIGUATION — when more than one wallet is configured " +
+    "MULTI-WALLET DISAMBIGUATION - when more than one wallet is configured " +
     "in the user's env (Q402_PRIVATE_KEY for the real EOA, " +
     "Q402_AGENTIC_PRIVATE_KEY for the Agent Wallet's exported key, or only " +
     "Q402_MULTICHAIN_API_KEY for the server-managed Agent Wallet), the tool " +
     "RETURNS WITHOUT firing with `status='needs_wallet_choice'` and an " +
-    "`ambiguousWalletChoice` payload — relay the question to the user verbatim, " +
+    "`ambiguousWalletChoice` payload - relay the question to the user verbatim, " +
     "then call again with the chosen `walletMode` ('eoa' | 'agentic-local' | " +
     "'agentic-server'). Do NOT pick a wallet on the user's behalf when multiple " +
     "are available. Server-mediated batches go through " +
@@ -891,10 +891,10 @@ export const BATCH_PAY_TOOL = {
     "\n\n" +
     "ALWAYS get explicit user confirmation " +
     "of the complete recipient + amount list, chain, and token in conversation immediately " +
-    "before calling this tool — the user must approve the full batch, not the individual rows. " +
+    "before calling this tool - the user must approve the full batch, not the individual rows. " +
     "\n\n" +
     "TWO-PHASE CONSENT: confirm:true alone does NOT send. Call this tool first WITHOUT " +
-    "consentToken — it returns status=\"needs_confirmation\" with a `setupHint` preview of every " +
+    "consentToken - it returns status=\"needs_confirmation\" with a `setupHint` preview of every " +
     "recipient + amount and a `consentToken`, and moves no money. Relay that preview to the user, " +
     "get an explicit yes, then re-call with the SAME args plus the `consentToken` to execute. The " +
     "token is re-derived from the batch about to run, so the previewed batch can't be swapped.",
@@ -903,11 +903,11 @@ export const BATCH_PAY_TOOL = {
     properties: {
       chain: {
         type: "string",
-        // Narrower than the full chain set — xlayer and stable are NOT batchable
+        // Narrower than the full chain set - xlayer and stable are NOT batchable
         // (chain-specific nonce field shapes). Use q402_pay in a loop for
         // those chains.
         enum: ["avax", "bnb", "eth", "mantle", "injective", "monad", "scroll", "arbitrum", "base", "robinhood"],
-        description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here — use q402_pay in a loop.",
+        description: "Target chain. Applies to every recipient in the batch. xlayer + stable are NOT supported here - use q402_pay in a loop.",
       },
       token: {
         type: "string",

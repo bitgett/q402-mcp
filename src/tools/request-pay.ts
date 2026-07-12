@@ -1,11 +1,11 @@
 /**
- * q402_request_pay — pay a Q402 payment request from your own Agent Wallet.
+ * q402_request_pay - pay a Q402 payment request from your own Agent Wallet.
  *
  * Mode-C (apiKey) gasless settlement: the server signs from the payer's
  * encrypted Agent Wallet key and relays for $0 gas. recipient / amount /
  * chain / token come from the stored request (the payer can't redirect or
  * change the sum). MOVES FUNDS, so it gates on confirm:true plus a live key
- * and Q402_ENABLE_REAL_PAYMENTS=1 — identical safety to q402_pay. The same
+ * and Q402_ENABLE_REAL_PAYMENTS=1 - identical safety to q402_pay. The same
  * Q402_MAX_AMOUNT_PER_CALL + Q402_ALLOWED_RECIPIENTS rails apply.
  *
  * Flow: GET /api/request/{id} to resolve the terms, then
@@ -68,7 +68,7 @@ export interface RequestPayResult {
   error?: string;
   message?: string;
   setupHint?: string;
-  /** Set when called without a valid consentToken — the AI must relay the
+  /** Set when called without a valid consentToken - the AI must relay the
    *  preview to the user and re-call with the same args + this consentToken.
    *  No funds moved. */
   needsConsent?: { status: "needs_confirmation"; preview: string; consentToken: string };
@@ -93,7 +93,7 @@ export async function runRequestPay(input: RequestPayInput): Promise<RequestPayR
   const terms = { amount: req.amount, token: req.token, chain: req.chain, recipient: req.recipient };
 
   if (req.status !== "open") {
-    return { ok: false, status: "not_payable", requestId: req.id, txHash: null, receiptId: null, ...terms, error: req.status.toUpperCase(), message: `Request is ${req.status} — nothing to pay.` };
+    return { ok: false, status: "not_payable", requestId: req.id, txHash: null, receiptId: null, ...terms, error: req.status.toUpperCase(), message: `Request is ${req.status} - nothing to pay.` };
   }
 
   // 2. Client-side rails (same as q402_pay / q402_request_create).
@@ -105,7 +105,7 @@ export async function runRequestPay(input: RequestPayInput): Promise<RequestPayR
     return { ok: false, status: "not_payable", requestId: req.id, txHash: null, receiptId: null, ...terms, error: "RECIPIENT_NOT_ALLOWED", message: `Recipient ${req.recipient} is not in Q402_ALLOWED_RECIPIENTS.` };
   }
 
-  // 2.5 Two-phase consent — identical to q402_pay. A first call without a valid
+  // 2.5 Two-phase consent - identical to q402_pay. A first call without a valid
   // consentToken moves NO money: it returns a preview + token the agent must
   // relay to the user and echo back. Defeats one-shot prompt-injected pays.
   const consentIntent = {
@@ -115,7 +115,7 @@ export async function runRequestPay(input: RequestPayInput): Promise<RequestPayR
     amount: req.amount,
     token: req.token,
     chain: req.chain,
-    // Bind the funding source too — the user is consenting to pay from THIS
+    // Bind the funding source too - the user is consenting to pay from THIS
     // wallet, so swapping walletId after the preview must void consent. Mirrors
     // q402_pay's consentIntent. Empty string = the server-default Agent Wallet
     // (resolved at settle time); pinning a specific wallet re-triggers consent.
@@ -211,7 +211,7 @@ export const REQUEST_PAY_TOOL = {
   description:
     "Pay a Q402 payment request from your own Agent Wallet, gaslessly. Give it a req_ id (from a " +
     "/pay link, a 402 Payment Required response, or whoever billed you) and it settles the exact " +
-    "amount + token + recipient the request specifies — you cannot redirect or change them. MOVES " +
+    "amount + token + recipient the request specifies - you cannot redirect or change them. MOVES " +
     "FUNDS: requires confirm:true, a live API key, and Q402_ENABLE_REAL_PAYMENTS=1, same as q402_pay. " +
     "Call q402_request_status first to show the user what they're paying. This is the agent-to-agent " +
     "billing path: agent A bills with q402_request_create, agent B settles here.",
@@ -226,7 +226,7 @@ export const REQUEST_PAY_TOOL = {
       confirm: {
         type: "boolean" as const,
         const: true,
-        description: "REQUIRED. Must be literally true. Paying moves real funds — get an explicit user yes first.",
+        description: "REQUIRED. Must be literally true. Paying moves real funds - get an explicit user yes first.",
       },
       walletId: {
         type: "string" as const,

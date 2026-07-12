@@ -1,8 +1,8 @@
 /**
- * q402_stake_positions — read-only Q staking snapshot for the Agent Wallet.
+ * q402_stake_positions - read-only Q staking snapshot for the Agent Wallet.
  *
  * Returns the wallet's open Q (QuackAI) stakes on QuackAiStake (BNB): per
- * position the tier, principal, APR, stake/unlock time, and matured flag —
+ * position the tier, principal, APR, stake/unlock time, and matured flag -
  * plus aggregate stakedTotal, the matured/withdrawable total (the unstake
  * "max"), and the liquid Q balance (the stake "max"). No funds move.
  *
@@ -16,7 +16,7 @@ import { z } from "zod";
 import { CONFIG, resolveApiKey } from "../config.js";
 
 export interface StakePositionRecord {
-  /** 0-based array index — the argument to unstake (exit(ith)). */
+  /** 0-based array index - the argument to unstake (exit(ith)). */
   ith: number;
   /** On-chain stakeId (display only, NOT the unstake arg). */
   id: number;
@@ -26,7 +26,7 @@ export interface StakePositionRecord {
   stakedAt: number;
   unlockAt: number;
   matured: boolean;
-  /** matured && ith>=1 && not exited — can be unstaked now. */
+  /** matured && ith>=1 && not exited - can be unstaked now. */
   exitable: boolean;
 }
 
@@ -44,7 +44,7 @@ export interface StakePositionsData {
 
 /**
  * GET the stake positions for the apiKey owner's wallet. Returns the raw
- * { ok, status, data } tuple — callers decide how to surface failures.
+ * { ok, status, data } tuple - callers decide how to surface failures.
  * Throws only on a network/timeout error (let the caller translate it).
  */
 export async function fetchStakePositions(
@@ -53,7 +53,7 @@ export async function fetchStakePositions(
   timeoutMs = 15_000,
 ): Promise<{ ok: boolean; status: number; data: StakePositionsData }> {
   // String-concat (not new URL("/path", base)) so the base's `/api` segment
-  // is preserved — mirrors yield-positions.ts.
+  // is preserved - mirrors yield-positions.ts.
   const url = new URL(`${CONFIG.relayBaseUrl}/wallet/agentic/stake/positions`);
   if (walletId) url.searchParams.set("walletId", walletId);
   const res = await fetch(url, {
@@ -75,11 +75,11 @@ export const StakePositionsInputSchema = z.object({
 export const STAKE_POSITIONS_TOOL = {
   name: "q402_stake_positions",
   description:
-    "READ-ONLY — show the Agent Wallet's open Q (QuackAI) staking positions on QuackAiStake (BNB). " +
+    "READ-ONLY - show the Agent Wallet's open Q (QuackAI) staking positions on QuackAiStake (BNB). " +
     "Returns each position's tier (0=30d/10% … 3=180d/40% APR), principal Q, APR, stake + unlock time, and " +
     "whether it has matured (unlockable), plus the aggregate staked total, the matured/withdrawable total " +
     "(the unstake 'max'), and the liquid Q balance (the stake 'max'). Authenticated by the configured live " +
-    "Multichain API key — no private key, no funds move. Use it for 'what are my Q stakes?', 'how much Q can " +
+    "Multichain API key - no private key, no funds move. Use it for 'what are my Q stakes?', 'how much Q can " +
     "I unstake?', or before q402_unstake with amount 'max'.",
   inputSchema: {
     type: "object" as const,

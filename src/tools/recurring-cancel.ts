@@ -1,12 +1,12 @@
 /**
- * q402_recurring_cancel — stop a recurring-payment rule on the Agent Wallet.
+ * q402_recurring_cancel - stop a recurring-payment rule on the Agent Wallet.
  *
- * Mode-C-only (apiKey auth). Cancels a rule by ruleId — no advance
+ * Mode-C-only (apiKey auth). Cancels a rule by ruleId - no advance
  * notice required, the cancel is immediate. The rule transitions to
  * the `cancelled` status; a future re-author of the same recipient
  * + frequency would create a fresh rule, not resurrect the old one.
  *
- * Use this when the user says "stop my weekly payout to Alice" — list
+ * Use this when the user says "stop my weekly payout to Alice" - list
  * first with q402_recurring_list to find the matching ruleId, then
  * cancel.
  *
@@ -21,7 +21,7 @@ export const RecurringCancelInputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      "Rule id to cancel. Obtain from q402_recurring_list — each entry's " +
+      "Rule id to cancel. Obtain from q402_recurring_list - each entry's " +
         "`ruleId` field. Cancelling is immediate.",
     ),
   walletId: z
@@ -39,11 +39,11 @@ export const RECURRING_CANCEL_TOOL = {
   name: "q402_recurring_cancel",
   description:
     "Cancel an active recurring-payment rule on the Agent Wallet. Takes a " +
-    "ruleId (from q402_recurring_list). Cancel is immediate — the rule will " +
+    "ruleId (from q402_recurring_list). Cancel is immediate - the rule will " +
     "not fire again. Authenticated by the configured Multichain API key. " +
     "Idempotent: cancelling an already-cancelled rule returns 409 with a " +
     "clear message. Use this whenever the user says 'stop my recurring " +
-    "payment to X' — call q402_recurring_list first to find the matching " +
+    "payment to X' - call q402_recurring_list first to find the matching " +
     "ruleId, then call this with that id.",
   inputSchema: {
     type: "object" as const,

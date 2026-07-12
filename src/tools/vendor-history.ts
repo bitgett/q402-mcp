@@ -1,5 +1,5 @@
 /**
- * q402_vendor_history — how much has been paid to a vendor, or a vendor
+ * q402_vendor_history - how much has been paid to a vendor, or a vendor
  * leaderboard. Read-only; Mode-C. Hits memory-by-key { action:"vendor" }.
  */
 import { z } from "zod";

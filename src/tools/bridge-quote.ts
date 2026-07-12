@@ -1,5 +1,5 @@
 /**
- * q402_bridge_quote — read-only CCIP fee quote.
+ * q402_bridge_quote - read-only CCIP fee quote.
  *
  * Returns LINK + native fee estimates for a hypothetical USDC bridge across
  * the 3-chain CCIP triangle (eth/avax/arbitrum). No state change, no auth.
@@ -62,7 +62,7 @@ export async function runBridgeQuote(input: z.infer<typeof BridgeQuoteInputSchem
   const url = new URL("/api/ccip/quote", CONFIG.relayBaseUrl);
   let res: Response;
   try {
-    // 15s timeout — quote is a CCIP router read on the source chain.
+    // 15s timeout - quote is a CCIP router read on the source chain.
     // RPC blips on eth/avax/arbitrum should fail fast so the agent can
     // retry or fall back, not freeze the MCP client.
     res = await fetch(url, {

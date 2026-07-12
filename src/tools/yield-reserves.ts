@@ -1,11 +1,11 @@
 /**
- * q402_yield_reserves — read-only Q402 Yield lending-market list.
+ * q402_yield_reserves - read-only Q402 Yield lending-market list.
  *
  * Returns the supply markets the Agent Wallet can lend into: protocol,
  * chain, asset, the position (a)token, the market/pool address, and the
  * current supply APY. No state change, no auth, no funds move. Use this
  * to show the user which assets earn yield (and how much) BEFORE they
- * decide to supply — same "preview first" role q402_bridge_quote plays
+ * decide to supply - same "preview first" role q402_bridge_quote plays
  * for bridging.
  */
 
@@ -22,9 +22,9 @@ export const YieldReservesInputSchema = z.object({
 export const YIELD_RESERVES_TOOL = {
   name: "q402_yield_reserves",
   description:
-    "READ-ONLY — list the Q402 Yield lending markets the Agent Wallet can supply into. " +
+    "READ-ONLY - list the Q402 Yield lending markets the Agent Wallet can supply into. " +
     "Returns each market's protocol, chain, asset, asset address, position token, market address, " +
-    "and current supply APY (shown as a %). No auth required and no funds move — this is purely a " +
+    "and current supply APY (shown as a %). No auth required and no funds move - this is purely a " +
     "preview of available yield. " +
     "Reads the curated lending markets on BNB Chain, plus Base when a curated vault is configured; " +
     "each market reports its own protocol/venue. " +
@@ -51,7 +51,7 @@ interface Market {
   assetAddress: string;
   positionToken: string;
   marketAddress: string;
-  /** Fraction — 0.021 means 2.1% APY. */
+  /** Fraction - 0.021 means 2.1% APY. */
   supplyApy: number;
   label: string;
 }
@@ -72,7 +72,7 @@ export async function runYieldReserves(input: z.infer<typeof YieldReservesInputS
 
   let res: Response;
   try {
-    // 15s timeout — reserves is a read of on-chain Aave rate data; RPC
+    // 15s timeout - reserves is a read of on-chain Aave rate data; RPC
     // blips should fail fast so the agent can retry rather than freeze
     // the MCP client (mirrors q402_bridge_quote).
     res = await fetch(url, {

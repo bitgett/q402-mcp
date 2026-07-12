@@ -1,5 +1,5 @@
 /**
- * Server-side Q402 client — Node.js variant of public/q402-sdk.js.
+ * Server-side Q402 client - Node.js variant of public/q402-sdk.js.
  *
  * The browser SDK relies on `window.ethereum` for signing. Here we sign with
  * an `ethers.Wallet` loaded from `Q402_PRIVATE_KEY`, then post the same body
@@ -50,7 +50,7 @@ export interface PayResult {
   mode?: "sandbox" | "live";
   explorerUrl?: string | null;
   /**
-   * Mode C only — `true` when an identical send is still in flight on
+   * Mode C only - `true` when an identical send is still in flight on
    * the server (concurrent retry hit the SET NX idempotency claim).
    * The caller should wait `retryAfterSec` and retry the same call;
    * the server will return the cached settlement once the original
@@ -60,7 +60,7 @@ export interface PayResult {
   pending?: boolean;
   retryAfterSec?: number;
   /**
-   * Mode C MultiPayeeSplit only — `true` when the server fanned the
+   * Mode C MultiPayeeSplit only - `true` when the server fanned the
    * payment out to N legs instead of a single recipient. When set, the
    * funds went to the addresses in `legs` (NOT the top-level `to`), and
    * the top-level `txHash` mirrors the first settled leg's hash. The AI
@@ -77,7 +77,7 @@ export interface PayResult {
   /** Number of legs that failed (split only). Non-zero with success:true is impossible. */
   failedLegs?: number;
   /**
-   * Split only — `true` when NOT every leg settled (server HTTP 207 /
+   * Split only - `true` when NOT every leg settled (server HTTP 207 /
    * status==='partial'). Funds DID move for the settled legs; this is NOT
    * a plain failure and the AI must NOT tell the user to blindly "retry"
    * (a retry would replay only the still-pending intent, never double-pay
@@ -85,7 +85,7 @@ export interface PayResult {
    */
   partial?: boolean;
   /**
-   * Mode C only — `true` when the server returned a cached settlement for
+   * Mode C only - `true` when the server returned a cached settlement for
    * a duplicate request (durable replay guard) rather than firing a fresh
    * one. Outcome is identical to the original; surfaced so the AI can say
    * "already settled earlier" instead of implying a second payment.
@@ -147,7 +147,7 @@ export function toRawAmount(amount: string, decimals: number): string {
   }
   if (!/^\d+(\.\d+)?$/.test(amount)) {
     throw new Error(
-      `invalid amount "${amount}" — use a positive decimal string (no sign, no scientific notation, no whitespace)`,
+      `invalid amount "${amount}" - use a positive decimal string (no sign, no scientific notation, no whitespace)`,
     );
   }
   let raw: bigint;
@@ -172,7 +172,7 @@ async function signAuthorization(
   //   r, s, yParity = secp256k1.sign(privateKey, message)
   //
   // ethers v6.16+ exposes `Wallet.authorize()` which produces exactly this
-  // signature. The shape is NOT an EIP-712 typed digest — anything that
+  // signature. The shape is NOT an EIP-712 typed digest - anything that
   // signs a typed digest over a custom domain produces a different
   // recovered address and the authorizationList silently fails to
   // delegate. The tx still succeeds as a no-op call into the
@@ -213,7 +213,7 @@ export class Q402NodeClient {
 
   async fetchFacilitator(): Promise<string> {
     const url = `${this.opts.relayBaseUrl.replace(/\/$/, "")}/relay/info`;
-    // 10s timeout — facilitator info is a small read; if it takes longer
+    // 10s timeout - facilitator info is a small read; if it takes longer
     // than that, the relay is unhealthy and we should fail the tool call
     // explicitly rather than hang the whole MCP session waiting.
     let resp: Response;
@@ -221,7 +221,7 @@ export class Q402NodeClient {
       resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     } catch (e) {
       if (e instanceof Error && (e.name === "TimeoutError" || /aborted/i.test(e.message))) {
-        throw new Error("Q402 relay didn't respond within 10s while reading facilitator info — the relay may be temporarily degraded. Safe to retry.");
+        throw new Error("Q402 relay didn't respond within 10s while reading facilitator info - the relay may be temporarily degraded. Safe to retry.");
       }
       throw e;
     }
@@ -315,7 +315,7 @@ export class Q402NodeClient {
           ? { ...baseBody, stableNonce: paymentNonce.toString() }
           : { ...baseBody, nonce: paymentNonce.toString() };
 
-    // 30s timeout — single-recipient relay path. Real settlements typically
+    // 30s timeout - single-recipient relay path. Real settlements typically
     // resolve in 1-3s; 30s is a generous ceiling so a stalled relay can't
     // hang the MCP tool indefinitely (which would block the whole AI turn).
     let resp: Response;
@@ -331,7 +331,7 @@ export class Q402NodeClient {
       // agent can actually relay to the user. Same translation applied
       // on batchPay() + fetchFacilitator() to keep the surface uniform.
       if (e instanceof Error && (e.name === "TimeoutError" || /aborted/i.test(e.message))) {
-        throw new Error("Q402 relay didn't respond within 30s — the relay may be temporarily degraded. Safe to retry.");
+        throw new Error("Q402 relay didn't respond within 30s - the relay may be temporarily degraded. Safe to retry.");
       }
       throw e;
     }
@@ -386,7 +386,7 @@ export class Q402NodeClient {
       );
     }
 
-    // Pre-validate every recipient's amount before any signing — we don't
+    // Pre-validate every recipient's amount before any signing - we don't
     // want to sign 4 of 5 transfers and only then discover the 5th had
     // a malformed amount.
     for (let i = 0; i < rows.length; i++) {
@@ -399,11 +399,11 @@ export class Q402NodeClient {
       }
     }
 
-    // Chain scope for batchPay — default EIP-7702 mode only (avax / bnb /
+    // Chain scope for batchPay - default EIP-7702 mode only (avax / bnb /
     // eth / mantle / injective / monad / scroll). X Layer and Stable use chain-specific
     // nonce field shapes (xlayerNonce / stableNonce) and the X Layer USDC
     // path has an EIP-3009 fallback that doesn't install a delegation at
-    // all — none of those compose cleanly with sequential first-failure-
+    // all - none of those compose cleanly with sequential first-failure-
     // abort batching today. The same scope is enforced in the server
     // route, the browser SDK, and the MCP tool schema so the supported-
     // chain claim is consistent across every surface.
@@ -479,7 +479,7 @@ export class Q402NodeClient {
       });
     }
 
-    // Send the batch. 60s timeout — relay loops recipients sequentially,
+    // Send the batch. 60s timeout - relay loops recipients sequentially,
     // so a 20-row paid batch can legitimately take 10-20s. 60s ceiling
     // keeps a stalled relay from pinning the MCP tool for the whole AI
     // turn while still allowing healthy batches to complete.
@@ -499,7 +499,7 @@ export class Q402NodeClient {
       });
     } catch (e) {
       if (e instanceof Error && (e.name === "TimeoutError" || /aborted/i.test(e.message))) {
-        throw new Error("Q402 relay didn't respond within 60s on the batch path — the relay may be temporarily degraded. Safe to retry.");
+        throw new Error("Q402 relay didn't respond within 60s on the batch path - the relay may be temporarily degraded. Safe to retry.");
       }
       throw e;
     }
@@ -507,7 +507,7 @@ export class Q402NodeClient {
 
     // Aborted batches (server returns 424) and partial failures (207) must
     // throw, not return. The server returns 200/ok:true even when
-    // recipient[0] failed and the batch was abandoned — relying only on
+    // recipient[0] failed and the batch was abandoned - relying only on
     // !resp.ok would let q402_batch_pay report "batch sent" to the user
     // when zero transfers actually landed. The throw carries a
     // BatchPayError with the per-row results so callers can still surface
@@ -535,7 +535,7 @@ export class Q402NodeClient {
       throw err;
     }
 
-    // Decorate each successful row with the explorer URL — same shape
+    // Decorate each successful row with the explorer URL - same shape
     // single-recipient pay() returns, so agents can render uniformly.
     data.results = data.results.map((r) => ({
       ...r,
@@ -600,7 +600,7 @@ export interface BatchPayResult {
 }
 
 /**
- * Sandbox path — signs nothing on-chain, returns a deterministic-looking
+ * Sandbox path - signs nothing on-chain, returns a deterministic-looking
  * fake hash. Used when API key is absent / test-tier, real-payments flag
  * is off, or a private key is missing.
  */
@@ -610,13 +610,13 @@ export function sandboxPay(
 ): PayResult {
   const tokenCfg = tokenFor(chain, input.token);
   const tokenAmount = toRawAmount(input.amount, tokenCfg.decimals);
-  // 32-byte random hex — visually indistinguishable from a real tx hash but
+  // 32-byte random hex - visually indistinguishable from a real tx hash but
   // never collides with one because we don't emit any transaction.
   const fakeHash = "0x" + hexlify(randomBytes(32)).slice(2);
 
   return {
     // `success: false` because no funds moved. The `sandbox: true` flag is
-    // the canonical "this was a simulation" marker — downstream callers
+    // the canonical "this was a simulation" marker - downstream callers
     // should branch on EITHER field to avoid misreporting a settlement.
     success: false,
     sandbox: true,

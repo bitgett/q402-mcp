@@ -1,14 +1,14 @@
 /**
- * q402_recurring_create — author a new recurring-payment rule on the
+ * q402_recurring_create - author a new recurring-payment rule on the
  * Agent Wallet.
  *
- * Mode-C-only (apiKey auth). Single-recipient — for multi-recipient
+ * Mode-C-only (apiKey auth). Single-recipient - for multi-recipient
  * payroll rules the user opens the dashboard. The recurring scheduler
  * itself handles cancel-window alerts and the hourly heartbeat that
  * drives every cadence. Each fire is gated server-side by BOTH the
  * wallet's `perTxMaxUsd` (per-fire cap) AND its `dailyLimitUsd`: the
  * rule's daily total reserves against the same daily bucket as manual
- * sends (a 2026-06-10 fix — the cron skips the fire if the bucket can't
+ * sends (a 2026-06-10 fix - the cron skips the fire if the bucket can't
  * cover it), so scheduled rules can't outrun the dashboard caps. This
  * tool additionally applies the client-side Q402_MAX_AMOUNT_PER_CALL +
  * Q402_ALLOWED_RECIPIENTS rails to (recipient, amount) at author time,
@@ -24,7 +24,7 @@
  *
  * Recurring is a paid feature on EVERY chain, including BNB. Trial keys
  * are rejected at create time with `MULTICHAIN_REQUIRED` even when the
- * user picks `chain: "bnb"` — trial keys can still pay manually via
+ * user picks `chain: "bnb"` - trial keys can still pay manually via
  * `q402_pay`, but scheduled fires consume paid-tier quota and require
  * the live Multichain subscription.
  *
@@ -42,7 +42,7 @@ export const RecurringCreateInputSchema = z.object({
     .literal(true)
     .describe(
       "REQUIRED. Must be literally `true`. Authoring a recurring rule schedules " +
-        "future on-chain payments that the user does not click through one-by-one — " +
+        "future on-chain payments that the user does not click through one-by-one - " +
         "the user has to explicitly say yes BEFORE this is called. Echo back the " +
         "frequency + recipient + amount + chain + token + cancelWindow you intend " +
         "to create, get a plain-language confirmation from the user (e.g. \"yes, " +
@@ -75,7 +75,7 @@ export const RecurringCreateInputSchema = z.object({
     .describe(
       "Chain to fire the recurring TX on. Defaults to bnb. " +
         "Recurring requires the paid Multichain subscription on EVERY chain, " +
-        "including bnb — Trial keys are rejected at create time with " +
+        "including bnb - Trial keys are rejected at create time with " +
         "MULTICHAIN_REQUIRED. Trial keys can still pay one-shot via q402_pay on BNB.",
     ),
   token: z
@@ -113,13 +113,13 @@ export const RECURRING_CREATE_TOOL = {
   description:
     "Author a new recurring-payment rule on the user's Agent Wallet. Single-" +
     "recipient (use the dashboard for multi-recipient payroll). Pick a " +
-    "cadence — hourly:N, daily, weekly:{day}, monthly:N, or monthly:last — " +
+    "cadence - hourly:N, daily, weekly:{day}, monthly:N, or monthly:last - " +
     "and a recipient + amount + chain + token. Authenticated by the " +
     "configured Multichain API key; no private key required. Recurring " +
     "requires the paid Multichain subscription on EVERY chain including " +
-    "bnb — trial keys are rejected at create time with MULTICHAIN_REQUIRED " +
+    "bnb - trial keys are rejected at create time with MULTICHAIN_REQUIRED " +
     "and should keep using q402_pay for one-shot Trial sends. Each fire is " +
-    "bounded server-side by BOTH the wallet's perTxMax AND its dailyLimit — a " +
+    "bounded server-side by BOTH the wallet's perTxMax AND its dailyLimit - a " +
     "rule's daily total reserves against the same daily bucket as manual sends " +
     "(the scheduler skips the fire if the bucket can't cover it), so scheduled " +
     "rules can't outrun the dashboard caps. This tool also enforces your local " +
@@ -155,7 +155,7 @@ export const RECURRING_CREATE_TOOL = {
       chain: {
         type: "string" as const,
         enum: ["bnb", "eth", "avax", "xlayer", "mantle", "injective", "monad", "scroll", "stable", "arbitrum", "base", "robinhood"],
-        description: "Default 'bnb'. Recurring requires the paid Multichain subscription on EVERY chain (BNB included) — trial keys are rejected with MULTICHAIN_REQUIRED.",
+        description: "Default 'bnb'. Recurring requires the paid Multichain subscription on EVERY chain (BNB included) - trial keys are rejected with MULTICHAIN_REQUIRED.",
       },
       token: {
         type: "string" as const,
@@ -244,7 +244,7 @@ export async function runRecurringCreate(
   // F10: apply the SAME client-side rails q402_pay / q402_batch_pay apply.
   // A recurring rule schedules future sends the user won't click through
   // one-by-one, so each fire's (recipient, amount) must clear the per-call
-  // amount cap and the recipient allowlist the user configured — otherwise
+  // amount cap and the recipient allowlist the user configured - otherwise
   // an agent could schedule payouts above the cap or to an off-allowlist
   // address that the one-shot tools would have refused.
   const amountNum = Number(input.amount);
@@ -257,7 +257,7 @@ export async function runRecurringCreate(
       message:
         `Per-fire amount $${input.amount} exceeds your Q402_MAX_AMOUNT_PER_CALL cap of ` +
         `$${CONFIG.maxAmountPerCallUsd}. Each recurring fire is bounded by the same per-call ` +
-        `cap as a one-shot q402_pay — raise the cap if this schedule is intentional.`,
+        `cap as a one-shot q402_pay - raise the cap if this schedule is intentional.`,
       dashboardUrl,
     };
   }
@@ -272,7 +272,7 @@ export async function runRecurringCreate(
       error:    "RECIPIENT_NOT_ALLOWED",
       message:
         `Recipient ${input.recipient} is not in Q402_ALLOWED_RECIPIENTS. A recurring rule would ` +
-        `send to it on every fire — add it to the allowlist or unset the env var to disable the guard.`,
+        `send to it on every fire - add it to the allowlist or unset the env var to disable the guard.`,
       dashboardUrl,
     };
   }

@@ -1,5 +1,5 @@
 /**
- * q402_quote — read-only, no API key required.
+ * q402_quote - read-only, no API key required.
  *
  * Compares gas costs across the twelve chains Q402 relays for, given a payment
  * amount and (optional) target chain/token. Lets a Claude agent reason about
@@ -19,9 +19,9 @@ export const QuoteInputSchema = z.object({
     .optional()
     .describe(
       "Optional token filter. USDC / USDT are supported on most chains; RLUSD " +
-        "(Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only — passing " +
+        "(Ripple USD, NY DFS regulated, decimals 18) is Ethereum-only - passing " +
         "RLUSD here narrows the quote to chain=\"eth\". USDG (Paxos Global Dollar, " +
-        "decimals 6) is Robinhood-Chain-only — passing USDG narrows the quote to " +
+        "decimals 6) is Robinhood-Chain-only - passing USDG narrows the quote to " +
         "chain=\"robinhood\".",
     ),
   chain: z
@@ -47,7 +47,7 @@ interface ChainQuote {
 
 function quoteForChain(cfg: ChainConfig): ChainQuote {
   // Q (QuackAI) is not USD-quotable (it floats on a TWAP, not a $1 peg), so it
-  // never appears in a gas/cost quote — filter it out, narrowing back to the
+  // never appears in a gas/cost quote - filter it out, narrowing back to the
   // stablecoin union the quote reports. USDG (Paxos Global Dollar) IS a $1
   // stablecoin, so it stays in the quote.
   const supported: ReadonlyArray<"USDC" | "USDT" | "RLUSD" | "USDG"> = (cfg.supportedTokens ?? ["USDC", "USDT"]).filter(
@@ -77,7 +77,7 @@ export function runQuote(input: QuoteInput): {
   const candidates = (filterChain ? [filterChain] : CHAIN_KEYS)
     .map(k => CHAIN_CONFIG[k])
     .filter(cfg => {
-      // Skip chains narrowed to an empty supportedTokens list — happens when
+      // Skip chains narrowed to an empty supportedTokens list - happens when
       // BNB_FOCUS_MODE (emergency flag, currently false) mutates non-BNB
       // chains to []. Without this guard the quote tool would happily list
       // "Ethereum: no tokens", which is a worse signal to the model than
@@ -104,7 +104,7 @@ export function runQuote(input: QuoteInput): {
     quotes,
     disclaimer:
       "Gas cost is order-of-magnitude only. Real cost depends on network congestion at relay time. " +
-      "Q402 always charges $0 to the payer's wallet — gas is paid from the developer's pre-funded gas tank.",
+      "Q402 always charges $0 to the payer's wallet - gas is paid from the developer's pre-funded gas tank.",
   };
 }
 
@@ -113,11 +113,11 @@ export const QUOTE_TOOL = {
   description:
     "Compare gas costs and supported tokens across the 12 chains Q402 relays " +
     "for (avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum, base, robinhood). " +
-    "Returns the full chain × token matrix unconditionally — this tool does " +
+    "Returns the full chain × token matrix unconditionally - this tool does " +
     "not read any API key, so it can't filter by trial vs multichain scope. " +
     "When the caller intends to settle with a Trial API Key, treat any non-BNB " +
     "row as informational only (q402_pay will return 403 TRIAL_BNB_ONLY for " +
-    "those). Includes RLUSD on Ethereum. Read-only — " +
+    "those). Includes RLUSD on Ethereum. Read-only - " +
     "no API key needed, no funds move. Use this before q402_pay so the user " +
     "can see what's available and pick a chain.",
   // Plain JSON schema mirroring the Zod schema above; MCP servers receive parameters as JSON.
@@ -132,7 +132,7 @@ export const QUOTE_TOOL = {
         type: "string",
         enum: ["USDC", "USDT", "RLUSD", "USDG"],
         description:
-          "Optional token filter. RLUSD (Ripple USD) is Ethereum-only — passing it narrows the quote to chain=\"eth\". USDG (Paxos Global Dollar) is Robinhood-Chain-only — passing it narrows the quote to chain=\"robinhood\".",
+          "Optional token filter. RLUSD (Ripple USD) is Ethereum-only - passing it narrows the quote to chain=\"eth\". USDG (Paxos Global Dollar) is Robinhood-Chain-only - passing it narrows the quote to chain=\"robinhood\".",
       },
       chain: {
         type: "string",

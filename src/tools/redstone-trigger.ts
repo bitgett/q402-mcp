@@ -1,5 +1,5 @@
 /**
- * RedStone data-event trigger tools — the "pay when a NAV / price feed crosses a
+ * RedStone data-event trigger tools - the "pay when a NAV / price feed crosses a
  * threshold" surface for Agent Wallets.
  *
  *   q402_redstone_feeds          no-key. Which feeds are readable + is the
@@ -11,12 +11,12 @@
  *
  * A trigger fires EXACTLY ONCE per rising-edge crossing (edge-latch, server-
  * side): it will not re-fire on a level that stays breached, and a trigger
- * created while the feed is already past the threshold does NOT instant-fire —
+ * created while the feed is already past the threshold does NOT instant-fire -
  * it arms on the next unmet observation and fires on the next crossing. Each
  * fire is bounded by the wallet's perTxMax + dailyLimit, same as recurring.
  *
  * All write tools hit POST /api/wallet/agentic/redstone-trigger-by-key.
- * The feature is OFF by default server-side (REDSTONE_ENABLED) — the create/
+ * The feature is OFF by default server-side (REDSTONE_ENABLED) - the create/
  * list/cancel calls return REDSTONE_DISABLED (503) until an operator enables it.
  */
 
@@ -34,7 +34,7 @@ function dashboardUrl(): string {
   return CONFIG.relayBaseUrl.replace(/\/api$/, "") + "/dashboard?tab=agent";
 }
 
-// ── q402_redstone_feeds (no key) ─────────────────────────────────────────────
+// -- q402_redstone_feeds (no key) ---------------------------------------------
 
 export const RedstoneFeedsInputSchema = z.object({});
 export type RedstoneFeedsInput = z.infer<typeof RedstoneFeedsInputSchema>;
@@ -45,7 +45,7 @@ export const REDSTONE_FEEDS_TOOL = {
     "Discover which RedStone feeds this deployment can drive triggers off, and " +
     "whether the RedStone-trigger feature is enabled. No API key required. Call " +
     "this before q402_redstone_trigger_create so you pick a feedId the server " +
-    "can actually read — a trigger on a non-allowlisted feed is rejected. " +
+    "can actually read - a trigger on a non-allowlisted feed is rejected. " +
     "Returns { enabled, allowedFeeds, dataServiceId }.",
   inputSchema: { type: "object" as const, properties: {}, additionalProperties: false },
 };
@@ -88,14 +88,14 @@ export async function runRedstoneFeeds(): Promise<RedstoneFeedsResult> {
   }
 }
 
-// ── q402_redstone_trigger_create (Mode C, confirm-gated) ─────────────────────
+// -- q402_redstone_trigger_create (Mode C, confirm-gated) ---------------------
 
 export const RedstoneTriggerCreateInputSchema = z.object({
   confirm: z
     .literal(true)
     .describe(
       "REQUIRED. Must be literally `true`. A trigger arms a FUTURE on-chain " +
-        "payout the user does not click through when it fires — echo back the " +
+        "payout the user does not click through when it fires - echo back the " +
         "feed + op + threshold + recipient + amount + chain + token you intend, " +
         "get an explicit user yes, and ONLY then call with confirm: true. Same " +
         "guard q402_pay / q402_recurring_create use.",
@@ -135,11 +135,11 @@ export const REDSTONE_TRIGGER_CREATE_TOOL = {
   name: "q402_redstone_trigger_create",
   description:
     "Arm a gasless payout that fires when a RedStone feed (NAV / price / RWA) " +
-    "crosses a threshold — e.g. \"when ETH >= 2000, send 100 USDT to 0x…\", or " +
+    "crosses a threshold - e.g. \"when ETH >= 2000, send 100 USDT to 0x…\", or " +
     "\"when the fund NAV drops to <= 0.98, send the redemption\". Fires EXACTLY " +
     "ONCE per rising-edge crossing (edge-latched server-side): it will not " +
     "re-fire while the level stays breached, and a trigger created while the " +
-    "feed is already past the threshold does NOT instant-fire — it waits for the " +
+    "feed is already past the threshold does NOT instant-fire - it waits for the " +
     "next real crossing. Authenticated by the Multichain API key; no private key. " +
     "Requires the paid Multichain subscription (trial keys rejected). Each fire " +
     "is bounded by the wallet's perTxMax + dailyLimit and your local " +
@@ -220,7 +220,7 @@ export async function runRedstoneTriggerCreate(
     };
   }
 
-  // Same client-side rails as q402_pay / q402_recurring_create — a trigger fires
+  // Same client-side rails as q402_pay / q402_recurring_create - a trigger fires
   // a future send the user won't click through, so (recipient, amount) must
   // clear the per-call cap + recipient allowlist.
   const amountNum = Number(input.amount);
@@ -290,7 +290,7 @@ export async function runRedstoneTriggerCreate(
   }
 }
 
-// ── q402_redstone_trigger_list (Mode C) ──────────────────────────────────────
+// -- q402_redstone_trigger_list (Mode C) --------------------------------------
 
 export const RedstoneTriggerListInputSchema = z.object({
   walletId: z.string().optional().describe("Optional Agent Wallet address for multi-wallet owners."),
@@ -300,7 +300,7 @@ export type RedstoneTriggerListInput = z.infer<typeof RedstoneTriggerListInputSc
 export const REDSTONE_TRIGGER_LIST_TOOL = {
   name: "q402_redstone_trigger_list",
   description:
-    "List the RedStone triggers on the user's Agent Wallet — each with its feed, " +
+    "List the RedStone triggers on the user's Agent Wallet - each with its feed, " +
     "condition (op + threshold), recipient, amount, mode, armed state, and " +
     "fire history. Authenticated by the Multichain API key; no funds move.",
   inputSchema: {
@@ -350,7 +350,7 @@ export async function runRedstoneTriggerList(
   }
 }
 
-// ── q402_redstone_trigger_cancel (Mode C) ────────────────────────────────────
+// -- q402_redstone_trigger_cancel (Mode C) ------------------------------------
 
 export const RedstoneTriggerCancelInputSchema = z.object({
   triggerId: z.string().min(1).describe("The trigger id to permanently cancel (from q402_redstone_trigger_list)."),

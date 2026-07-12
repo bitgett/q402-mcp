@@ -1,16 +1,16 @@
 /**
- * q402_recurring_fires — fetch the past-fire log for one recurring rule.
+ * q402_recurring_fires - fetch the past-fire log for one recurring rule.
  *
  * Mode-C-only (apiKey auth). Returns up to the last 50 fires written by
  * the Q402 recurring cron after each successful settlement: when the
  * fire landed, the total amount that moved, the on-chain tx hashes, and
  * whether any recipient rows failed (partial-fire). Use this when the
  * user asks "did my weekly payout to Alice go out last Friday?" or
- * "how much has this rule spent so far this month?" — call
+ * "how much has this rule spent so far this month?" - call
  * q402_recurring_list first to find the matching ruleId, then call
  * this with that id.
  *
- * Read-only — does NOT trigger a fire, modify the rule, or cancel
+ * Read-only - does NOT trigger a fire, modify the rule, or cancel
  * anything. Older fires beyond the 50-entry server cap drop off the
  * log; the on-chain history remains intact and can still be queried
  * from a block explorer using the rule's chain + recipient.
@@ -26,7 +26,7 @@ export const RecurringFiresInputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      "Rule id whose fire history to fetch. Obtain from q402_recurring_list — " +
+      "Rule id whose fire history to fetch. Obtain from q402_recurring_list - " +
         "each entry's `ruleId` field.",
     ),
   limit: z
@@ -60,7 +60,7 @@ export const RECURRING_FIRES_TOOL = {
     "Use this when the user asks 'when was the last fire?', 'did Friday's " +
     "payout go out?', 'how much has rule X spent?', or before claiming a " +
     "fire is missing. Authenticated by the configured Multichain API key. " +
-    "Read-only — does not trigger or modify anything. Call q402_recurring_list " +
+    "Read-only - does not trigger or modify anything. Call q402_recurring_list " +
     "first to find the ruleId.",
   inputSchema: {
     type: "object" as const,
@@ -109,7 +109,7 @@ interface FireEntry {
   /** Recipient rows that successfully settled on-chain. */
   settledCount:       number;
   /** Recipient rows that failed AFTER at least one settled (partial fire).
-   *  All-rows-failed fires are NOT in this log — the rule didn't advance. */
+   *  All-rows-failed fires are NOT in this log - the rule didn't advance. */
   failedCount:        number;
   /** Human-readable partial-failure summary; null on clean fires. */
   partialFailureNote: string | null;

@@ -1,15 +1,15 @@
 /**
- * q402_yield_deposit — WRITE / MOVES FUNDS. Supplies the Agent Wallet's
+ * q402_yield_deposit - WRITE / MOVES FUNDS. Supplies the Agent Wallet's
  * stablecoin into Q402 Yield's curated lending market for the chosen chain
  * so it starts earning supply APY.
  *
  * Server-mediated (Mode C): authenticated by the live Multichain API key
  * sent in the JSON BODY, matching how the agentic pay/send path
  * authenticates. The server holds the Agent Wallet's encrypted key, signs
- * the lending-market `supply`, and auto-funds source-chain gas — the MCP
+ * the lending-market `supply`, and auto-funds source-chain gas - the MCP
  * never holds a private key for this path.
  *
- * SAFETY GATE — mirrors q402_pay: this tool MOVES FUNDS, so it refuses to
+ * SAFETY GATE - mirrors q402_pay: this tool MOVES FUNDS, so it refuses to
  * execute unless `confirm === true`. When `confirm` is missing/false the
  * tool does NOT call the endpoint; it returns (NOT an error) a one-line
  * description of exactly what will happen and asks the agent to re-call
@@ -62,7 +62,7 @@ export const YieldDepositInputSchema = z.object({
         "when you want retry-safety: re-calling with the same key replays the first " +
         "result instead of double-supplying. IMPORTANT: if a call returns " +
         'status="uncertain" (timeout / unconfirmed broadcast), it echoes back the ' +
-        "idempotencyKey it used — pass THAT exact value here to safely resume the same " +
+        "idempotencyKey it used - pass THAT exact value here to safely resume the same " +
         "deposit instead of starting a new one.",
     ),
   confirm: z
@@ -89,28 +89,28 @@ export const YieldDepositInputSchema = z.object({
 export const YIELD_DEPOSIT_TOOL = {
   name: "q402_yield_deposit",
   description:
-    "WRITE — MOVES FUNDS. Supplies the Agent Wallet's stablecoin (USDC / USDT) into " +
+    "WRITE - MOVES FUNDS. Supplies the Agent Wallet's stablecoin (USDC / USDT) into " +
     "Q402 Yield's curated lending market for the chosen chain so it starts earning supply APY. " +
     "Server-managed Agent Wallet path (Mode C): authenticated by the configured live Multichain " +
-    "API key — the server holds the encrypted key, signs the supply, and sponsors gas. " +
+    "API key - the server holds the encrypted key, signs the supply, and sponsors gas. " +
     "CHAINS: 'bnb' supports USDC or USDT; 'base' supports USDC only. The actual lending venue is " +
     "the chain's curated market and is reported in the markets feed and the receipt. " +
     "Other chains are not yet available. " +
     "\n\n" +
-    "REQUIRES CONFIRMATION — like q402_pay, this tool refuses to execute unless " +
+    "REQUIRES CONFIRMATION - like q402_pay, this tool refuses to execute unless " +
     "`confirm: true` is set. Call it FIRST without confirm to get a one-line preview of " +
     "exactly what will happen (amount, token, chain, wallet); show that to the user, get " +
     "explicit approval, THEN re-call with confirm:true. Never set confirm:true on the " +
     "user's behalf without that approval. " +
     "\n\n" +
-    "SANDBOX BY DEFAULT — like q402_pay, no funds move unless a live Multichain key " +
+    "SANDBOX BY DEFAULT - like q402_pay, no funds move unless a live Multichain key " +
     "(q402_live_*) is configured AND Q402_ENABLE_REAL_PAYMENTS=1. Without both, " +
-    "confirm:true returns a sandbox preview (no on-chain supply) with a setup hint — " +
+    "confirm:true returns a sandbox preview (no on-chain supply) with a setup hint - " +
     "confirm:true alone does NOT move real funds. " +
     "\n\n" +
-    "RETRY SAFETY — on a timeout or an unconfirmed broadcast the tool returns " +
+    "RETRY SAFETY - on a timeout or an unconfirmed broadcast the tool returns " +
     'status="uncertain" and echoes back the idempotencyKey it used. The deposit MAY ' +
-    "have settled, so do NOT blindly call again — that starts a NEW deposit and can " +
+    "have settled, so do NOT blindly call again - that starts a NEW deposit and can " +
     "double-supply. To resume the SAME operation, re-call with idempotencyKey set to " +
     "the echoed value; the server dedupes on it and replays the original result. " +
     "\n\n" +
@@ -153,15 +153,15 @@ export const YIELD_DEPOSIT_TOOL = {
         description:
           "Optional durable idempotency key. Omit and the tool generates a FRESH random " +
           "key per invocation, so every call executes a distinct deposit. Pass your own " +
-          "STABLE key only for opt-in retry-safety — re-calling with the same key replays " +
+          "STABLE key only for opt-in retry-safety - re-calling with the same key replays " +
           "the first result instead of double-supplying. If a call returns " +
-          'status="uncertain", it echoes the idempotencyKey it used — pass that exact ' +
+          'status="uncertain", it echoes the idempotencyKey it used - pass that exact ' +
           "value back here to resume the same deposit rather than start a new one.",
       },
       confirm: {
         type: "boolean" as const,
         description:
-          "MUST be true to actually supply funds — set only after the user explicitly " +
+          "MUST be true to actually supply funds - set only after the user explicitly " +
           "approved this exact deposit in chat. Omit (or false) to preview without moving funds.",
       },
       consentToken: {
@@ -191,7 +191,7 @@ interface DepositData {
 }
 
 export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSchema>) {
-  // Strictly-positive amount. The schema regex accepts "0" / "0.0" — a zero
+  // Strictly-positive amount. The schema regex accepts "0" / "0.0" - a zero
   // supply is a no-op gas burn at best, so reject it before any network call.
   if (!(Number(input.amount) > 0)) {
     return {
@@ -224,7 +224,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
 
   // Idempotency key. The server keys a no-TTL "settled" marker on this, so a
   // PARAM-DERIVED default would be permanent: a re-deposit with the same
-  // (walletId, chain, token, amount) — e.g. after a `withdraw max` — would
+  // (walletId, chain, token, amount) - e.g. after a `withdraw max` - would
   // replay the OLD txHash forever instead of executing. So the default is a
   // FRESH random 32-byte key per invocation: each distinct call runs. A
   // caller who genuinely wants retry-safety can still pass an explicit STABLE
@@ -234,11 +234,11 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
       ? input.idempotencyKey
       : hexlify(randomBytes(32));
 
-  // ── Two-phase consent gate — MOVES FUNDS ────────────────────────────────
+  // -- Two-phase consent gate - MOVES FUNDS --------------------------------
   // Requires BOTH confirm:true AND a consentToken bound to the deposit intent.
   // confirm:true alone is a model-filled boolean; the token forces the deposit
   // through a human-visible preview and pins the exact params. When either is
-  // missing/stale we DO NOT hit the endpoint — we return a preview carrying the
+  // missing/stale we DO NOT hit the endpoint - we return a preview carrying the
   // token the agent must echo back after the user approves.
   const consentIntent = {
     t: "yield-deposit",
@@ -284,7 +284,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
     };
   }
 
-  // ── Real-payments gate — mirrors q402_pay's Mode C path ──────────────────
+  // -- Real-payments gate - mirrors q402_pay's Mode C path ------------------
   // A live key + confirm:true is NOT enough to move real funds. Like
   // q402_pay, this server-mediated write also requires Q402_ENABLE_REAL_PAYMENTS=1.
   // Without it we return a sandbox preview (no /api call, no on-chain supply)
@@ -303,7 +303,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
           amount: input.amount,
           walletId: walletId ?? null,
           setupHint:
-            "Sandbox mode — set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real Q402 Yield " +
+            "Sandbox mode - set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real Q402 Yield " +
             "deposit. No funds moved.",
         }, null, 2),
       }],
@@ -312,7 +312,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
 
   let res: Response;
   try {
-    // 60s timeout — the route signs + supplies + settles synchronously (same
+    // 60s timeout - the route signs + supplies + settles synchronously (same
     // posture as the Mode C send path). Fail fast on a stuck Vercel cold-start
     // rather than hang the MCP client.
     res = await fetch(`${CONFIG.relayBaseUrl}/wallet/agentic/yield/deposit`, {
@@ -330,10 +330,10 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
       signal: AbortSignal.timeout(60_000),
     });
   } catch (e) {
-    // NETWORK-UNCERTAIN — the request may or may not have reached the server
+    // NETWORK-UNCERTAIN - the request may or may not have reached the server
     // (timeout, dropped socket, cold-start). The deposit could already be in
     // flight or settled. We MUST NOT let the caller retry with a fresh random
-    // key — that would be a NEW deposit (double-supply). Surface THIS call's
+    // key - that would be a NEW deposit (double-supply). Surface THIS call's
     // idempotencyKey so a retry passing it back resumes the SAME logical
     // deposit (the server dedupes on it) instead of starting another.
     return {
@@ -349,7 +349,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
           idempotencyKey,
           error: e instanceof Error ? e.message : String(e),
           message:
-            "Network error before a confirmed response — the deposit may or may not " +
+            "Network error before a confirmed response - the deposit may or may not " +
             "have been submitted. Do NOT start a new deposit. To safely resume THIS " +
             `operation, retry with idempotencyKey="${idempotencyKey}" (the server dedupes ` +
             "on it, so a retry that already landed replays the original result instead of " +
@@ -362,11 +362,11 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
 
   const data = (await res.json().catch(() => ({}))) as DepositData;
   if (!res.ok) {
-    // 502 settlement_uncertain — the tx was broadcast but the receipt is
+    // 502 settlement_uncertain - the tx was broadcast but the receipt is
     // unconfirmed; the funds MAY have moved. Same rule as the network-error
     // path: a retry must reuse THIS idempotencyKey, never a fresh one, or it
     // risks a second on-chain supply. Surface the key + the no-blind-retry
-    // guidance. (Other non-2xx codes — 402/403/409/429/503 — are clean
+    // guidance. (Other non-2xx codes - 402/403/409/429/503 - are clean
     // pre-settlement rejections where no funds moved; the server already
     // explains them, so we pass the body through unchanged.)
     if (res.status === 502) {
@@ -384,7 +384,7 @@ export async function runYieldDeposit(input: z.infer<typeof YieldDepositInputSch
             txHash: data.txHash ?? null,
             error: data.error ?? "settlement_uncertain",
             message:
-              "Broadcast but unconfirmed — the deposit may have settled on-chain. Do NOT " +
+              "Broadcast but unconfirmed - the deposit may have settled on-chain. Do NOT " +
               "blindly start a new deposit. Verify on-chain first; if you must retry, reuse " +
               `idempotencyKey="${idempotencyKey}" so the server resumes THIS operation ` +
               "(replays the original result) instead of supplying again.",

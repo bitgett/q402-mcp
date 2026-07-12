@@ -1,15 +1,15 @@
 /**
- * q402_receipt — read-only, no API key required.
+ * q402_receipt - read-only, no API key required.
  *
  * Looks up a Q402 Trust Receipt **by receiptId** and returns the public-shaped
  * record plus a `verified` boolean from a client-side ECDSA recovery against
- * the relayer EOA. txHash-only lookup is **not** supported in v0.2.x — the
+ * the relayer EOA. txHash-only lookup is **not** supported in v0.2.x - the
  * public JSON endpoint doesn't expose the tx → receiptId index yet, so the
  * tool returns notFound when given txHash alone. Pass `receiptId` (rct_…)
  * for everything that exists today.
  *
  * The receipt itself is the canonical settlement attestation produced by the
- * relay route — every successful POST /api/relay creates one (with a backfill
+ * relay route - every successful POST /api/relay creates one (with a backfill
  * cron as the durability safety net). The MCP tool exists so an agent can:
  *
  *   - hand the user a verifiable URL after a payment ("here's the receipt")
@@ -18,7 +18,7 @@
  *   - audit by tx hash without needing the receipt id ("did this tx produce
  *     a receipt?")
  *
- * Verification is deliberately done locally inside this tool — the receipt
+ * Verification is deliberately done locally inside this tool - the receipt
  * page already runs the same check in the browser, but exposing it through
  * MCP lets agents reason about the truthfulness of a receipt without a
  * round-trip through a UI.
@@ -63,7 +63,7 @@ const ReceiptShape = z.object({
 
 export type Receipt = z.infer<typeof ReceiptShape>;
 
-// Subset that goes into the canonical hash — must match
+// Subset that goes into the canonical hash - must match
 // app/lib/receipt-shared.ts ReceiptSignedFields exactly. Sorted-keys JSON +
 // keccak256 + EIP-191 personal_sign on the server; we reproduce here for
 // local verification.
@@ -85,13 +85,13 @@ function digest(canonical: string): string {
   return keccak256(toUtf8Bytes(canonical));
 }
 
-// The Q402 relayer EOA that signs every Trust Receipt — app/lib/wallets.ts
+// The Q402 relayer EOA that signs every Trust Receipt - app/lib/wallets.ts
 // RELAYER_ADDRESS, which app/lib/relayer-key.ts asserts the signing key derives
 // to. The `verified` boolean is only a real trust signal if it anchors here:
 // recovering against the receipt's OWN self-reported signedBy (the previous
 // behaviour) just checks internal consistency, so a receipt forged + signed by
 // any attacker key and labelled with a matching signedBy would pass. Hardcoded
-// — the signer is a stable, publicly-known address; the on-chain key-rotation
+// - the signer is a stable, publicly-known address; the on-chain key-rotation
 // guard keeps every receipt anchored to it.
 const RELAYER_SIGNER = "0xfc77ff29178b7286a8ba703d7a70895ca74ff466";
 
@@ -118,9 +118,9 @@ function verifyReceiptSignature(r: Receipt): boolean {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Tool input + output
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export const ReceiptInputSchema = z.object({
   receiptId: z.string()
@@ -171,7 +171,7 @@ function pageBase(): string {
 export async function runReceipt(input: ReceiptInput): Promise<ReceiptSummary> {
   const apiBase = receiptApiBase();
 
-  // Resolve receiptId — directly given, or looked up via the relay's
+  // Resolve receiptId - directly given, or looked up via the relay's
   // /api/receipt index. We use the public JSON endpoint, which already
   // strips server-only fields (apiKeyId, optional apiKeyTier).
   const receiptId = input.receiptId ?? null;
@@ -199,7 +199,7 @@ export async function runReceipt(input: ReceiptInput): Promise<ReceiptSummary> {
     };
   }
 
-  // 10s timeout — receipt read is a small static lookup; a stall longer
+  // 10s timeout - receipt read is a small static lookup; a stall longer
   // than that means the relay is unhealthy and we should fail the tool
   // call explicitly instead of hanging the MCP session indefinitely.
   const resp = await fetch(`${apiBase}/receipt/${receiptId}`, {

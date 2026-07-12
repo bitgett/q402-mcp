@@ -1,5 +1,5 @@
 /**
- * q402_request_status — look up a Q402 payment request by its req_ id.
+ * q402_request_status - look up a Q402 payment request by its req_ id.
  *
  * Read-only, no API key. Returns the payer-facing projection (amount, token,
  * chain, recipient, status, expiry). Use it to poll whether a request you

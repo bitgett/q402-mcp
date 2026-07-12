@@ -1,5 +1,5 @@
 /**
- * q402_agent_spend_report — per-Agent-Wallet spend breakdown over a window.
+ * q402_agent_spend_report - per-Agent-Wallet spend breakdown over a window.
  * Read-only; Mode-C. Hits memory-by-key { action:"agent" }.
  */
 import { z } from "zod";

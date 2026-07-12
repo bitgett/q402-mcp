@@ -1,5 +1,5 @@
 /**
- * q402_balance — read-only, requires at least one API key.
+ * q402_balance - read-only, requires at least one API key.
  *
  * Returns the API key's validity and plan tier from `/api/keys/verify` (POST).
  * The endpoint exposes `valid / address / plan / createdAt / remainingCredits`
@@ -54,7 +54,7 @@ function mask(key: string | null): string | null {
 
 async function verifyOne(apiKey: string): Promise<unknown> {
   try {
-    // 15s timeout — verify is a single KV read + HMAC compare. Anything
+    // 15s timeout - verify is a single KV read + HMAC compare. Anything
     // slower is upstream-stuck. Without a timeout balance.ts hangs
     // indefinitely on a degraded socket (Vercel cold-start, partial
     // outage), wedging the MCP client UI.
@@ -92,11 +92,11 @@ export async function runBalance(): Promise<BalanceSummary> {
   const targets: Array<{ scope: ScopedVerifyResult["scope"]; key: string }> = [];
   if (CONFIG.trialApiKey)      targets.push({ scope: "trial",      key: CONFIG.trialApiKey });
   if (CONFIG.multichainApiKey) targets.push({ scope: "multichain", key: CONFIG.multichainApiKey });
-  // Only emit the legacy fallback entry when neither scoped key is set —
+  // Only emit the legacy fallback entry when neither scoped key is set -
   // otherwise it'd duplicate one of the entries above. We label it as
   // "multichain" (the broader scope it falls into) rather than "legacy"
   // because the user-facing surfaces hide the legacy var (see 0.5.7+
-  // policy in doctor.ts) — exposing "legacy" here would re-introduce
+  // policy in doctor.ts) - exposing "legacy" here would re-introduce
   // the third env-name to first-time readers.
   if (targets.length === 0 && CONFIG.legacyApiKey) {
     targets.push({ scope: "multichain", key: CONFIG.legacyApiKey });
@@ -109,7 +109,7 @@ export async function runBalance(): Promise<BalanceSummary> {
       scopes: [],
       dashboardUrl: "https://q402.quackai.ai/dashboard",
       setupHint:
-        "No API key configured. Call q402_doctor for guided setup — it will " +
+        "No API key configured. Call q402_doctor for guided setup - it will " +
         "offer to create ~/.q402/mcp.env with placeholders that the user can " +
         "fill in. (Manual path: set Q402_TRIAL_API_KEY for BNB-only sponsored " +
         "free trial (https://q402.quackai.ai/event) or Q402_MULTICHAIN_API_KEY " +
@@ -155,8 +155,8 @@ export const BALANCE_TOOL = {
     "Read-only. When both Q402_TRIAL_API_KEY and Q402_MULTICHAIN_API_KEY are set, returns " +
     "BOTH summaries so the agent can show the user trial credits AND paid credits in one view. " +
     "For trial-scoped keys, returns days-left + credits-remaining for the trial allotment. " +
-    "Free trial available at https://q402.quackai.ai/event — 2,000 gasless TX over 30 days. " +
-    "For per-chain gas tank balances, point the user at https://q402.quackai.ai/dashboard — " +
+    "Free trial available at https://q402.quackai.ai/event - 2,000 gasless TX over 30 days. " +
+    "For per-chain gas tank balances, point the user at https://q402.quackai.ai/dashboard - " +
     "those need a wallet signature, not a bare key.",
   inputSchema: {
     type: "object" as const,

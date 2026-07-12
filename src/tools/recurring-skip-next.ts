@@ -1,16 +1,16 @@
 /**
- * q402_recurring_skip_next — skip the next scheduled fire for a
+ * q402_recurring_skip_next - skip the next scheduled fire for a
  * recurring-payment rule.
  *
  * Mode-C-only (apiKey auth). Advances nextRunAt past the upcoming
  * slot to the one after. Useful when the user wants to honour the
- * cadence but not this specific upcoming payment — e.g. "skip Alice's
+ * cadence but not this specific upcoming payment - e.g. "skip Alice's
  * payout next Friday because she's on holiday, resume the Friday
  * after". One-shot: only the next slot is skipped; subsequent fires
  * continue normally.
  *
  * The rule must be in "active" status. Paused / cancelled rules
- * cannot be skipped — resume first if needed. List with
+ * cannot be skipped - resume first if needed. List with
  * q402_recurring_list to find the ruleId and inspect current state.
  *
  * Hits POST /api/wallet/agentic/recurring-by-key { action: "skip-next", ruleId }.
@@ -25,7 +25,7 @@ export const RecurringSkipNextInputSchema = z.object({
     .min(1)
     .describe(
       "Rule id whose next scheduled fire to skip. Obtain from " +
-        "q402_recurring_list — each entry's `ruleId` field.",
+        "q402_recurring_list - each entry's `ruleId` field.",
     ),
   walletId: z
     .string()
@@ -42,7 +42,7 @@ export const RECURRING_SKIP_NEXT_TOOL = {
   name: "q402_recurring_skip_next",
   description:
     "Skip ONLY the next scheduled fire of a recurring-payment rule. " +
-    "Cadence is preserved — the fire after the skipped one runs normally. " +
+    "Cadence is preserved - the fire after the skipped one runs normally. " +
     "Use this when the user says 'skip the next Friday payout, Alice is " +
     "on holiday' or 'don't fire this month's subscription, charge it next " +
     "month'. The rule must be in active status; paused / cancelled rules " +

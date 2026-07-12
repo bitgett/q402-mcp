@@ -1,8 +1,8 @@
 /**
- * q402_request_create — publish a Q402 payment request (the receive side).
+ * q402_request_create - publish a Q402 payment request (the receive side).
  *
- * Mode-C (apiKey) only. Creating a request moves NO funds — it publishes an
- * intent to RECEIVE money — so there is no confirm gate and a Trial key is
+ * Mode-C (apiKey) only. Creating a request moves NO funds - it publishes an
+ * intent to RECEIVE money - so there is no confirm gate and a Trial key is
  * fine. Returns a shareable pay URL + req_ id. Anyone can then fulfill it:
  * a human via the /pay link, or another agent via q402_request_pay (which
  * settles gaslessly). The recipient defaults to the configured Agent Wallet,
@@ -152,8 +152,8 @@ export async function runRequestCreate(input: RequestCreateInput): Promise<Reque
 export const REQUEST_CREATE_TOOL = {
   name: "q402_request_create",
   description:
-    "Publish a Q402 payment request (an invoice / bill). Moves no funds — it creates a shareable " +
-    "request to RECEIVE money — so no confirmation is needed and a Trial key works. Returns a req_ id " +
+    "Publish a Q402 payment request (an invoice / bill). Moves no funds - it creates a shareable " +
+    "request to RECEIVE money - so no confirmation is needed and a Trial key works. Returns a req_ id " +
     "+ a /pay link you can share with a human, or hand the requestId to another agent that pays it " +
     "gaslessly via q402_request_pay. The recipient defaults to your configured Agent Wallet, so you " +
     "can bill yourself with just an amount. Pair with q402_request_status to poll for payment.",

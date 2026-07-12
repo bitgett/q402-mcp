@@ -1,5 +1,5 @@
 /**
- * q402_oft_send — bridge USDT (USDT0) across chains via LayerZero OFT (Mode C).
+ * q402_oft_send - bridge USDT (USDT0) across chains via LayerZero OFT (Mode C).
  *
  * Companion to q402_bridge_send (USDC/CCIP). Moves the Agent Wallet's USDT0 from
  * one chain to the SAME wallet's address on another chain (recipient is always
@@ -18,7 +18,7 @@ export const OftSendInputSchema = z.object({
   src: z.enum(OFT_CHAINS).describe("Source chain"),
   dst: z.enum(OFT_CHAINS).describe("Destination chain (MUST differ from src)"),
   amount: z.string().regex(/^\d*[1-9]\d*$/).describe("USDT0 amount in raw local-decimal units, > 0 (6-decimal)"),
-  walletId: z.string().optional().describe("Agent Wallet ID (from q402_agentic_info). Optional — defaults to the owner's default Agent Wallet."),
+  walletId: z.string().optional().describe("Agent Wallet ID (from q402_agentic_info). Optional - defaults to the owner's default Agent Wallet."),
   maxFeeRaw: z.string().regex(/^\d+$/).optional().describe("Optional client-side native fee cap (raw 18-dec wei). Server still clamps to a 10% ceiling."),
   sandbox: z.boolean().optional().describe("Sandbox mode (default true). Set to false for a live on-chain bridge."),
   confirm: z.boolean().optional().describe("Must be true (with a matching consentToken) for a live bridge."),
@@ -53,12 +53,12 @@ function sandbox(input: z.infer<typeof OftSendInputSchema>, note: string): Sandb
 }
 
 export async function runOftSend(input: z.infer<typeof OftSendInputSchema>) {
-  // ── Sandbox by default ────────────────────────────────────────────────
+  // -- Sandbox by default ------------------------------------------------
   if (input.sandbox !== false) {
     return { content: [{ type: "text" as const, text: JSON.stringify(sandbox(input, "Sandbox response. Pass `sandbox: false` AND set Q402_ENABLE_REAL_PAYMENTS=1 (with a live Q402_MULTICHAIN_API_KEY) to fire a real USDT0 bridge."), null, 2) }] };
   }
 
-  // ── Two-phase consent — LIVE bridge MOVES FUNDS ───────────────────────
+  // -- Two-phase consent - LIVE bridge MOVES FUNDS -----------------------
   const consentIntent = {
     t: "oft",
     src: input.src,
@@ -81,7 +81,7 @@ export async function runOftSend(input: z.infer<typeof OftSendInputSchema>) {
     };
   }
 
-  // ── Live mode gates ───────────────────────────────────────────────────
+  // -- Live mode gates ---------------------------------------------------
   const resolved = resolveApiKey(input.src, "multichain");
   if (!resolved.apiKey) {
     return { content: [{ type: "text" as const, text: JSON.stringify(sandbox(input, resolved.sandboxReason ?? "No live Multichain API key configured. Set Q402_MULTICHAIN_API_KEY to a q402_live_… key from https://q402.quackai.ai/payment."), null, 2) }] };
@@ -95,7 +95,7 @@ export async function runOftSend(input: z.infer<typeof OftSendInputSchema>) {
 
   const walletId = typeof input.walletId === "string" && input.walletId.length > 0 ? input.walletId.toLowerCase() : CONFIG.walletId ?? undefined;
 
-  // ── Live request ──────────────────────────────────────────────────────
+  // -- Live request ------------------------------------------------------
   let resp: Response;
   try {
     resp = await fetch(`${CONFIG.relayBaseUrl}/wallet/agentic/oft-bridge`, {
@@ -112,7 +112,7 @@ export async function runOftSend(input: z.infer<typeof OftSendInputSchema>) {
       signal: AbortSignal.timeout(90_000),
     });
   } catch (e) {
-    return { content: [{ type: "text" as const, text: `Bridge request failed: ${e instanceof Error ? e.message : String(e)}. The bridge may or may not have fired — check q402_oft_history before retrying.` }], isError: true };
+    return { content: [{ type: "text" as const, text: `Bridge request failed: ${e instanceof Error ? e.message : String(e)}. The bridge may or may not have fired - check q402_oft_history before retrying.` }], isError: true };
   }
 
   const data = (await resp.json()) as Record<string, unknown>;

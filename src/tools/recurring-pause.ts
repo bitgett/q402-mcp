@@ -1,12 +1,12 @@
 /**
- * q402_recurring_pause — pause an active recurring-payment rule.
+ * q402_recurring_pause - pause an active recurring-payment rule.
  *
  * Mode-C-only (apiKey auth). Paused rules stay in KV with status
  * "paused" but the cron skips them. Resume with q402_recurring_resume
  * to bring the rule back to active without re-authoring it.
  *
  * Use this when the user says "stop my weekly payout for now" or
- * "pause my Friday rule until I sort out the recipient" — a milder
+ * "pause my Friday rule until I sort out the recipient" - a milder
  * action than cancel, fully reversible. List first with
  * q402_recurring_list to find the ruleId.
  *
@@ -21,7 +21,7 @@ export const RecurringPauseInputSchema = z.object({
     .string()
     .min(1)
     .describe(
-      "Rule id to pause. Obtain from q402_recurring_list — each entry's " +
+      "Rule id to pause. Obtain from q402_recurring_list - each entry's " +
         "`ruleId` field. Pausing is immediate and reversible.",
     ),
   walletId: z
@@ -39,10 +39,10 @@ export const RECURRING_PAUSE_TOOL = {
   name: "q402_recurring_pause",
   description:
     "Pause an active recurring-payment rule. Takes a ruleId (from " +
-    "q402_recurring_list). The rule transitions to status \"paused\" — the " +
+    "q402_recurring_list). The rule transitions to status \"paused\" - the " +
     "cron skips it on every tick until you resume. Fully reversible via " +
     "q402_recurring_resume. Use this when the user says 'pause my Friday " +
-    "payout' or 'hold on, stop my recurring rule for now' — gentler than " +
+    "payout' or 'hold on, stop my recurring rule for now' - gentler than " +
     "cancel, no re-authoring required. Authenticated by the paid Multichain " +
     "API key (same gate as create/cancel). Read q402_recurring_list first " +
     "to find the matching ruleId.",

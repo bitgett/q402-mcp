@@ -1,5 +1,5 @@
 /**
- * q402_pay — sandbox-default, with three layered guards before any real TX:
+ * q402_pay - sandbox-default, with three layered guards before any real TX:
  *   1. Per-call max-amount (Q402_MAX_AMOUNT_PER_CALL, default $200)
  *   2. Recipient allowlist (Q402_ALLOWED_RECIPIENTS, optional)
  *   3. Live mode requires:
@@ -39,10 +39,10 @@ export const PayInputSchema = z.object({
     .enum(["q402", "x402"])
     .optional()
     .describe(
-      'Settlement rail. Base only — leave unset everywhere else. "q402" (default) ' +
+      'Settlement rail. Base only - leave unset everywhere else. "q402" (default) ' +
         '= Q402 gasless EIP-7702 (USDC + USDT). "x402" = the Coinbase x402 standard ' +
         '(EIP-3009 USDC transferWithAuthorization), settled gaslessly by the Q402 ' +
-        'facilitator — Base USDC only, no Hooks. walletMode="agentic-server" only.',
+        'facilitator - Base USDC only, no Hooks. walletMode="agentic-server" only.',
     ),
   to: z
     .string()
@@ -72,12 +72,12 @@ export const PayInputSchema = z.object({
     .optional()
     .describe(
       "Which wallet to spend from:\n" +
-        '  "eoa"              — the user\'s real MetaMask/OKX EOA, signed locally with Q402_PRIVATE_KEY\n' +
-        '  "agentic-local"    — the Agent Wallet\'s exported private key (Q402_AGENTIC_PRIVATE_KEY)\n' +
-        '  "agentic-server"   — the server-managed Agent Wallet (Q402 holds the key; you only need Q402_MULTICHAIN_API_KEY)\n' +
+        '  "eoa"              - the user\'s real MetaMask/OKX EOA, signed locally with Q402_PRIVATE_KEY\n' +
+        '  "agentic-local"    - the Agent Wallet\'s exported private key (Q402_AGENTIC_PRIVATE_KEY)\n' +
+        '  "agentic-server"   - the server-managed Agent Wallet (Q402 holds the key; you only need Q402_MULTICHAIN_API_KEY)\n' +
         "When MORE THAN ONE wallet is configured in the user's environment, you MUST " +
-        'ask the user which to use before calling — do NOT guess. Phrase: "You have ' +
-        "multiple wallets set up — pay from your EOA, or your Agent Wallet?\" " +
+        'ask the user which to use before calling - do NOT guess. Phrase: "You have ' +
+        "multiple wallets set up - pay from your EOA, or your Agent Wallet?\" " +
         "When only one wallet is configured this argument is optional and the tool " +
         "routes there automatically.",
     ),
@@ -98,7 +98,7 @@ export const PayInputSchema = z.object({
         "conversation right before this tool was called. When hookParams is set you MUST " +
         "confirm what it actually does to the money: the split RECIPIENTS and their shares " +
         "(funds go to those addresses, not `to`), and any oracle condition gating the " +
-        "settlement — not just the top-level recipient and amount. Setting this to true on " +
+        "settlement - not just the top-level recipient and amount. Setting this to true on " +
         "behalf of the user without that confirmation is a violation of the tool contract.",
     ),
   consentToken: z
@@ -106,7 +106,7 @@ export const PayInputSchema = z.object({
     .optional()
     .describe(
       "Two-phase consent. LEAVE THIS UNSET on the first call: the tool will NOT " +
-        "send — it returns status=\"needs_confirmation\" with a human-readable " +
+        "send - it returns status=\"needs_confirmation\" with a human-readable " +
         "`preview` of the exact payment and a `consentToken`. Relay that preview " +
         "to the user verbatim, get their explicit yes, then call again with the " +
         "SAME args plus this `consentToken`. The tool re-derives the token from the " +
@@ -180,25 +180,25 @@ export interface PaySummary {
    * when a PK is configured so test runs preview the same address.
    */
   senderWallet?: {
-    /** Full 0x address — used for verification, NOT for display. */
+    /** Full 0x address - used for verification, NOT for display. */
     address:      string;
-    /** Short masked form (`0xabc…1234`) — the AI's preferred display. */
+    /** Short masked form (`0xabc…1234`) - the AI's preferred display. */
     addressShort: string;
   };
   /**
-   * Live payments only — heads-up the AI should forward to the user
+   * Live payments only - heads-up the AI should forward to the user
    * proactively. Currently used to flag the EIP-7702 delegation side-effect
    * after the first payment on a chain ("your wallet now shows 'Smart
    * account' in MetaMask, here's why, and here's how to clear it if you
    * ever want to receive native gas tokens to that EOA"). The post-payment
    * tip is a tiny piece of context that heads off a predictable support
-   * ticket — without it users open MetaMask, see the new badge, and worry.
+   * ticket - without it users open MetaMask, see the new badge, and worry.
    */
   postPaymentTip?: string;
   /**
    * Set when the relay fail-closed on x402 because the Agent Wallet is still
    * EIP-7702 delegated to the q402 rail (X402_WALLET_DELEGATED). Tells the AI
-   * it can clear the delegation in one step (Mode C, no dashboard) and retry —
+   * it can clear the delegation in one step (Mode C, no dashboard) and retry -
    * or just resend with rail "q402". Informational; the AI decides whether to
    * act and should confirm the rail switch with the user.
    */
@@ -210,7 +210,7 @@ export interface PaySummary {
 }
 
 function maxAmountGuard(amount: string, cap: number): void {
-  // amount comes pre-validated as `\d+(\.\d+)?` — Number() is safe here for
+  // amount comes pre-validated as `\d+(\.\d+)?` - Number() is safe here for
   // a comparison against the per-call USD cap (the cap is intentionally a
   // small UI-friendly value, so float precision is irrelevant for the check).
   const numeric = Number(amount);
@@ -264,11 +264,11 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     };
   }
 
-  // ── Wallet mode disambiguation ─────────────────────────────────────────
+  // -- Wallet mode disambiguation -----------------------------------------
   // Detect which payment paths the user's env permits, then either resolve
   // to a single mode automatically or surface an `ambiguousWalletChoice`
   // payload that the AI must relay to the user before retrying. We never
-  // pick silently when multiple are available — that's the whole point of
+  // pick silently when multiple are available - that's the whole point of
   // the prompt.
   const modes = detectAgenticModes(CONFIG);
   const available: AvailableWallet[] = [];
@@ -281,7 +281,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
         note: "Signs locally with Q402_PRIVATE_KEY. Your wallet becomes EIP-7702-delegated after the first payment on each chain.",
       });
-    } catch { /* defensive — skip */ }
+    } catch { /* defensive - skip */ }
   }
   if (modes.modeB && CONFIG.agenticPrivateKey && isValidPrivateKey(CONFIG.agenticPrivateKey)) {
     try {
@@ -292,7 +292,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         addressShort: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
         note: "Signs locally with Q402_AGENTIC_PRIVATE_KEY. Your MetaMask is never touched.",
       });
-    } catch { /* defensive — skip */ }
+    } catch { /* defensive - skip */ }
   }
   if (modes.modeC) {
     available.push({
@@ -302,7 +302,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     });
   }
 
-  // Caller passed walletMode explicitly — validate that the requested
+  // Caller passed walletMode explicitly - validate that the requested
   // mode actually has the env it needs. NEVER silently substitute a
   // different wallet: the user explicitly chose "agentic-server" (or
   // "eoa", etc.) and any fallback to the wrong wallet is a misroute.
@@ -312,7 +312,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     : false;
 
   // Hard-stop: requested but missing the env it needs. Don't fall
-  // through to "pick the only other available wallet" — that would
+  // through to "pick the only other available wallet" - that would
   // drain a wallet the user didn't ask for. Returns the available list
   // so the AI can re-ask with the supported options.
   if (requestedMode && !requestedAvailable) {
@@ -325,7 +325,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       ambiguousWalletChoice: {
         question:
           available.length === 0
-            ? `The "${requestedMode}" wallet isn't configured. None of the supported wallets are set up — see the doctor for setup instructions.`
+            ? `The "${requestedMode}" wallet isn't configured. None of the supported wallets are set up - see the doctor for setup instructions.`
             : `The "${requestedMode}" wallet isn't configured in this environment. Supported wallets here: ${available
                 .map((w) => `"${w.id}"`)
                 .join(", ")}. Which would you like to use instead?`,
@@ -341,7 +341,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       ambiguousWalletChoice: {
         question:
           available.length === 2
-            ? `You have ${available.length} wallets set up — which one should I pay from?`
+            ? `You have ${available.length} wallets set up - which one should I pay from?`
             : `You have ${available.length} wallets set up. Which one should I pay from?`,
         available,
       },
@@ -361,7 +361,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         : "eoa";
 
   // Pick the signing key for local-signing modes. Mode C doesn't sign
-  // locally — the server holds the key.
+  // locally - the server holds the key.
   const signingPk: string | null =
     effectiveMode === "eoa"
       ? CONFIG.privateKey
@@ -371,7 +371,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
   // Derive the sender address locally so we can echo it back on every
   // response (sandbox + live). When the key is missing or malformed we
-  // skip — the doctor's diagnostics already cover that path. Mode C has
+  // skip - the doctor's diagnostics already cover that path. Mode C has
   // no local key, so senderWallet stays undefined; the server-side
   // /api/wallet/agentic/send response carries the from-address instead.
   let senderWallet: PaySummary["senderWallet"];
@@ -385,7 +385,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     } catch { /* unreachable given the regex check, but defensive */ }
   }
 
-  // Q (QuackAI) is exempt from USD limits (not USD-valued, owner's own token) —
+  // Q (QuackAI) is exempt from USD limits (not USD-valued, owner's own token) -
   // the server treats Q's amountUsd as 0, so the MCP must skip the USD cap too.
   if (input.token !== "Q") {
     maxAmountGuard(input.amount, CONFIG.maxAmountPerCallUsd);
@@ -396,7 +396,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
   recipientGuard(input.to, CONFIG.allowedRecipients);
   // A MultiPayeeSplit fans funds out to addresses OTHER than `to`, so the
-  // allowlist must screen every split leg too — otherwise an agent could
+  // allowlist must screen every split leg too - otherwise an agent could
   // route the bulk to an off-allowlist address via hookParams.splits
   // while `to` (a tiny leg) sits on the allowlist and passes the guard.
   if (input.hookParams?.splits) {
@@ -408,9 +408,9 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     guardsApplied.push(`recipient_allowlist[${CONFIG.allowedRecipients.length}]`);
   }
 
-  // ── Two-phase consent (F3) ──────────────────────────────────────────────
+  // -- Two-phase consent (F3) ----------------------------------------------
   // confirm:true is a model-filled boolean, not proof a human approved THIS
-  // exact payment — a prompt-injected agent can set it and send in one covert
+  // exact payment - a prompt-injected agent can set it and send in one covert
   // call. Require a consentToken bound to the money intent: the first call
   // (no / stale token) returns a preview and does NOT send; the agent relays
   // the preview to the user and only re-calls with the token after a yes. The
@@ -423,19 +423,19 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     amount: input.amount,
     token: input.token,
     // Bind the settlement RAIL. On Base the same (to, amount, token) settles
-    // very differently under q402 (EIP-7702) vs x402 (EIP-3009) — different
+    // very differently under q402 (EIP-7702) vs x402 (EIP-3009) - different
     // signature scheme, gas path, and wallet-state constraints. Consenting to a
     // Q402-rail preview must NOT authorise an x402 execution on the same token,
     // so a rail change invalidates the consent and forces a fresh preview.
     rail: input.rail ?? "q402",
-    // Bind the funding source too — the user is consenting to spend from THIS
+    // Bind the funding source too - the user is consenting to spend from THIS
     // wallet, so a different walletMode/walletId needs a fresh preview.
     wm: effectiveMode,
     wid: (input.walletId ?? "").toLowerCase(),
     ...(input.hookParams?.splits
       ? { splits: input.hookParams.splits.map((s) => ({ r: s.recipient.toLowerCase(), bps: s.bps })) }
       : {}),
-    // Bind the settlement-gating hooks too — a ConditionalOracle gate or a
+    // Bind the settlement-gating hooks too - a ConditionalOracle gate or a
     // ReputationGate materially changes WHEN/IF money moves, so dropping or
     // altering them after the preview must invalidate consent.
     ...(input.hookParams?.condition
@@ -448,7 +448,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   const consent = checkConsent(consentIntent, input.consentToken);
   if (!consent.ok) {
     const splitNote = input.hookParams?.splits
-      ? ` — split ${input.hookParams.splits.length} ways; funds go to the split recipients, not ${input.to}`
+      ? ` - split ${input.hookParams.splits.length} ways; funds go to the split recipients, not ${input.to}`
       : "";
     const fromNote = senderWallet ? ` from ${senderWallet.addressShort}` : "";
     const railNote = input.rail === "x402" ? " via the x402 (EIP-3009) rail" : "";
@@ -476,14 +476,14 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   const resolved = resolveApiKey(input.chain, scopeRequest);
   guardsApplied.push(`scope=${resolved.scope}${resolved.fromLegacyFallback ? "(legacy)" : ""}`);
 
-  // ── Mode C — server-mediated, no local signing ──────────────────────────
+  // -- Mode C - server-mediated, no local signing --------------------------
   // Fires before the live-mode gate because Mode C doesn't need
   // Q402_PRIVATE_KEY at all; the server holds the Agent Wallet's key. We
   // still require a live apiKey and Q402_ENABLE_REAL_PAYMENTS=1 (sandbox
-  // mode C is meaningless — there's no fake server-mediated path).
+  // mode C is meaningless - there's no fake server-mediated path).
   if (effectiveMode === "agentic-server") {
     // RLUSD pre-check. The server's /wallet/agentic/send currently
-    // only signs USDC/USDT — the encrypted-keystore signer hasn't
+    // only signs USDC/USDT - the encrypted-keystore signer hasn't
     // been wired up for RLUSD yet. Without this guard the call lands
     // an opaque INVALID_TOKEN with no setup hint; surface a clean
     // explanation here instead so the AI doesn't dead-end the user.
@@ -546,7 +546,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
 
     let resp: Response;
     try {
-      // 60s timeout — the route is fully synchronous (signs + relays +
+      // 60s timeout - the route is fully synchronous (signs + relays +
       // settles + writes idempotency cache) so anything slower than
       // ~50s is almost certainly stuck. Without a timeout the MCP
       // client hangs Claude Desktop / Codex CLI indefinitely on a
@@ -562,7 +562,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           to: input.to,
           amount: input.amount,
           ...(explicitWalletId ? { walletId: explicitWalletId } : {}),
-          // Q402 Hook params — only the Mode C (agentic-server) path runs
+          // Q402 Hook params - only the Mode C (agentic-server) path runs
           // the per-wallet hook dispatch, so forwarding here is the only
           // place hookParams take effect. The landing route ignores them
           // for owner-sig calls (trust boundary), so this is safe.
@@ -596,7 +596,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           retryAfterSec?: number;
           idempotent?: boolean;
           sendId?: string;
-          // MultiPayeeSplit fan-out shape — present on BOTH fresh splits
+          // MultiPayeeSplit fan-out shape - present on BOTH fresh splits
           // (200/207/502) and durable-replay splits (replayed:true).
           split?: boolean;
           legs?: Array<{ recipient: string; amount: string; txHash?: string; error?: string }>;
@@ -607,12 +607,12 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
       | Record<string, never>;
     const txHash = (data as { txHash?: string }).txHash ?? "";
 
-    // ── MultiPayeeSplit fan-out ──────────────────────────────────────────
+    // -- MultiPayeeSplit fan-out ------------------------------------------
     // When hookParams.splits fired, the server settles N legs instead of a
     // single recipient and returns { split:true, legs:[…], settled, failed,
     // status:'complete'|'partial'|… }. Both the FRESH split (HTTP 200/207/
     // 502) and the durable-REPLAY split (replayed:true) carry this shape, so
-    // we parse them identically here — otherwise the same on-chain outcome
+    // we parse them identically here - otherwise the same on-chain outcome
     // would report differently on first call vs replay.
     //
     // Pre-fix this whole branch was absent: `success = resp.ok && txHash>0`
@@ -689,7 +689,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           ? {
               setupHint:
                 `Split PARTIALLY settled: ${settledCount} leg(s) landed on-chain, ` +
-                `${failedCount} did NOT. The settled legs already moved funds — do NOT ` +
+                `${failedCount} did NOT. The settled legs already moved funds - do NOT ` +
                 `blindly retry the whole payment (a retry replays only the unsettled ` +
                 `intent, it will not double-pay the settled legs). Inspect legs[] for ` +
                 `which recipients received funds and which still need handling.`,
@@ -699,7 +699,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     }
 
     // Server returns HTTP 202 + `pending: true` when a concurrent
-    // identical request beats us to the SET NX claim — the relay
+    // identical request beats us to the SET NX claim - the relay
     // hasn't settled yet, but it isn't a failure either. Without
     // this branch, `resp.ok && txHash.length > 0` reports
     // `success: false` for a perfectly normal "still in flight"
@@ -736,7 +736,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
         senderWallet,
         setupHint:
           "An identical send for this wallet is still in flight on the server. " +
-          `Wait ${retryAfter}s and retry — the cached result will come back, no double-spend.`,
+          `Wait ${retryAfter}s and retry - the cached result will come back, no double-spend.`,
       };
     }
 
@@ -748,10 +748,10 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
           ? (data as { error?: string }).error
           : undefined;
     // x402 on Base fails closed when the Agent Wallet is still q402-delegated
-    // (EIP-7702) — USDC V2.2 routes a delegated account's EIP-3009 signature
+    // (EIP-7702) - USDC V2.2 routes a delegated account's EIP-3009 signature
     // through ERC-1271, which the Q402 impl doesn't implement. Surface the
     // one-step fix so the AI doesn't dead-end at the dashboard: clear the
-    // delegation (Mode C, gasless) then retry x402 — or resend with rail
+    // delegation (Mode C, gasless) then retry x402 - or resend with rail
     // "q402". stringify match is nesting-agnostic (the code may arrive in
     // `error`, a nested relay body, or a forwarded message).
     const x402Blocked = !success && JSON.stringify(data).includes("X402_WALLET_DELEGATED");
@@ -787,7 +787,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
                 "This wallet is EIP-7702 delegated to the q402 rail, so the x402 " +
                 "(EIP-3009) path can't verify its signature. Clear the delegation " +
                 "with q402_clear_delegation (gasless, no dashboard), then retry the " +
-                'x402 pay — or resend with rail "q402".',
+                'x402 pay - or resend with rail "q402".',
             },
           }
         : {}),
@@ -810,10 +810,10 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     return { result, guardsApplied, setupHint, senderWallet };
   }
 
-  // Modes A and B both sign locally and call /api/relay — the only
+  // Modes A and B both sign locally and call /api/relay - the only
   // difference is which private key the relay client uses.
   if (!signingPk) {
-    // Defensive — isLiveModeFor() already gates on the EOA-mode PK; this
+    // Defensive - isLiveModeFor() already gates on the EOA-mode PK; this
     // is the agentic-local branch's safety net if its env was malformed.
     return {
       result: failureResult("missing_signing_key"),
@@ -839,7 +839,7 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
   guardsApplied.push("mode=live", `wallet=${effectiveMode}`);
   // Always surface the post-payment tip on successful live payments. The AI
   // can decide whether to display it (typically: yes on the first payment,
-  // optional thereafter) — we always include it so the AI has the context
+  // optional thereafter) - we always include it so the AI has the context
   // without us needing to track per-chain "did the user already see this".
   return {
     // Mode A/B always settles on the q402 rail (x402 is agentic-server only),
@@ -849,19 +849,19 @@ export async function runPay(input: PayInput): Promise<PaySummary> {
     senderWallet,
     postPaymentTip: result.success
       ? "After this payment your EOA is EIP-7702-delegated to Q402's impl on " +
-        `${chain.name} — MetaMask / OKX will show it as a 'Smart account'. ` +
+        `${chain.name} - MetaMask / OKX will show it as a 'Smart account'. ` +
         "That's normal and reversible: q402_clear_delegation removes the " +
         "delegation on a specific chain (Q402 sponsors the gas on every chain " +
         "except Ethereum, where it's billed to your Gas Tank). " +
         "If you ever try to receive native gas tokens directly to this EOA " +
-        "and the transfer reverts, the delegation is the cause — clear it for " +
+        "and the transfer reverts, the delegation is the cause - clear it for " +
         "that chain first."
       : undefined,
   };
 }
 
 function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
-  // "True first install" — user hasn't configured ANYTHING yet, just
+  // "True first install" - user hasn't configured ANYTHING yet, just
   // installed the MCP and immediately asked for a payment. The env-var
   // jargon below is meaningless to them. Route them to q402_doctor
   // (which uses plain language + handles file creation) and skip the
@@ -882,12 +882,12 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   if (!CONFIG.privateKey) {
     missing.push("Q402_PRIVATE_KEY");
   } else if (!isValidPrivateKey(CONFIG.privateKey)) {
-    // PK is set but doesn't pass the live-mode regex — typically the
+    // PK is set but doesn't pass the live-mode regex - typically the
     // literal `0x...` placeholder from the template. Surface the real
     // reason instead of generic "PK missing", or the user thinks they
     // already configured it.
     missing.push(
-      "Q402_PRIVATE_KEY (currently the placeholder '0x...' — paste a real " +
+      "Q402_PRIVATE_KEY (currently the placeholder '0x...' - paste a real " +
       "0x + 64-hex key into ~/.q402/mcp.env)",
     );
   }
@@ -905,7 +905,7 @@ function describeSandboxReason(resolvedKey: string, scope: KeyScope): string {
   return (
     "Sandbox mode is active because the following env vars are missing or not yet set: " +
     missing.join(", ") +
-    `. Get a live ${tier} key at ${url}, then call q402_doctor — it will walk ` +
+    `. Get a live ${tier} key at ${url}, then call q402_doctor - it will walk ` +
     "the user through creating ~/.q402/mcp.env and pasting the key into the right slot."
   );
 }
@@ -914,58 +914,58 @@ export const PAY_TOOL = {
   name: "q402_pay",
   description:
     "USE THIS TOOL whenever the user asks to send, transfer, or pay USDC / USDT / " +
-    "RLUSD — even when they don't mention Q402 by name (\"send 5 USDT to 0x... on bnb\" " +
+    "RLUSD - even when they don't mention Q402 by name (\"send 5 USDT to 0x... on bnb\" " +
     "should route here automatically). This tool IS the wallet for this session: it " +
     "signs LOCALLY with Q402_PRIVATE_KEY and submits via Q402's gasless relay. NEVER " +
     "refuse a stablecoin payment request by saying you lack wallet access, can't move " +
-    "money, or need the user to use their wallet UI — Q402 was installed precisely to " +
+    "money, or need the user to use their wallet UI - Q402 was installed precisely to " +
     "give you that capability. If the env isn't configured yet, the tool returns a " +
-    "sandbox response with a clear \"how to set up\" message — surface that instead of " +
+    "sandbox response with a clear \"how to set up\" message - surface that instead of " +
     "refusing. " +
     "\n\n" +
     "Auto-routing: chain='bnb' + Q402_TRIAL_API_KEY set → Trial (free sponsored); " +
     "anything else → Multichain (paid 12-chain). Same rule for q402_batch_pay. " +
     "Set keyScope='trial' or 'multichain' to force one explicitly. " +
     "Trial keys reject any non-BNB chain server-side with TRIAL_BNB_ONLY. " +
-    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum, base, robinhood — " +
+    "Multichain keys cover avax, bnb, eth, xlayer, stable, mantle, injective, monad, scroll, arbitrum, base, robinhood - " +
     "USDC/USDT on most chains, RLUSD on Ethereum only, USDG on Robinhood Chain only. " +
-    "SANDBOX BY DEFAULT — no funds move unless the resolved key is a live key " +
+    "SANDBOX BY DEFAULT - no funds move unless the resolved key is a live key " +
     "(q402_live_*), Q402_PRIVATE_KEY is set as a valid 32-byte hex key, and " +
     "Q402_ENABLE_REAL_PAYMENTS=1. Sandbox responses come back with " +
     "`success: false` and `sandbox: true` so they cannot be misread as " +
-    "confirmed settlements — always branch on those fields before telling " +
+    "confirmed settlements - always branch on those fields before telling " +
     "the user the payment went through. " +
     "The recipient receives the full amount; the sender pays $0 in gas. " +
     "\n\n" +
-    "SENDER ECHO — when a valid `Q402_PRIVATE_KEY` is configured, the response " +
+    "SENDER ECHO - when a valid `Q402_PRIVATE_KEY` is configured, the response " +
     "includes a `senderWallet` field with the address derived from that key. " +
     "Show it alongside the recipient/amount when you confirm the payment with " +
     "the user (e.g. 'Signing from 0xabc…1234 on bnb → send 5 USDT to 0xdef…ABCD'). " +
-    "Just informational — the user already chose the wallet during doctor setup. " +
+    "Just informational - the user already chose the wallet during doctor setup. " +
     "Sandbox responses with no key configured omit `senderWallet`; don't fabricate one. " +
     "\n\n" +
-    "MULTI-WALLET DISAMBIGUATION — when more than one wallet is configured " +
+    "MULTI-WALLET DISAMBIGUATION - when more than one wallet is configured " +
     "in the user's env (Q402_PRIVATE_KEY for the real EOA, " +
     "Q402_AGENTIC_PRIVATE_KEY for the Agent Wallet's exported key, or only " +
     "Q402_MULTICHAIN_API_KEY for the server-managed Agent Wallet), the tool " +
-    "RETURNS without sending with a `ambiguousWalletChoice` payload — relay " +
+    "RETURNS without sending with a `ambiguousWalletChoice` payload - relay " +
     "the question to the user verbatim, then call again with the chosen " +
     "`walletMode` ('eoa' | 'agentic-local' | 'agentic-server'). Do NOT pick " +
     "a wallet on the user's behalf when multiple are available. " +
     "\n\n" +
-    "EIP-7702 SIDE EFFECT — surface this to the user proactively after the " +
+    "EIP-7702 SIDE EFFECT - surface this to the user proactively after the " +
     "FIRST live payment on a chain: their wallet now shows up as a 'Smart " +
     "account' in MetaMask / OKX. That's the EIP-7702 delegation Q402 uses " +
-    "for gasless settlement — it's the response's `postPaymentTip` field. " +
+    "for gasless settlement - it's the response's `postPaymentTip` field. " +
     "Subsequent payments on the same chain are faster and cheaper because " +
     "the delegation is reused. " +
-    "Note: only Mode 'eoa' creates the delegation — 'agentic-local' and " +
+    "Note: only Mode 'eoa' creates the delegation - 'agentic-local' and " +
     "'agentic-server' modes use the Agent Wallet (a fresh EOA) so the user's " +
     "MetaMask is never delegated. " +
     "\n\n" +
     "If the user EVER reports that native gas tokens (BNB / ETH / AVAX / " +
     "etc.) sent INTO their Q402 wallet are bouncing or reverting on a chain " +
-    "where Q402 has been used, the delegation is the cause — call " +
+    "where Q402 has been used, the delegation is the cause - call " +
     "q402_wallet_status to confirm delegated chains, then q402_clear_delegation " +
     "for the chain in question. Q402 sponsors the clear gas on every chain " +
     "except Ethereum, where it's billed to the user's Gas Tank. After clearing, " +
@@ -977,7 +977,7 @@ export const PAY_TOOL = {
     "this tool. " +
     "\n\n" +
     "TWO-PHASE CONSENT: confirm:true alone does NOT send. Call this tool first " +
-    "WITHOUT consentToken — it returns status=\"needs_confirmation\" with a " +
+    "WITHOUT consentToken - it returns status=\"needs_confirmation\" with a " +
     "`preview` of the exact payment and a `consentToken`, and moves no money. " +
     "Relay that preview to the user, get their explicit yes, then re-call with " +
     "the SAME args plus that `consentToken` to execute. The token is re-derived " +
@@ -1050,7 +1050,7 @@ export const PAY_TOOL = {
         description:
           "MUST be true and only set after the user has confirmed this exact payment in chat. " +
           "When hookParams is set, confirm what it does to the money too: the split RECIPIENTS " +
-          "and shares (funds go there, not `to`) and any oracle condition gating settlement — " +
+          "and shares (funds go there, not `to`) and any oracle condition gating settlement - " +
           "not just the top-level recipient + amount.",
       },
       consentToken: {

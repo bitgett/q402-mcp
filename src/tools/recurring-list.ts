@@ -1,12 +1,12 @@
 /**
- * q402_recurring_list — list the Agent Wallet's recurring-payment rules.
+ * q402_recurring_list - list the Agent Wallet's recurring-payment rules.
  *
  * Mode-C-only: the configured Multichain API key authenticates the call.
  * No private key required. Returns the same rule shape the dashboard
  * uses (status, frequency, next-run timestamp, fired count, last
  * error) so the AI can describe the schedule back to the user.
  *
- * Read-only — does not create, modify, or cancel rules. Use
+ * Read-only - does not create, modify, or cancel rules. Use
  * `q402_recurring_create` to author and `q402_recurring_cancel` to stop.
  *
  * Hits POST /api/wallet/agentic/recurring-by-key { action: "list" }.
@@ -37,7 +37,7 @@ export const RECURRING_LIST_TOOL = {
     "fire is scheduled, how many fires have completed, and the most recent error " +
     "(if any). Use this when the user asks 'what scheduled payouts do I have?' or " +
     "before authoring a new rule with q402_recurring_create. Authenticated by the " +
-    "configured Multichain API key — no private key required.",
+    "configured Multichain API key - no private key required.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -97,7 +97,7 @@ export async function runRecurringList(
         "or open the dashboard to create rules from the UI.",
     };
   }
-  // Recurring lookups also gate behind the Multichain key — same scope
+  // Recurring lookups also gate behind the Multichain key - same scope
   // as create/cancel. Pre-check locally so Trial-only users hear "you
   // need a paid key" from the tool instead of the server.
   if (!CONFIG.multichainApiKey || !CONFIG.multichainApiKey.startsWith("q402_live_")) {
@@ -139,7 +139,7 @@ export async function runRecurringList(
         dashboardUrl,
         setupHint:
           `recurring-list failed: ${errBody.error ?? `HTTP ${res.status}`}` +
-          (errBody.message ? ` — ${errBody.message}` : ""),
+          (errBody.message ? ` - ${errBody.message}` : ""),
       };
     }
     const data = (await res.json()) as { walletId: string; rules: RuleSummary[]; count: number };

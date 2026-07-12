@@ -1,12 +1,12 @@
 /**
- * q402_bridge_gas_tank — show LINK + native Gas Tank balance per CCIP chain.
+ * q402_bridge_gas_tank - show LINK + native Gas Tank balance per CCIP chain.
  *
  * Lets the agent check whether the user has enough Gas Tank balance to fund
  * a bridge before committing. Returns LINK balance + native balance per of
  * the 3 CCIP chains (eth/avax/arbitrum). Surfaces deposit addresses for
  * top-ups.
  *
- * Current release: read-only guidance — full balance fetch requires
+ * Current release: read-only guidance - full balance fetch requires
  * owner-sig auth which lands in a follow-up. Tool exists today so
  * doctor/agents can route users to the dashboard's Bridge Gas Tank
  * section.
@@ -21,7 +21,7 @@ export const BridgeGasTankInputSchema = z.object({
 export const BRIDGE_GAS_TANK_TOOL = {
   name: "q402_bridge_gas_tank",
   description:
-    "READ-ONLY GUIDANCE TOOL — Bridge Gas Tank live balance via MCP is not yet wired (requires " +
+    "READ-ONLY GUIDANCE TOOL - Bridge Gas Tank live balance via MCP is not yet wired (requires " +
     "owner-sig auth which is dashboard-bound until session-binding lands, same follow-up as " +
     "q402_bridge_history). Tool returns static guidance: the LINK/native fee model, the 3-chain " +
     "CCIP triangle (eth/avax/arbitrum), the canonical Gas Tank deposit address, and a dashboard " +
@@ -33,13 +33,13 @@ export const BRIDGE_GAS_TANK_TOOL = {
       ownerAddress: {
         type: "string" as const,
         pattern: "^0x[0-9a-fA-F]{40}$",
-        description: "Owner EOA (0x address, optional — defaults to configured wallet).",
+        description: "Owner EOA (0x address, optional - defaults to configured wallet).",
       },
     },
   },
 };
 
-// Keep this in sync with `app/lib/wallets.ts` — GASTANK_ADDRESS is the
+// Keep this in sync with `app/lib/wallets.ts` - GASTANK_ADDRESS is the
 // single deposit sink for both Q402 settlement Gas Tank and Bridge Gas
 // Tank top-ups. Drift here means users mis-route funds.
 const GASTANK_ADDRESS = "0x10fb078594b70ee8024b2ded3d67fc3aa9ea747a";

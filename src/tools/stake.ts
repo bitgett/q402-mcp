@@ -1,8 +1,8 @@
 /**
- * q402_stake / q402_unstake — WRITE / MOVES FUNDS. Gasless Q (QuackAI) token
+ * q402_stake / q402_unstake - WRITE / MOVES FUNDS. Gasless Q (QuackAI) token
  * staking into QuackAiStake on BNB (and unstaking back) from a server-managed
  * Agent Wallet (Mode C). The server holds the encrypted key, signs the
- * Stake/Unstake witness, and the relayer sponsors gas — the MCP never holds a
+ * Stake/Unstake witness, and the relayer sponsors gas - the MCP never holds a
  * key for this path. Thin wrapper over POST /api/wallet/agentic/stake.
  *
  * STAKE binds an amount (supports "max" = the wallet's whole Q balance, resolved
@@ -21,7 +21,7 @@ import { CONFIG, resolveApiKey } from "../config.js";
 import { checkConsent } from "../consent.js";
 import { fetchStakePositions, type StakePositionRecord } from "./stake-positions.js";
 
-/** Lock tiers (display only — the staking contract validates + reverts on an unknown tier). */
+/** Lock tiers (display only - the staking contract validates + reverts on an unknown tier). */
 const STAKE_TIERS = [
   { stakeType: 0, lockDays: 30, aprPct: 10 },
   { stakeType: 1, lockDays: 60, aprPct: 15 },
@@ -30,7 +30,7 @@ const STAKE_TIERS = [
 ] as const;
 const TIER_VALUES = STAKE_TIERS.map((t) => t.stakeType);
 
-// ── q402_stake ────────────────────────────────────────────────────────────
+// -- q402_stake ------------------------------------------------------------
 
 export const StakeInputSchema = z.object({
   amount: z
@@ -47,23 +47,23 @@ export const StakeInputSchema = z.object({
     ),
   walletId: z.string().optional().describe("Optional Agent Wallet address to stake from. Omit for the default."),
   confirm: z.boolean().optional().describe("MUST be true to actually stake. Omit to preview (no funds move)."),
-  consentToken: z.string().optional().describe("Two-phase consent — leave unset to preview + get a token, then re-call with confirm:true + this token."),
+  consentToken: z.string().optional().describe("Two-phase consent - leave unset to preview + get a token, then re-call with confirm:true + this token."),
 });
 
 export const STAKE_TOOL = {
   name: "q402_stake",
   description:
-    "WRITE — MOVES FUNDS. Stakes the Agent Wallet's Q (QuackAI) token into QuackAiStake " +
+    "WRITE - MOVES FUNDS. Stakes the Agent Wallet's Q (QuackAI) token into QuackAiStake " +
     "on BNB Chain, gaslessly. Server-managed Agent Wallet path (Mode C): the server holds " +
     "the encrypted key, signs the stake, and sponsors gas. Pick a lock tier (stakeType 0-3): " +
-    "0=30d/10%, 1=60d/15%, 2=120d/32%, 3=180d/40% APR — longer lock, higher APR. Q is BNB-only. " +
+    "0=30d/10%, 1=60d/15%, 2=120d/32%, 3=180d/40% APR - longer lock, higher APR. Q is BNB-only. " +
     'amount accepts "max" (stake the wallet\'s whole Q balance). \n\n' +
-    "REQUIRES CONFIRMATION — like q402_pay, refuses to execute unless confirm:true. Call FIRST " +
+    "REQUIRES CONFIRMATION - like q402_pay, refuses to execute unless confirm:true. Call FIRST " +
     "without confirm to preview (amount, tier, lock, wallet); show the user, get approval, THEN " +
     "re-call with confirm:true + the consentToken. \n\n" +
-    "SANDBOX BY DEFAULT — no funds move unless a live Multichain key (q402_live_*) is configured " +
+    "SANDBOX BY DEFAULT - no funds move unless a live Multichain key (q402_live_*) is configured " +
     "AND Q402_ENABLE_REAL_PAYMENTS=1. \n\n" +
-    "RETRY SAFETY — on status=\"uncertain\" (broadcast unconfirmed) the stake MAY have settled; do " +
+    "RETRY SAFETY - on status=\"uncertain\" (broadcast unconfirmed) the stake MAY have settled; do " +
     "NOT blindly retry. The server dedupes identical (tier, amount) calls for 15 min.",
   inputSchema: {
     type: "object" as const,
@@ -71,7 +71,7 @@ export const STAKE_TOOL = {
       amount: { type: "string" as const, description: 'Human-readable Q amount to stake, e.g. "1000", or "max" for the whole Q balance.' },
       stakeType: { type: "number" as const, enum: TIER_VALUES as unknown as number[], description: "Lock tier 0-3 (0=30d/10% … 3=180d/40% APR). Longer lock = higher APR." },
       walletId: { type: "string" as const, description: "Optional Agent Wallet address to stake from. Defaults to the owner's default wallet." },
-      confirm: { type: "boolean" as const, description: "MUST be true to actually stake — only after the user approved this exact stake. Omit to preview." },
+      confirm: { type: "boolean" as const, description: "MUST be true to actually stake - only after the user approved this exact stake. Omit to preview." },
       consentToken: { type: "string" as const, description: "Two-phase consent token. Leave unset on the first call to preview + get a token; re-call with confirm:true + this token." },
     },
     required: ["amount", "stakeType"],
@@ -79,7 +79,7 @@ export const STAKE_TOOL = {
   },
 };
 
-// ── q402_unstake ──────────────────────────────────────────────────────────
+// -- q402_unstake ----------------------------------------------------------
 
 export const UnstakeInputSchema = z.object({
   ith: z
@@ -90,16 +90,16 @@ export const UnstakeInputSchema = z.object({
   all: z
     .boolean()
     .optional()
-    .describe("Set true to unstake EVERY matured (exitable) stake — one on-chain exit per record. Mutually exclusive with ith."),
+    .describe("Set true to unstake EVERY matured (exitable) stake - one on-chain exit per record. Mutually exclusive with ith."),
   walletId: z.string().optional().describe("Optional Agent Wallet address to unstake from. Omit for the default."),
   confirm: z.boolean().optional().describe("MUST be true to actually unstake. Omit to preview."),
-  consentToken: z.string().optional().describe("Two-phase consent — leave unset to preview + get a token, then re-call with confirm:true + this token."),
+  consentToken: z.string().optional().describe("Two-phase consent - leave unset to preview + get a token, then re-call with confirm:true + this token."),
 });
 
 export const UNSTAKE_TOOL = {
   name: "q402_unstake",
   description:
-    "WRITE — MOVES FUNDS. Unstakes the Agent Wallet's matured Q from QuackAiStake on BNB back to " +
+    "WRITE - MOVES FUNDS. Unstakes the Agent Wallet's matured Q from QuackAiStake on BNB back to " +
     "the wallet, gaslessly (Mode C, server-signed, relayer-sponsored gas). Unstake is PER-RECORD: " +
     "QuackAiStake exits one matured stake at a time by its index. Pass `ith` (a record index from " +
     "q402_stake_positions) to exit one stake, or `all: true` to exit EVERY matured stake (one tx " +
@@ -113,7 +113,7 @@ export const UNSTAKE_TOOL = {
       ith: { type: "number" as const, description: "Record index to exit (one matured stake). From q402_stake_positions. Must be >= 1." },
       all: { type: "boolean" as const, description: "Exit EVERY matured stake (one on-chain exit per record). Mutually exclusive with ith." },
       walletId: { type: "string" as const, description: "Optional Agent Wallet address. Defaults to the owner's default wallet." },
-      confirm: { type: "boolean" as const, description: "MUST be true to actually unstake — only after user approval. Omit to preview." },
+      confirm: { type: "boolean" as const, description: "MUST be true to actually unstake - only after user approval. Omit to preview." },
       consentToken: { type: "string" as const, description: "Two-phase consent token. Leave unset to preview + get a token; re-call with confirm:true + this token." },
     },
     additionalProperties: false,
@@ -178,7 +178,7 @@ export async function runStake(input: z.infer<typeof StakeInputSchema>) {
     // "max" MUST resolve a concrete cap = the wallet's current Q balance, and that
     // cap is BOUND into the consent below. If the balance grows between preview and
     // confirm the cap changes, the preview token no longer matches, and the user is
-    // forced to re-approve — so "approve 100 Q max" can never settle as 1,000.
+    // forced to re-approve - so "approve 100 Q max" can never settle as 1,000.
     try {
       const { ok, data } = await fetchStakePositions(live.apiKey, walletId);
       if (ok && data.qBalance && Number(data.qBalance) > 0) {
@@ -209,20 +209,20 @@ export async function runStake(input: z.infer<typeof StakeInputSchema>) {
   const live = requireLiveKey();
   if ("error" in live) return live.error;
   if (!CONFIG.realPaymentsRequested) {
-    return { content: [{ type: "text" as const, text: JSON.stringify({ sandbox: true, success: false, status: "sandbox", action: "stake", amount: isMax ? "max" : input.amount, stakeType, walletId: walletId ?? null, setupHint: "Sandbox mode — set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real stake. No funds moved." }, null, 2) }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify({ sandbox: true, success: false, status: "sandbox", action: "stake", amount: isMax ? "max" : input.amount, stakeType, walletId: walletId ?? null, setupHint: "Sandbox mode - set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real stake. No funds moved." }, null, 2) }] };
   }
 
   let res: { ok: boolean; status: number; data: StakeActionData };
   try {
     res = await postStake(live.apiKey, { action: "stake", amount: isMax ? "max" : input.amount, ...(cap ? { cap } : {}), stakeType, ...(walletId ? { walletId } : {}) });
   } catch (e) {
-    return { content: [{ type: "text" as const, text: JSON.stringify({ status: "uncertain", success: false, action: "stake", error: e instanceof Error ? e.message : String(e), message: "Network error before a confirmed response — the stake may or may not have submitted. Do NOT blindly retry; the server dedupes an identical call for 15 min." }, null, 2) }], isError: true };
+    return { content: [{ type: "text" as const, text: JSON.stringify({ status: "uncertain", success: false, action: "stake", error: e instanceof Error ? e.message : String(e), message: "Network error before a confirmed response - the stake may or may not have submitted. Do NOT blindly retry; the server dedupes an identical call for 15 min." }, null, 2) }], isError: true };
   }
 
   const data = res.data;
   if (!res.ok) {
     if (res.status === 502 || data.status === "uncertain") {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ status: "uncertain", success: false, action: "stake", txHash: data.txHash ?? null, error: data.error ?? "settlement_uncertain", message: "Broadcast but unconfirmed — the stake may have settled. Verify on-chain first." }, null, 2) }], isError: true };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ status: "uncertain", success: false, action: "stake", txHash: data.txHash ?? null, error: data.error ?? "settlement_uncertain", message: "Broadcast but unconfirmed - the stake may have settled. Verify on-chain first." }, null, 2) }], isError: true };
     }
     return { content: [{ type: "text" as const, text: `Q stake failed (HTTP ${res.status}): ${JSON.stringify(data)}` }], isError: true };
   }
@@ -288,7 +288,7 @@ export async function runUnstake(input: z.infer<typeof UnstakeInputSchema>) {
   }
 
   if (!CONFIG.realPaymentsRequested) {
-    return { content: [{ type: "text" as const, text: JSON.stringify({ sandbox: true, success: false, status: "sandbox", action: "unstake", positions: targets.map((t) => t.ith), setupHint: "Sandbox mode — set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real unstake. No funds moved." }, null, 2) }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify({ sandbox: true, success: false, status: "sandbox", action: "unstake", positions: targets.map((t) => t.ith), setupHint: "Sandbox mode - set Q402_ENABLE_REAL_PAYMENTS=1 to fire a real unstake. No funds moved." }, null, 2) }] };
   }
 
   // Execute one exit per target record (sequential). Stop on the first uncertain
@@ -320,7 +320,7 @@ export async function runUnstake(input: z.infer<typeof UnstakeInputSchema>) {
   const complete = settled === targets.length;
   const status = complete ? "settled" : uncertain ? "partial_uncertain" : "partial_failure";
   const summary = `Unstaked ${settled}/${targets.length} matured position(s) on BNB${
-    uncertain ? " — one result is UNCERTAIN (broadcast unconfirmed); verify on-chain before retrying." : failed > 0 ? ` — ${failed} failed.` : "."
+    uncertain ? " - one result is UNCERTAIN (broadcast unconfirmed); verify on-chain before retrying." : failed > 0 ? ` - ${failed} failed.` : "."
   }`;
   return {
     content: [

@@ -1,11 +1,11 @@
 /**
- * q402_wallet_status — read-only, no API key required.
+ * q402_wallet_status - read-only, no API key required.
  *
  * Reports the EIP-7702 delegation state of the EOA derived from
  * Q402_PRIVATE_KEY across all 12 Q402-supported chains. Read-only:
  * no signing, no funds movement, no quota consumption.
  *
- * Useful as the diagnostic companion to `q402_clear_delegation` —
+ * Useful as the diagnostic companion to `q402_clear_delegation` -
  * agents call this first to see which chains have an active
  * delegation, then call clear_delegation for the chains the user
  * wants to reset.
@@ -29,7 +29,7 @@ interface WalletStatusResult {
   chains?:        Record<string, ChainState>;
   summary?:       string;
   /** Set when Q402_PRIVATE_KEY isn't available or the relay endpoint
-   *  rejected the request — the tool short-circuits with a clear hint. */
+   *  rejected the request - the tool short-circuits with a clear hint. */
   error?:         string;
   hint?:          string;
   /** When the relay returned 429 RATE_LIMITED, this carries the cooldown
@@ -60,7 +60,7 @@ export async function runWalletStatus(): Promise<WalletStatusResult> {
   let body: unknown;
   let res:  Response;
   try {
-    // 10s timeout — endpoint fans out 9 parallel eth_getCode calls on
+    // 10s timeout - endpoint fans out 9 parallel eth_getCode calls on
     // the server but completes in 200-500ms when healthy. A stall past
     // 10s means the relay is unhealthy; bail rather than hang the tool.
     res  = await fetch(url, { signal: AbortSignal.timeout(10_000) });
@@ -74,7 +74,7 @@ export async function runWalletStatus(): Promise<WalletStatusResult> {
   }
   if (!res.ok) {
     // Propagate the relay's structured fields (retryAfterSec, hint) so the
-    // agent can tell the user something useful — e.g. "try again in N
+    // agent can tell the user something useful - e.g. "try again in N
     // seconds" on a 429 instead of a bare HTTP code.
     const errBody = body as { error?: string; reason?: string; hint?: string; retryAfterSec?: number };
     return {
@@ -99,7 +99,7 @@ export const WALLET_STATUS_TOOL = {
     "Report the EIP-7702 delegation status of your Q402 wallet (the EOA " +
     "derived from Q402_PRIVATE_KEY) across all 12 Q402-supported chains. " +
     "Returns per-chain { delegated, impl } and a one-line summary. Read-" +
-    "only — no signing, no on-chain TX, no quota consumption. Pair with " +
+    "only - no signing, no on-chain TX, no quota consumption. Pair with " +
     "q402_clear_delegation when the user wants to reset a specific chain. " +
     "Requires Q402_PRIVATE_KEY in env (same as q402_pay).",
   inputSchema: {

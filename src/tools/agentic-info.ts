@@ -1,5 +1,5 @@
 /**
- * q402_agentic_info — read-only Agent Wallet introspection.
+ * q402_agentic_info - read-only Agent Wallet introspection.
  *
  * Surfaces the Agent Wallet that the configured Multichain API key
  * unlocks: the wallet address, the per-tx and daily spending caps, the
@@ -39,9 +39,9 @@ export const AGENTIC_INFO_TOOL = {
     "Read-only Agent Wallet introspection. Returns the wallet address, " +
     "per-tx and daily caps, archive state, an aggregate USD balance, AND a " +
     "per-chain breakdown (`byChain`) of which chains actually hold USDC/USDT " +
-    "across the 12 supported EVM chains — so you can see WHERE funds are " +
+    "across the 12 supported EVM chains - so you can see WHERE funds are " +
     "before routing a payment. Authenticated by the configured Multichain " +
-    "API key — no private key required. Accepts an optional walletId for " +
+    "API key - no private key required. Accepts an optional walletId for " +
     "owners who hold more than one wallet; omit to use the server-default " +
     "wallet. Use this whenever the user asks 'what's in my agent wallet?', " +
     "'how much do I have on Base / on each chain?', or 'what's the spending limit?'",
@@ -63,7 +63,7 @@ export const AGENTIC_INFO_TOOL = {
 /**
  * Reputation summary mirrored from the backend's
  * `app/lib/erc8004-reputation.ts`. Populated only for ERC-8004
- * graduated wallets — surfaces both the total cross-source aggregate
+ * graduated wallets - surfaces both the total cross-source aggregate
  * AND Q402's own weekly heartbeat count, so AI agents can introspect
  * "how does the world see me" vs "how active has my home rail been
  * vouching for me".
@@ -98,7 +98,7 @@ export interface AgenticInfoSummary {
    *  guessing from the aggregate. Empty array when empty everywhere; null when
    *  the balance read failed. */
   byChain: Array<{ chain: string; usdc: number; usdt: number; totalUsd: number }> | null;
-  /** Chains whose USDC+USDT read failed this snapshot (RPC down) — a funded
+  /** Chains whose USDC+USDT read failed this snapshot (RPC down) - a funded
    *  chain here means "unknown", NOT "$0". */
   unreachableChains: string[];
   /** When balance was last read. */
@@ -185,7 +185,7 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
       ? input.walletId.toLowerCase()
       : CONFIG.walletId;
 
-  // No live key configured at all — full sandbox / first-install state.
+  // No live key configured at all - full sandbox / first-install state.
   if (!CONFIG.apiKey || !CONFIG.apiKey.startsWith("q402_live_")) {
     return {
       configured: false,
@@ -277,7 +277,7 @@ export async function runAgenticInfo(input: AgenticInfoInput = {}): Promise<Agen
 
   // Per-chain breakdown: keep only chains that hold funds (totalUsd > 0),
   // richest first, so the agent sees WHERE the money is. USD-pegged, so the
-  // usd figure doubles as the token amount. unreachableChains stays separate —
+  // usd figure doubles as the token amount. unreachableChains stays separate -
   // a funded-but-unread chain must not look like a real $0.
   const byChain = balance?.perChain
     ? balance.perChain

@@ -1,5 +1,5 @@
 /**
- * q402_yield_positions — read-only Q402 Yield lending-position snapshot.
+ * q402_yield_positions - read-only Q402 Yield lending-position snapshot.
  *
  * Returns the Agent Wallet's current lending positions: per-market the
  * CURRENT supplied position value (the live aToken balance, which already
@@ -8,14 +8,14 @@
  * USD. No state change, no funds move.
  *
  * NOTE: this Phase-0 read does NOT report principal or accrued earnings as
- * separate figures — the server returns those as null (it tracks no
+ * separate figures - the server returns those as null (it tracks no
  * deposit-time principal yet), so we surface only what's real: the current
  * position value + APY. Do not present a "you've earned $X" number from this
  * tool; it isn't available.
  *
  * Authenticated by the live Multichain API key, sent in the `x-api-key`
  * header (the same resolved key the Mode C pay path uses). The walletId
- * is optional — when omitted, the landing route resolves the owner's
+ * is optional - when omitted, the landing route resolves the owner's
  * default Agent Wallet from the apiKey, so we only pass walletId when the
  * caller explicitly provides one (or Q402_AGENT_WALLET_ADDRESS is set).
  */
@@ -41,13 +41,13 @@ export const YieldPositionsInputSchema = z.object({
 export const YIELD_POSITIONS_TOOL = {
   name: "q402_yield_positions",
   description:
-    "READ-ONLY — show the Agent Wallet's current Q402 Yield lending positions. Returns each " +
+    "READ-ONLY - show the Agent Wallet's current Q402 Yield lending positions. Returns each " +
     "position's protocol, chain, asset, market address, CURRENT supplied position value (the live " +
     "position-token balance, in token units), and live supply APY, plus the aggregate current value in USD. " +
-    "Authenticated by the configured live Multichain API key — no private key required and no funds move. " +
+    "Authenticated by the configured live Multichain API key - no private key required and no funds move. " +
     "Reads the curated lending markets on BNB Chain and Base; each position reports its own protocol/venue. " +
     "Deposit/withdraw cover both: 'bnb' (USDC/USDT) and 'base' (USDC only). " +
-    "DOES NOT report principal or accrued earnings as separate numbers — the position-token balance already " +
+    "DOES NOT report principal or accrued earnings as separate numbers - the position-token balance already " +
     "includes accrued interest but is not broken out, so do NOT claim a specific 'earnings/profit/" +
     "interest earned' figure from this tool; report only the current position value and the APY. " +
     "walletId is OPTIONAL: omit it and the server reads the owner's default Agent Wallet " +
@@ -81,14 +81,14 @@ interface Position {
   marketAddress: string;
   /** CURRENT supplied position value in token units (live aToken balance).
    *  This is the redeemable amount and already includes any accrued
-   *  interest — it is NOT split into principal vs. earnings. */
+   *  interest - it is NOT split into principal vs. earnings. */
   balance: string;
-  /** Phase-0 server returns these as null — deposit-time principal isn't
+  /** Phase-0 server returns these as null - deposit-time principal isn't
    *  tracked yet, so accrued earnings can't be derived. Typed nullable so we
    *  never present a fabricated earnings figure. */
   principal: string | null;
   accrued: string | null;
-  /** Fraction — 0.021 means 2.1% APY. */
+  /** Fraction - 0.021 means 2.1% APY. */
   supplyApy: number;
 }
 
@@ -100,7 +100,7 @@ interface PositionsData {
   /**
    * Chains the server could NOT read this cycle (per-chain RPC blip while
    * fetching aToken balances + rates). Surfaced so a read FAILURE is
-   * distinguishable from a genuinely empty position — dropping it would make
+   * distinguishable from a genuinely empty position - dropping it would make
    * a transient RPC error look like "no position" and could mislead a
    * downstream `withdraw max` decision. `unavailable` is the boolean form
    * some server builds return alongside (or instead of) the list.
@@ -148,7 +148,7 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
 
   let res: Response;
   try {
-    // 15s timeout — positions reads aToken balances + rates on-chain;
+    // 15s timeout - positions reads aToken balances + rates on-chain;
     // fail fast on an RPC blip rather than hang the MCP client.
     res = await fetch(url, {
       method: "GET",
@@ -182,20 +182,20 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
   const positions = data.positions ?? [];
   // Surface per-chain read failures so an RPC blip isn't reported as an empty
   // position. The server flags them via `unavailableChains` (list) and/or
-  // `unavailable` (boolean) — honour either form.
+  // `unavailable` (boolean) - honour either form.
   const unavailableChains = Array.isArray(data.unavailableChains) ? data.unavailableChains : [];
   const hasUnavailable = data.unavailable === true || unavailableChains.length > 0;
 
   // One-line aggregate so the LLM can answer "what's my position worth?"
   // without parsing the blob; full position list follows for traceability.
-  // This is CURRENT VALUE (live aToken balance), not "earnings" — the server
+  // This is CURRENT VALUE (live aToken balance), not "earnings" - the server
   // doesn't report accrued profit, so don't imply one. When some chains
-  // failed to read, say so explicitly instead of implying a zero balance —
+  // failed to read, say so explicitly instead of implying a zero balance -
   // the snapshot is PARTIAL, not necessarily empty.
   const unavailableNote = hasUnavailable
     ? ` Some chains could not be read this cycle${
         unavailableChains.length ? ` (${unavailableChains.join(", ")})` : ""
-      } — this snapshot may be incomplete; retry before treating a balance as zero.`
+      } - this snapshot may be incomplete; retry before treating a balance as zero.`
     : "";
   const summary = positions.length
     ? `Total current position value: $${(data.totalSuppliedUsd ?? 0).toFixed(2)} across ` +
@@ -204,7 +204,7 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
     : hasUnavailable
       ? `No positions returned, but a read failure occurred${
           unavailableChains.length ? ` on ${unavailableChains.join(", ")}` : ""
-        } — this is NOT a confirmed empty position; retry.`
+        } - this is NOT a confirmed empty position; retry.`
       : "No open Q402 Yield positions for this wallet.";
 
   return {
@@ -217,7 +217,7 @@ export async function runYieldPositions(input: z.infer<typeof YieldPositionsInpu
           // Surface only what's real: the current position value (live aToken
           // balance) + APY. `principal`/`accrued` come back null from this
           // Phase-0 read, so they're included ONLY when the server actually
-          // populated them — never as a null placeholder that reads like a
+          // populated them - never as a null placeholder that reads like a
           // real (zero) earnings figure.
           positions: positions.map(p => ({
             protocol: p.protocol,

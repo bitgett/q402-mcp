@@ -1,7 +1,7 @@
 /**
  * @quackai/q402-mcp - MCP server entry point (stdio transport).
  *
- * Exposes 43 tools to any MCP-compatible AI client (Claude Desktop,
+ * Exposes 46 tools to any MCP-compatible AI client (Claude Desktop,
  * Claude Code, OpenAI Codex CLI, Cursor, Cline, …):
  *
  *   q402_doctor             read-only, no key - first-install onboarding +
@@ -113,6 +113,7 @@ import { BRIDGE_QUOTE_TOOL,    BridgeQuoteInputSchema,    runBridgeQuote }    fr
 import { BRIDGE_SEND_TOOL,     BridgeSendInputSchema,     runBridgeSend }     from "./tools/bridge-send.js";
 import { OFT_QUOTE_TOOL,       OftQuoteInputSchema,       runOftQuote }       from "./tools/oft-quote.js";
 import { OFT_SEND_TOOL,        OftSendInputSchema,        runOftSend }        from "./tools/oft-send.js";
+import { OFT_HISTORY_TOOL,     OftHistoryInputSchema,     runOftHistory }     from "./tools/oft-history.js";
 import { BRIDGE_HISTORY_TOOL,  BridgeHistoryInputSchema,  runBridgeHistory }  from "./tools/bridge-history.js";
 import { BRIDGE_GAS_TANK_TOOL, BridgeGasTankInputSchema, runBridgeGasTank } from "./tools/bridge-gas-tank.js";
 import { YIELD_RESERVES_TOOL,  YieldReservesInputSchema,  runYieldReserves }  from "./tools/yield-reserves.js";
@@ -222,6 +223,7 @@ async function main(): Promise<void> {
       BRIDGE_GAS_TANK_TOOL,
       OFT_QUOTE_TOOL,
       OFT_SEND_TOOL,
+      OFT_HISTORY_TOOL,
       // Q402 Yield surface - read-only curated lending market list + the
       // Agent Wallet's own positions. No funds move; positions auths via
       // the live Multichain apiKey (x-api-key header), reserves is public.
@@ -252,10 +254,10 @@ async function main(): Promise<void> {
       ESCROW_REFUND_TOOL,
       ESCROW_DISPUTE_TOOL,
       REQUEST_PAY_TOOL,
-      // RedStone data-event triggers — arm a gasless payout on a NAV / price
+      // RedStone data-event triggers - arm a gasless payout on a NAV / price
       // feed crossing (edge-latched, fires once per crossing). feeds is no-key
       // discovery; create/list/cancel are Mode C. OFF by default server-side
-      // (REDSTONE_ENABLED) — writes return REDSTONE_DISABLED until enabled.
+      // (REDSTONE_ENABLED) - writes return REDSTONE_DISABLED until enabled.
       REDSTONE_FEEDS_TOOL,
       REDSTONE_TRIGGER_CREATE_TOOL,
       REDSTONE_TRIGGER_LIST_TOOL,
@@ -362,6 +364,10 @@ async function main(): Promise<void> {
         case "q402_oft_send": {
           const parsed = OftSendInputSchema.parse(args ?? {});
           return await runOftSend(parsed);
+        }
+        case "q402_oft_history": {
+          const parsed = OftHistoryInputSchema.parse(args ?? {});
+          return await runOftHistory(parsed);
         }
         case "q402_bridge_history": {
           const parsed = BridgeHistoryInputSchema.parse(args ?? {});

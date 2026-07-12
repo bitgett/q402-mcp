@@ -1,9 +1,9 @@
 /**
- * q402_bridge_history — list the agent's recent CCIP bridges.
+ * q402_bridge_history - list the agent's recent CCIP bridges.
  *
  * Returns the last 50 bridge records for the owner address. Requires the
  * owner-sig auth path (same as q402_gas_tank_status). The current
- * release ships without the owner-sig wiring from MCP — surface the
+ * release ships without the owner-sig wiring from MCP - surface the
  * dashboard URL for now.
  */
 
@@ -16,7 +16,7 @@ export const BridgeHistoryInputSchema = z.object({
 export const BRIDGE_HISTORY_TOOL = {
   name: "q402_bridge_history",
   description:
-    "READ-ONLY GUIDANCE TOOL — bridge history via MCP is not yet wired in this release. It " +
+    "READ-ONLY GUIDANCE TOOL - bridge history via MCP is not yet wired in this release. It " +
     "requires owner-sig auth which is dashboard-bound until session-binding lands (same " +
     "follow-up as live q402_bridge_send). This tool returns a pointer to the dashboard " +
     "and intentionally surfaces as an error so an LLM does not interpret the prose as an " +
@@ -30,7 +30,7 @@ export const BRIDGE_HISTORY_TOOL = {
       ownerAddress: {
         type: "string" as const,
         pattern: "^0x[0-9a-fA-F]{40}$",
-        description: "Owner EOA (0x address, optional — defaults to configured wallet).",
+        description: "Owner EOA (0x address, optional - defaults to configured wallet).",
       },
     },
   },

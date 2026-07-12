@@ -7,7 +7,7 @@
  *   Q402_API_KEY             Legacy single-key fallback. Used for both
  *                            scopes when the two scoped envs are unset.
  *
- * Sandbox-default by design — `q402_pay` only performs a real on-chain
+ * Sandbox-default by design - `q402_pay` only performs a real on-chain
  * transaction when *all three* conditions hold for the scope being used:
  *   1. The scope-resolved key is set and starts with `q402_live_`
  *   2. `Q402_ENABLE_REAL_PAYMENTS=1`
@@ -33,7 +33,7 @@ import { isAddress }                          from "ethers";
  * sourcing through every MCP client:
  *   - The MCP server is spawned as a subprocess by Claude / Codex /
  *     Cursor / Cline. Subprocesses inherit env from their parent, not
- *     from arbitrary files on disk — so a `~/.q402/mcp.env` would be
+ *     from arbitrary files on disk - so a `~/.q402/mcp.env` would be
  *     invisible without each client either inlining secrets in config
  *     or the user maintaining shell-source plumbing per client.
  *   - Reading the file here gives a single, client-agnostic install
@@ -57,7 +57,7 @@ const Q402_ENV_FILE = join(homedir(), ".q402", "mcp.env");
  */
 /** Module-level read-error capture. The loader doesn't throw on read
  *  failure (we want sandbox fallback to stay safe), but the doctor needs
- *  to surface "your file is unreadable" to the user — so we stash the
+ *  to surface "your file is unreadable" to the user - so we stash the
  *  error message here at module load. `null` = no error / not yet loaded. */
 let lastReadError: string | null = null;
 
@@ -72,7 +72,7 @@ export function getQ402EnvFileReadError(): string | null {
  *  either malicious or pointed at the wrong path. Without this guard a
  *  symlink at `~/.q402/mcp.env` aimed at a 1 GB log file would OOM-
  *  crash the MCP server on every spawn. 64 KB is several thousand env
- *  rows — fine ceiling. */
+ *  rows - fine ceiling. */
 const MAX_ENV_FILE_BYTES = 64 * 1024;
 
 export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
@@ -91,7 +91,7 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
           `(mode ${mode.toString(8)}). Run: chmod 600 ${path}\n`,
         );
       }
-    } catch { /* stat failure is non-fatal — just skip the warning */ }
+    } catch { /* stat failure is non-fatal - just skip the warning */ }
   }
 
   // Bail before allocating an unbounded buffer if the file is too large.
@@ -99,7 +99,7 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     const size = statSync(path).size;
     if (size > MAX_ENV_FILE_BYTES) {
       const msg = `file is ${size} bytes (max ${MAX_ENV_FILE_BYTES}); refusing to load. ` +
-        "Check ~/.q402/mcp.env — is it a misdirected log file or symlink?";
+        "Check ~/.q402/mcp.env - is it a misdirected log file or symlink?";
       lastReadError = msg;
       process.stderr.write(`[q402-mcp] warning: ${msg}\n`);
       return {};
@@ -118,7 +118,7 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
   }
 
   // Strip a leading UTF-8 BOM (U+FEFF). Windows Notepad writes the BOM
-  // by default when saving "ANSI"/"UTF-8 with signature" files — without
+  // by default when saving "ANSI"/"UTF-8 with signature" files - without
   // this strip, the first key `Q402_TRIAL_API_KEY` becomes
   // `﻿Q402_TRIAL_API_KEY`, fails the `Q402_` prefix filter, and
   // silently drops the user into sandbox with no warning.
@@ -136,7 +136,7 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     // trailing comment. Without this, `Q402_ENABLE_REAL_PAYMENTS=1 # live`
     // would parse the value as the string `"1 # live"` and silently keep
     // the server in sandbox (since "1 # live" !== "1"). For quoted
-    // values we leave `#` intact — a user who quoted the value clearly
+    // values we leave `#` intact - a user who quoted the value clearly
     // wants the literal characters.
     let rawVal = t.slice(eq + 1).trim();
     const quoted = /^(['"])(.*)\1\s*(?:#.*)?$/.exec(rawVal);
@@ -145,7 +145,7 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     } else {
       // Strip ` #` (or tab-#) onward; preserve `#` inside the value if
       // not preceded by whitespace (e.g. a key that happens to contain
-      // `#` — unlikely, but cheap to preserve).
+      // `#` - unlikely, but cheap to preserve).
       const hashIdx = rawVal.search(/\s#/);
       if (hashIdx >= 0) rawVal = rawVal.slice(0, hashIdx).trimEnd();
     }
@@ -153,7 +153,7 @@ export function loadQ402EnvFileFromPath(path: string): Record<string, string> {
     // the api-key + private-key lines uncommented but empty so users
     // only have to paste the value (no `#` to remove). An empty value
     // should propagate as "unset" to `envSlot()` / `detectPhase()`
-    // rather than landing in FILE_ENV as a literal empty string —
+    // rather than landing in FILE_ENV as a literal empty string -
     // otherwise Q402_ENV_FILE_KEYS would lie about it being configured.
     if (rawVal === "") continue;
     out[k] = rawVal;
@@ -167,7 +167,7 @@ function loadQ402EnvFile(): Record<string, string> {
 
 /**
  * Effective env: file values, then process env overrides on top. Frozen
- * so downstream `loadConfig()` reads a stable snapshot — and so tests
+ * so downstream `loadConfig()` reads a stable snapshot - and so tests
  * can patch `process.env` for one-shot scenarios without us silently
  * recomputing under their feet.
  */
@@ -193,7 +193,7 @@ export const Q402_ENV_FILE_KEYS: ReadonlySet<string> = Object.freeze(
   ),
 ) as ReadonlySet<string>;
 
-/** EVERY key the file defines — even ones that process.env shadows.
+/** EVERY key the file defines - even ones that process.env shadows.
  *  q402_doctor uses this to surface the "your shell export is hiding
  *  your edits to ~/.q402/mcp.env" footgun: if a key appears in both
  *  process.env AND the file, the user editing the file gets nothing,
@@ -219,30 +219,30 @@ export interface Config {
   /**
    * Back-compat alias: prefers multichain, then trial, then legacy. Many
    * existing callers (`apiKeyKind`, sandbox reason) only need to know "is
-   * SOME live key configured" — those continue to read `apiKey` directly.
+   * SOME live key configured" - those continue to read `apiKey` directly.
    */
   apiKey: string | null;
   apiKeyKind: "live" | "test" | "missing";
   /**
-   * Q402_PRIVATE_KEY — user's real EOA private key (Mode A). The signer
+   * Q402_PRIVATE_KEY - user's real EOA private key (Mode A). The signer
    * is the user's MetaMask/OKX wallet, EIP-7702 delegated to Q402 impl.
    */
   privateKey: string | null;
   /**
-   * Q402_AGENTIC_PRIVATE_KEY — Agent Wallet's exported private key
+   * Q402_AGENTIC_PRIVATE_KEY - Agent Wallet's exported private key
    * (Mode B). The signer is the Agent Wallet itself; the user's
    * MetaMask is untouched.
    */
   agenticPrivateKey: string | null;
   /**
-   * Q402_AGENT_WALLET_ADDRESS — Mode C only. Lowercased Agent Wallet
+   * Q402_AGENT_WALLET_ADDRESS - Mode C only. Lowercased Agent Wallet
    * address (the hex `0x…` that the dashboard shows on the Agent
    * Wallet card) picking which of the user's wallets the server
    * should sign with. Multi-wallet supports up to 10 per owner.
    * Null means "use the user's default wallet". Per-call `walletId`
    * argument on `q402_pay` / `q402_batch_pay` overrides this env.
    *
-   * Was named `Q402_WALLET_ID` in v0.6.0 — too generic, easily
+   * Was named `Q402_WALLET_ID` in v0.6.0 - too generic, easily
    * confused with the user's MetaMask address or an apiKey
    * identifier. Renamed in v0.6.1 to make the namespace + content
    * shape explicit. The Config field name (`walletId`) stays so
@@ -272,7 +272,7 @@ const DEFAULT_MAX_AMOUNT = 200;
  * Q402_MULTICHAIN_API_KEY=q402_test_typo + Q402_TRIAL_API_KEY=q402_live_real.
  * In that mixed state `apiKeyKind` resolves against the multichain test
  * key (alias winner) and reads "test", but the trial key is live for
- * BNB-scope `q402_pay` — so detectPhase must look at each slot directly.
+ * BNB-scope `q402_pay` - so detectPhase must look at each slot directly.
  */
 export function classifyApiKey(k: string | null): Config["apiKeyKind"] {
   if (!k) return "missing";
@@ -317,7 +317,7 @@ export function loadConfig(): Config {
     ENV.Q402_AGENT_WALLET_ADDRESS ?? ENV.Q402_WALLET_ID;
   if (!ENV.Q402_AGENT_WALLET_ADDRESS && ENV.Q402_WALLET_ID) {
     process.stderr.write(
-      "[q402-mcp] Q402_WALLET_ID is deprecated — rename to Q402_AGENT_WALLET_ADDRESS. " +
+      "[q402-mcp] Q402_WALLET_ID is deprecated - rename to Q402_AGENT_WALLET_ADDRESS. " +
         "Old name will be removed in a future release.\n",
     );
   }
@@ -332,7 +332,7 @@ export function loadConfig(): Config {
   // (`multichain ?? trial ?? legacy`) for backward-compat, but the actual
   // live gate per call resolves the scope from the chain+recipient set
   // and looks at that scope's key independently. If any one scope's key
-  // is live, q402_pay can settle on-chain — `mode=live` should reflect
+  // is live, q402_pay can settle on-chain - `mode=live` should reflect
   // that, otherwise stderr says `mode=sandbox` while live BNB pays
   // actually go through.
   const anyLiveKey =
@@ -368,11 +368,11 @@ export function loadConfig(): Config {
 /**
  * Snapshot of which Agent Wallet modes the current env can drive.
  *
- *   Mode A — `Q402_PRIVATE_KEY` set: real user EOA signs locally, EIP-7702
+ *   Mode A - `Q402_PRIVATE_KEY` set: real user EOA signs locally, EIP-7702
  *            delegation to Q402 impl. Existing flow.
- *   Mode B — `Q402_AGENTIC_PRIVATE_KEY` set: Agent Wallet's exported pk
+ *   Mode B - `Q402_AGENTIC_PRIVATE_KEY` set: Agent Wallet's exported pk
  *            signs locally. User MetaMask never touched.
- *   Mode C — only `Q402_*_API_KEY` set, no private key: server-mediated
+ *   Mode C - only `Q402_*_API_KEY` set, no private key: server-mediated
  *            send through /api/wallet/agentic/send. Q402 holds the key.
  *
  * When more than one mode is configured, callers (q402_pay, batch_pay)
@@ -392,7 +392,7 @@ export interface AgenticModes {
 export function detectAgenticModes(c: Config = CONFIG): AgenticModes {
   const modeA = isValidPrivateKey(c.privateKey);
   const modeB = isValidPrivateKey(c.agenticPrivateKey);
-  // Mode C is available whenever a live multichain apiKey is configured —
+  // Mode C is available whenever a live multichain apiKey is configured -
   // independent of Modes A/B. Earlier revisions gated Mode C behind
   // `!modeA && !modeB`, but that hid the server-managed wallet from any
   // user who *also* had a private key set, which is the most common
@@ -408,7 +408,7 @@ export function detectAgenticModes(c: Config = CONFIG): AgenticModes {
   return { modeA, modeB, modeC, count, primary };
 }
 
-/** Single shared instance — env is parsed once at process start. */
+/** Single shared instance - env is parsed once at process start. */
 export const CONFIG = loadConfig();
 
 /**
@@ -437,7 +437,7 @@ export const CONFIG = loadConfig();
  * the load-bearing user-safety guards.
  *
  * The one trial-specific guard kept here is the chain check: `keyScope: "trial"`
- * with a non-BNB chain is an impossible combination — even with a valid Trial
+ * with a non-BNB chain is an impossible combination - even with a valid Trial
  * key the server would 403 with TRIAL_BNB_ONLY. We surface that intent error
  * via `sandboxReason` (still no throw) so the agent sees a clear hint.
  */
@@ -474,7 +474,7 @@ export function resolveApiKey(
         scope: "trial",
         fromLegacyFallback: false,
         sandboxReason:
-          `keyScope="trial" requested but chain="${chain}" — Trial keys support ` +
+          `keyScope="trial" requested but chain="${chain}" - Trial keys support ` +
           `BNB Chain only. Drop keyScope (or set keyScope="multichain") to use ` +
           `the paid Multichain key on ${chain}.`,
       };
@@ -520,22 +520,22 @@ const PRIVATE_KEY_RE = /^0x[a-fA-F0-9]{64}$/;
  *   - `resolved.apiKey` starts with `q402_live_`
  *   - `Q402_ENABLE_REAL_PAYMENTS=1`
  *   - AT LEAST ONE valid signing key is configured. That's either
- *     `Q402_PRIVATE_KEY` (Mode A — user EOA) OR
- *     `Q402_AGENTIC_PRIVATE_KEY` (Mode B — exported Agent Wallet PK).
+ *     `Q402_PRIVATE_KEY` (Mode A - user EOA) OR
+ *     `Q402_AGENTIC_PRIVATE_KEY` (Mode B - exported Agent Wallet PK).
  *     Mode C (server-mediated) doesn't sign locally so it short-circuits
  *     ahead of this gate in `pay.ts` / `batch-pay.ts`.
  *
  * The PK format check matters: the 0.5.6 doctor template shipped with
  * `Q402_PRIVATE_KEY=0x...` as a placeholder, and the previous version
  * of this function (which only checked truthiness) let the literal
- * string `"0x..."` through — q402_pay then threw inside `new Wallet()`
+ * string `"0x..."` through - q402_pay then threw inside `new Wallet()`
  * instead of dropping into a friendly sandbox response. Validating the
  * shape here means a placeholder-tripped live mode now resolves to
  * sandbox + a clear setupHint.
  *
  * Earlier revisions hard-required `Q402_PRIVATE_KEY` regardless of
  * effective mode. That blocked Mode B users (no MetaMask key, just the
- * exported Agent Wallet PK) from ever going live — making Mode B
+ * exported Agent Wallet PK) from ever going live - making Mode B
  * useless as a prod option. The signer-selection step downstream picks
  * the correct PK based on the chosen `walletMode`, so the gate here
  * only needs to confirm that SOME valid signing key is available.

@@ -1,5 +1,5 @@
 /**
- * q402_oft_quote — read-only USDT0 (LayerZero OFT) bridge fee quote.
+ * q402_oft_quote - read-only USDT0 (LayerZero OFT) bridge fee quote.
  *
  * Returns the native LayerZero fee + the delivered amount for a hypothetical
  * USDT0 bridge across the 5-chain OFT set (eth/arbitrum/mantle/monad/xlayer).
