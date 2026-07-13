@@ -175,10 +175,11 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 ## Tools exposed
 
-**46 tools** — read-only by default; live mode needs an API key + signing path + `Q402_ENABLE_REAL_PAYMENTS=1`.
+**46 tools, grouped by capability.** Read-only by default; live mode needs a live API key, a signing path, and `Q402_ENABLE_REAL_PAYMENTS=1`. Rows marked `live mode` move funds and need an explicit in-chat confirmation.
 
 | Tool | Auth | Purpose |
 |---|---|---|
+| **Payments & wallet** | | |
 | `q402_doctor` | none | First-install onboarding + ongoing health check (per-scope quota, EIP-7702 state, relay reachability, slot-mismatch warnings). |
 | `q402_quote` | none | Compare gas + supported tokens across chains. |
 | `q402_balance` | api key | Verify key + remaining quota. |
@@ -188,9 +189,11 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_wallet_status` | private key | Per-chain EIP-7702 state for the EOA derived from `Q402_PRIVATE_KEY`. |
 | `q402_clear_delegation` | private key / api key | Clear EIP-7702 delegation (Mode A/B local key OR Mode C api key, server-signed). Sponsored on every chain except Ethereum (billed to your Gas Tank). Two-phase consent (`consentToken`). |
 | `q402_agentic_info` | api key | Agent Wallet info (addresses, per-wallet caps, daily-spend used, ERC-8004 id). Drives Mode C. |
+| **Treasury memory** | | |
 | `q402_memory_summary` | api key | Treasury overview over a window: USD-stablecoin spend by chain/source, top vendors, schedules, open requests/escrow, failures. Read-only. |
 | `q402_vendor_history` | api key | Total paid to one vendor (or a vendor leaderboard) with recurring cadence. Read-only. |
 | `q402_agent_spend_report` | api key | Per-Agent-Wallet spend with each wallet's caps. Read-only. |
+| **Recurring** | | |
 | `q402_recurring_list` | api key | List scheduled rules. |
 | `q402_recurring_create` | api key | Author a recurring rule. Paid Multichain on EVERY chain (BNB included). |
 | `q402_recurring_fires` | api key | Last 50 fires per rule (timestamp + txHashes + amount). |
@@ -198,26 +201,32 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 | `q402_recurring_resume` | api key | Resume a paused / stopped rule. |
 | `q402_recurring_skip_next` | api key | Skip only the next scheduled fire. |
 | `q402_recurring_cancel` | api key | Permanently stop a rule. |
+| **Bridge (CCIP + LayerZero)** | | |
 | `q402_bridge_quote` | none | Quote a Chainlink CCIP USDC bridge across eth/avax/arbitrum. Returns LINK + native fee. |
 | `q402_bridge_send` | live mode | Execute a CCIP bridge from the user's Agent Wallet. Mode C only (server-managed). Sandbox-by-default; `sandbox: false` + live Multichain key + `Q402_ENABLE_REAL_PAYMENTS=1` fires a real on-chain bridge. |
 | `q402_bridge_history` | not yet wired | Pointer to the dashboard. Returns `{ implemented: false, dashboardUrl, dashboardPath }` — read-only guidance until owner-sig auth lands in MCP. |
 | `q402_bridge_gas_tank` | not yet wired | Static guidance + dashboard pointer for the Bridge Gas Tank top-up flow. Live balance lookup needs owner-sig auth (dashboard for now). |
+| **Yield** | | |
 | `q402_yield_reserves` | none | List Q402 Yield lending markets — protocol, chain, asset, market address, supply APY. Curated lending markets per chain (Aave/Lista on BNB, Morpho on Base); each market reports its own venue. |
 | `q402_yield_positions` | api key | Show the Agent Wallet's open Q402 Yield positions (balance, principal, accrued interest, APY) + total supplied in USD. Mode C. |
 | `q402_yield_deposit` | live mode | Supply the Agent Wallet's stablecoins into Q402 Yield's curated lending market per chain: BNB (USDC/USDT) or Base (USDC only). Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_yield_withdraw` | live mode | Withdraw supplied stablecoins out of Q402 Yield (curated lending markets on BNB and Base) back to the Agent Wallet (`amount: "max"` = max currently redeemable, which vault caps or queues can leave below the full position). Mode C. Requires `confirm: true`; sandbox-by-default. |
+| **Staking** | | |
 | `q402_stake` | live mode | Gasless Q (QuackAI) staking into QuackAiStake on BNB Chain. Lock tiers 0-3 (30d/10%, 60d/15%, 120d/32%, 180d/40% APR). `amount: "max"` stakes the whole Q balance. Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_unstake` | live mode | Gasless unstake of matured Q on BNB. Per-record: exit one stake by index (`ith`) or `all: true` for every matured stake. Mode C. Requires `confirm: true`; sandbox-by-default. |
 | `q402_stake_positions` | live mode | The Agent Wallet's open Q stakes (indices, maturity, exitable) + liquid Q balance. Read-only; Mode C. |
+| **Payment requests** | | |
 | `q402_request_create` | api key | Publish a payment request (invoice). No funds move; returns a shareable `/pay` link + `req_…` id. Recipient defaults to the Agent Wallet. |
 | `q402_request_status` | none | Look up a payment request by `req_…` id (amount, token, chain, recipient, status). Read-only; `notFound` instead of throwing. |
 | `q402_request_pay` | live mode | Pay a request gaslessly from the payer's own Agent Wallet (Mode C). Terms come from the stored request, so they can't be redirected. Two-phase consent (same as `q402_pay`). |
+| **Escrow** | | |
 | `q402_escrow_create` | api key | Create a gasless non-custodial escrow (pending record, moves no funds); optional `walletId` funds it from an Agent Wallet. |
 | `q402_escrow_status` | none | Read an escrow's state, parties, amount, and tx hashes. Read-only. |
 | `q402_escrow_lock` | live mode | Fund a pending escrow gaslessly (EIP-7702); the server signs for an Agent-Wallet buyer. Sandbox-by-default. |
 | `q402_escrow_release` | live mode | Buyer releases a locked escrow to the seller (gasless). Sandbox-by-default. |
 | `q402_escrow_refund` | live mode | Permissionless refund to the buyer after the timeout / resolve window. |
 | `q402_escrow_dispute` | live mode | A party disputes an open escrow (requires a named arbiter). |
+| **Triggers (RedStone)** | | |
 | `q402_redstone_feeds` | none | Which RedStone feeds this deployment can drive triggers off (NAV / price / RWA). Read-only. |
 | `q402_redstone_trigger_create` | live mode | Arm a gasless payout that fires once when a RedStone feed crosses a threshold (edge-latched). |
 | `q402_redstone_trigger_list` | live mode | List the Agent Wallet's RedStone triggers + their state. |
@@ -225,7 +234,7 @@ Then export the values in `~/.zshrc` / `~/.bashrc`. See the [Codex config refere
 
 `q402_pay` + `q402_batch_pay` + `q402_bridge_send` + `q402_yield_deposit` + `q402_yield_withdraw` + `q402_stake` + `q402_unstake` + `q402_request_pay` require explicit in-chat confirmation. Batch confirmation = full batch, not per-row.
 
-> ℹ️ `q402_pay` expects a 0x address — ENS isn't resolved server-side. Resolve client-side first.
+> Note: `q402_pay` expects a 0x address; ENS is not resolved server-side, so resolve it client-side first.
 > Per-chain Gas Tank balances + full TX history live in the [dashboard](https://q402.quackai.ai/dashboard) (wallet-signature only).
 
 ---
